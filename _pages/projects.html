@@ -1,0 +1,12 @@
+---
+layout: archive
+title: "Projects"
+permalink: /projects/
+---
+
+<div class="grid__wrapper">
+  {% assign projects = site.projects | sort 'year' | reverse %}
+  {% for post in projects %}
+    {% include archive-single.html type="grid" %}
+  {% endfor %}
+</div>
