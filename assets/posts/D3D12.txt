@@ -1,0 +1,63 @@
+Total: 126 functions / methodsD3D12CreateDeviceD3D12CreateRootSignatureDeserializerD3D12GetDebugInterfaceD3D12SerializeRootSignature
+ID3D12CommandAllocator 
+* Reset
+
+ID3D12CommandList 
+* GetType
+
+ID3D12CommandQueue 
+* BeginEvent* CopyTileMappings* EndEvent* ExecuteCommandLists* GetClockCalibration* GetDesc* GetTimestampFrequency* SetMarker* Signal* UpdateTileMappings* Wait
+ID3D12DescriptorHeap 
+* GetCPUDescriptorHandleForHeapStart* GetDesc* GetGPUDescriptorHandleForHeapStart
+ID3D12Device 
+* CheckFeatureSupport* CopyDescriptors* CopyDescriptorsSimple* CreateCommandAllocator* CreateCommandList* CreateCommandQueue* CreateCommandSignature* CreateCommittedResource* CreateComputePipelineState* CreateConstantBufferView* CreateDepthStencilView* CreateDescriptorHeap* CreateFence* CreateGraphicsPipelineState* CreateHeap* CreatePlacedResource* CreateQueryHeap* CreateRenderTargetView* CreateReservedResource* CreateRootSignature* CreateSampler* CreateShaderResourceView* CreateSharedHandle* CreateUnorderedAccessView* Evict* GetAdapterLuid* GetCopyableFootprints* GetCustomHeapProperties* GetDescriptorHandleIncrementSize* GetDeviceRemovedReason* GetNodeCount* GetResourceAllocationInfo* GetResourceTiling* MakeResident* OpenSharedHandle* OpenSharedHandleByName* SetStablePowerState
+ID3D12DeviceChild * GetDeviceID3D12Fence * GetCompletedValue* SetEventOnCompletion* SignalID3D12GraphicsCommandList * BeginEvent* BeginQuery
+* ClearDepthStencilView
+* ClearRenderTargetView
+* ClearState
+* ClearUnorderedAccessViewFloat
+* ClearUnorderedAccessViewUint
+* Close
+* CopyBufferRegion
+* CopyResource
+* CopyTextureRegion
+* CopyTiles
+* DiscardResource
+* Dispatch
+* DrawIndexedInstanced
+* DrawInstanced
+* EndEvent
+* EndQuery
+* ExecuteBundle
+* ExecuteIndirect
+* IASetIndexBuffer
+* IASetPrimitiveTopology
+* IASetVertexBuffers
+* OMSetBlendFactor
+* OMSetRenderTargets
+* OMSetStencilRef
+* Reset
+* ResolveQueryData
+* ResolveSubresource
+* ResourceBarrier
+* RSSetScissorRects
+* RSSetViewports
+* SetComputeRoot32BitConstant
+* SetComputeRoot32BitConstants
+* SetComputeRootConstantBufferView
+* SetComputeRootDescriptorTable
+* SetComputeRootShaderResourceView
+* SetComputeRootSignature
+* SetComputeRootUnorderedAccessView
+* SetDescriptorHeaps
+* SetGraphicsRoot32BitConstant
+* SetGraphicsRoot32BitConstants
+* SetGraphicsRootConstantBufferView
+* SetGraphicsRootDescriptorTable
+* SetGraphicsRootShaderResourceView
+* SetGraphicsRootSignature
+* SetGraphicsRootUnorderedAccessView
+* SetMarker
+* SetPipelineState
+* SetPredication
+* SOSetTargetsID3D12Heap * GetHeapID3D12Object* GetPrivateData* SetName* SetPrivateData* SetPrivateDataInterfaceID3D12PipelineState * GetCachedBlobID3D12Resource * GetDesc* GetGPUVirtualAddress* GetHeapProperties* Map* ReadFromSubresource* Unmap* WriteToSubresourceID3D12RootSignatureDeserializer * GetRootSignatureDesc

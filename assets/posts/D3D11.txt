@@ -1,0 +1,220 @@
+Total: 175 functions / methods
+
+D3D11CreateDevice
+D3D11CreateDeviceAndSwapChain
+
+ID3D11Asynchronous
+* GetDataSize
+
+ID3D11BlendState 
+* GetDesc
+
+ID3D11CommandList
+* GetContextFlags
+
+ID3D11Counter 
+* GetDesc
+
+ID3D11DepthStencilState 
+* GetDesc
+
+ID3D11Device 
+* CheckCounter
+* CheckCounterInfo
+* CheckFeatureSupport
+* CheckFormatSupport
+* CheckMultisampleQualityLevels
+* CreateBlendState
+* CreateBuffer
+* CreateClassLinkage
+* CreateComputeShader
+* CreateCounter
+* CreateDeferredContext
+* CreateDepthStencilState
+* CreateDepthStencilView
+* CreateDomainShader
+* CreateGeometryShader
+* CreateGeometryShaderWithStreamOutput
+* CreateHullShader
+* CreateInputLayout
+* CreatePixelShader
+* CreatePredicate
+* CreateQuery
+* CreateRasterizerState
+* CreateRenderTargetView
+* CreateSamplerState
+* CreateShaderResourceView
+* CreateTexture1D
+* CreateTexture2D
+* CreateTexture3D
+* CreateUnorderedAccessView
+* CreateVertexShader
+* GetCreationFlags
+* GetDeviceRemovedReason
+* GetExceptionMode
+* GetFeatureLevel
+* GetImmediateContext
+* GetPrivateData
+* OpenSharedResource
+* SetExceptionMode
+* SetPrivateData
+* SetPrivateDataInterface
+
+ID3D11DeviceChild 
+* GetDevice
+* GetPrivateData
+* SetPrivateData
+* SetPrivateDataInterface
+
+ID3D11DeviceContext 
+* Begin
+* ClearDepthStencilView
+* ClearRenderTargetView
+* ClearState
+* ClearUnorderedAccessViewFloat
+* ClearUnorderedAccessViewUint
+* CopyResource
+* CopyStructureCount
+* CopySubresourceRegion
+* CSGetConstantBuffers
+* CSGetSamplers
+* CSGetShader
+* CSGetShaderResources
+* CSGetUnorderedAccessViews
+* CSSetConstantBuffers
+* CSSetSamplers
+* CSSetShader
+* CSSetShaderResources
+* CSSetUnorderedAccessViews
+* Dispatch
+* DispatchIndirect
+* Draw
+* DrawAuto
+* DrawIndexed
+* DrawIndexedInstanced
+* DrawIndexedInstancedIndirect
+* DrawInstanced
+* DrawInstancedIndirect
+* DSGetConstantBuffers
+* DSGetSamplers
+* DSGetShader
+* DSGetShaderResources
+* DSSetConstantBuffers
+* DSSetSamplers
+* DSSetShader
+* DSSetShaderResources
+* End
+* ExecuteCommandList
+* FinishCommandList
+* Flush
+* GenerateMips
+* GetContextFlags
+* GetData
+* GetPredication
+* GetResourceMinLOD
+* GetType
+* GSGetConstantBuffers
+* GSGetSamplers
+* GSGetShader
+* GSGetShaderResources
+* GSSetConstantBuffers
+* GSSetSamplers
+* GSSetShader
+* GSSetShaderResources
+* HSGetConstantBuffers
+* HSGetSamplers
+* HSGetShader
+* HSGetShaderResources
+* HSSetConstantBuffers
+* HSSetSamplers
+* HSSetShader
+* HSSetShaderResources
+* IAGetIndexBuffer
+* IAGetInputLayout
+* IAGetPrimitiveTopology
+* IAGetVertexBuffers
+* IASetIndexBuffer
+* IASetInputLayout
+* IASetPrimitiveTopology
+* IASetVertexBuffers
+* Map
+* OMGetBlendState
+* OMGetDepthStencilState
+* OMGetRenderTargets
+* OMGetRenderTargetsAndUnorderedAccessViews
+* OMSetBlendState
+* OMSetDepthStencilState
+* OMSetRenderTargets
+* OMSetRenderTargetsAndUnorderedAccessViews
+* PSGetConstantBuffers
+* PSGetSamplers
+* PSGetShader
+* PSGetShaderResources
+* PSSetConstantBuffers
+* PSSetSamplers
+* PSSetShader
+* PSSetShaderResources
+* ResolveSubresource
+* RSGetScissorRects
+* RSGetState
+* RSGetViewports
+* RSSetScissorRects
+* RSSetState
+* RSSetViewports
+* SetPredication
+* SetResourceMinLOD
+* SOGetTargets
+* SOSetTargets
+* Unmap
+* UpdateSubresource
+* VSGetConstantBuffers
+* VSGetSamplers
+* VSGetShader
+* VSGetShaderResources
+* VSSetConstantBuffers
+* VSSetSamplers
+* VSSetShader
+* VSSetShaderResources
+
+ID3D11Query 
+* GetDesc
+
+ID3D11RasterizerState 
+* GetDesc
+
+ID3D11SamplerState 
+* GetDesc
+
+D3D11CalcSubresource
+
+ID3D11Buffer 
+* GetDesc
+
+ID3D11Resource 
+* GetEvictionPriority
+* GetType
+* SetEvictionPriority
+
+ID3D11Texture1D 
+* GetDesc
+
+ID3D11Texture2D 
+* GetDesc
+
+ID3D11Texture3D 
+* GetDesc
+
+ID3D11DepthStencilView 
+* GetDesc
+
+ID3D11RenderTargetView 
+* GetDesc
+
+ID3D11ShaderResourceView 
+* GetDesc
+
+ID3D11UnorderedAccessView 
+* GetDesc
+
+ID3D11View 
+* GetDesc

@@ -1,0 +1,237 @@
+Total: 201 functions / methods
+
+Direct3DCreate9
+
+IDirect3D9
+* CheckDepthStencilMatch
+* CheckDeviceFormat
+* CheckDeviceFormatConversion
+* CheckDeviceMultiSampleType
+* CheckDeviceType
+* CreateDevice
+* EnumAdapterModes
+* GetAdapterCount
+* GetAdapterDisplayMode
+* GetAdapterIdentifier
+* GetAdapterModeCount
+* GetAdapterMonitor
+* GetDeviceCaps
+* RegisterSoftwareDevice
+
+IDirect3DBaseTexture9
+* GenerateMipSubLevels
+* GetAutoGenFilterType
+* GetLevelCount
+* GetLOD
+* SetAutoGenFilterType
+* SetLOD
+
+IDirect3DCubeTexture9
+* AddDirtyRect
+* GetCubeMapSurface
+* GetLevelDesc
+* LockRect
+* UnlockRect
+
+IDirect3DDevice9
+* BeginScene
+* BeginStateBlock
+* Clear
+* ColorFill
+* CreateAdditionalSwapChain
+* CreateCubeTexture
+* CreateDepthStencilSurface
+* CreateIndexBuffer
+* CreateOffscreenPlainSurface
+* CreatePixelShader
+* CreateQuery
+* CreateRenderTarget
+* CreateStateBlock
+* CreateTexture
+* CreateVertexBuffer
+* CreateVertexDeclaration
+* CreateVertexShader
+* CreateVolumeTexture
+* DeletePatch
+* DrawIndexedPrimitive
+* DrawIndexedPrimitiveUP
+* DrawPrimitive
+* DrawPrimitiveUP
+* DrawRectPatch
+* DrawTriPatch
+* EndScene
+* EndStateBlock
+* EvictManagedResources
+* GetAvailableTextureMem
+* GetBackBuffer
+* GetClipPlane
+* GetClipStatus
+* GetCreationParameters
+* GetCurrentTexturePalette
+* GetDepthStencilSurface
+* GetDeviceCaps
+* GetDirect3D
+* GetDisplayMode
+* GetFrontBufferData
+* GetFVF
+* GetGammaRamp
+* GetIndices
+* GetLight
+* GetLightEnable
+* GetMaterial
+* GetNPatchMode
+* GetNumberOfSwapChains
+* GetPaletteEntries
+* GetPixelShader
+* GetPixelShaderConstantB
+* GetPixelShaderConstantF
+* GetPixelShaderConstantI
+* GetRasterStatus
+* GetRenderState
+* GetRenderTarget
+* GetRenderTargetData
+* GetSamplerState
+* GetScissorRect
+* GetSoftwareVertexProcessing
+* GetStreamSource
+* GetStreamSourceFreq
+* GetSwapChain
+* GetTexture
+* GetTextureStageState
+* GetTransform
+* GetVertexDeclaration
+* GetVertexShader
+* GetVertexShaderConstantB
+* GetVertexShaderConstantF
+* GetVertexShaderConstantI
+* GetViewport
+* LightEnable
+* MultiplyTransform
+* Present
+* ProcessVertices
+* Reset
+* SetClipPlane
+* SetClipStatus
+* SetCurrentTexturePalette
+* SetCursorPosition
+* SetCursorProperties
+* SetDepthStencilSurface
+* SetDialogBoxMode
+* SetFVF
+* SetGammaRamp
+* SetIndices
+* SetLight
+* SetMaterial
+* SetNPatchMode
+* SetPaletteEntries
+* SetPixelShader
+* SetPixelShaderConstantB
+* SetPixelShaderConstantF
+* SetPixelShaderConstantI
+* SetRenderState
+* SetRenderTarget
+* SetSamplerState
+* SetScissorRect
+* SetSoftwareVertexProcessing
+* SetStreamSource
+* SetStreamSourceFreq
+* SetTexture
+* SetTextureStageState
+* SetTransform
+* SetVertexDeclaration
+* SetVertexShader
+* SetVertexShaderConstantB
+* SetVertexShaderConstantF
+* SetVertexShaderConstantI
+* SetViewport
+* ShowCursor
+* StretchRect
+* TestCooperativeLevel
+* UpdateSurface
+* UpdateTexture
+* ValidateDevice
+
+IDirect3DIndexBuffer9
+* GetDesc
+* Lock
+* Unlock
+
+IDirect3DPixelShader9
+* GetDevice
+* GetFunction
+
+IDirect3DQuery9
+* GetData
+* GetDataSize
+* GetDevice
+* GetType
+* Issue
+
+IDirect3DResource9
+* FreePrivateData
+* GetDevice
+* GetPriority
+* GetPrivateData
+* GetType
+* PreLoad
+* SetPriority
+* SetPrivateData
+
+IDirect3DStateBlock9
+* Apply
+* Capture
+* GetDevice
+
+IDirect3DSurface9
+* GetContainer
+* GetDC
+* GetDesc
+* LockRect
+* ReleaseDC
+* UnlockRect
+
+IDirect3DSwapChain9
+* GetBackBuffer
+* GetDevice
+* GetDisplayMode
+* GetFrontBufferData
+* GetPresentParameters
+* GetRasterStatus
+* Present
+
+IDirect3DTexture9
+* AddDirtyRect
+* GetLevelDesc
+* GetSurfaceLevel
+* LockRect
+* UnlockRect
+
+IDirect3DVertexBuffer9
+* GetDesc
+* Lock
+* Unlock
+
+IDirect3DVertexDeclaration9
+* GetDeclaration
+* GetDevice
+
+IDirect3DVertexShader9
+* GetDevice
+* GetFunction
+
+IDirect3DVolume9
+* FreePrivateData
+* GetContainer
+* GetDesc
+* GetDevice
+* GetPrivateData
+* LockBox
+* SetPrivateData
+* UnlockBox
+
+IDirect3DVolumeTexture9
+* AddDirtyBox
+* GetLevelDesc
+* GetVolumeLevel
+* LockBox
+* UnlockBox

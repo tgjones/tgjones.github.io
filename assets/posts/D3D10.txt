@@ -1,0 +1,187 @@
+Total: 142 functions / methods
+
+D3D10CreateBlob
+D3D10CreateDevice
+D3D10CreateDeviceAndSwapChain
+
+ID3D10BlendState
+* GetDesc
+
+ID3D10DepthStencilState 
+* GetDesc
+
+ID3D10RasterizerState 
+* GetDesc
+
+ID3D10SamplerState 
+* GetDesc
+
+ID3D10Asynchronous 
+* Begin
+* End
+* GetData
+* GetDataSize
+
+ID3D10Blob 
+* GetBufferPointer
+* GetBufferSize
+
+ID3D10Counter 
+* GetDesc
+
+ID3D10Device 
+* CheckCounter
+* CheckCounterInfo
+* CheckFormatSupport
+* CheckMultisampleQualityLevels
+* ClearDepthStencilView
+* ClearRenderTargetView
+* ClearState
+* CopyResource
+* CopySubresourceRegion
+* CreateBlendState
+* CreateBuffer
+* CreateCounter
+* CreateDepthStencilState
+* CreateDepthStencilView
+* CreateGeometryShader
+* CreateGeometryShaderWithStreamOutput
+* CreateInputLayout
+* CreatePixelShader
+* CreatePredicate
+* CreateQuery
+* CreateRasterizerState
+* CreateRenderTargetView
+* CreateSamplerState
+* CreateShaderResourceView
+* CreateTexture1D
+* CreateTexture2D
+* CreateTexture3D
+* CreateVertexShader
+* Draw
+* DrawAuto
+* DrawIndexed
+* DrawIndexedInstanced
+* DrawInstanced
+* Flush
+* GenerateMips
+* GetCreationFlags
+* GetDeviceRemovedReason
+* GetExceptionMode
+* GetPredication
+* GetPrivateData
+* GetTextFilterSize
+* GSGetConstantBuffers
+* GSGetSamplers
+* GSGetShader
+* GSGetShaderResources
+* GSSetConstantBuffers
+* GSSetSamplers
+* GSSetShader
+* GSSetShaderResources
+* IAGetIndexBuffer
+* IAGetInputLayout
+* IAGetPrimitiveTopology
+* IAGetVertexBuffers
+* IASetIndexBuffer
+* IASetInputLayout
+* IASetPrimitiveTopology
+* IASetVertexBuffers
+* OMGetBlendState
+* OMGetDepthStencilState
+* OMGetRenderTargets
+* OMSetBlendState
+* OMSetDepthStencilState
+* OMSetRenderTargets
+* OpenSharedResource
+* PSGetConstantBuffers
+* PSGetSamplers
+* PSGetShader
+* PSGetShaderResources
+* PSSetConstantBuffers
+* PSSetSamplers
+* PSSetShader
+* PSSetShaderResources
+* ResolveSubresource
+* RSGetScissorRects
+* RSGetState
+* RSGetViewports
+* RSSetScissorRects
+* RSSetState
+* RSSetViewports
+* SetExceptionMode
+* SetPredication
+* SetPrivateData
+* SetTextFilterSize
+* SOGetTargets
+* SOSetTargets
+* UpdateSubresource
+* VSGetConstantBuffers
+* VSGetSamplers
+* VSGetShader
+* VSGetShaderResources
+* VSSetConstantBuffers
+* VSSetSamplers
+* VSSetShader
+* VSSetShaderResources
+
+ID3D10DeviceChild 
+* GetDevice
+* GetPrivateData
+* SetPrivateData
+* SetPrivateDataInterface
+* SetPrivateDataInterface
+
+ID3D10Multithread 
+* Enter
+* GetMultithreadProtected
+* Leave
+* SetMultithreadProtected
+
+ID3D10Query 
+* GetDesc
+
+ID3D10StateBlock 
+* Apply
+* Capture
+* GetDevice
+* ReleaseAllDeviceObjects
+
+D3D10CalcSubresource
+
+ID3D10Buffer 
+* GetDesc
+* Map
+* Unmap
+
+ID3D10Resource 
+* GetEvictionPriority
+* GetType
+* SetEvictionPriority
+
+ID3D10Texture1D 
+* GetDesc
+* Map
+* Unmap
+
+ID3D10Texture2D
+* GetDesc
+* Map
+* Unmap
+
+ID3D10Texture3D
+* GetDesc
+* Map
+* Unmap
+
+ID3D10DepthStencilView 
+* GetDesc
+
+ID3D10RenderTargetView 
+* GetDesc
+
+ID3D10ShaderResourceView 
+* GetDesc
+
+ID3D10View 
+* GetResource
