@@ -21,9 +21,9 @@ It is essentially a port of [MJP's shadows sample](https://mynameismjp.wordpress
 
 Here are a couple of screenshots, the first showing just the shadows, and the second showing the cascades in different colours. The closest cascade is red, but isn't visible in this screenshot.
 
-![](/assets/552be75ff51f2749b9000002/standard/screenshot1.png)
+![](/assets/posts/shadow-mapping-1.png)
 
-![](/assets/552be75ff51f276d8d000003/standard/screenshot2.png)
+![](/assets/posts/shadow-mapping-2.png)
 
 The only filtering option I have implemented is [the PCF technique used in The Witness](http://the-witness.net/news/2013/09/shadow-mapping-summary-part-1/). This technique looks pretty good, especially compared to other techniques that use a similar number of shader instructions. In the sample, you can toggle the filter size using `f`, from 2x2 all the way up to 7x7.
 

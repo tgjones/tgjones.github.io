@@ -15,7 +15,7 @@ Anyway, what prompted this blog post was [this line](https://msdn.microsoft.com/
 
 It made me wonder - just how big are the API footprints of previous versions of Direct3D? So I made a list of all the functions / methods in Direct3D 9, Direct3D 10, Direct3D 11, and Direct3D 12, and then graphed it:
 
-![](/assets/55eb12adf51f2775e8000001/standard/d3d-versions-function-count.png)
+![](/assets/posts/d3d-versions-function-count.png)
 
 So Direct3D 9 is the "winner" with 201 functions / methods. Then Direct3D reset the clock, so-to-speak, with 142. Direct3D 11 increased that to 175. And Direct3D 12, as promised, reduces the API surface area to 126 functions / methods.
 

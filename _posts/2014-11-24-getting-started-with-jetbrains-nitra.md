@@ -8,7 +8,7 @@ excerpt: "In which I describe my exploration of the Nitra project from JetBrains
 
 > **I used Nitra for the first time 3 days ago. I might be and probably am wrong about some of the details. If anyone notices any errors, please let me know in the comments and I'll update the post. Thanks!**
 
-Computer languages and parsers are [an area](/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction) [of great interest](/blog/archive/2010/10/25/introducing-dotliquid-the-secure-open-source-template-engine) [for me](/blog/archive/2010/11/13/introducing-stitchup-generating-shaders-from-hlsl-shader-fragments). So when I [first heard about](http://blog.jetbrains.com/blog/2013/11/12/an-introduction-to-nitra/) the [Nitra](https://github.com/JetBrains/Nitra) project from JetBrains, I was intrigued. Over the last weekend, I finally find some time to use Nitra to write a parser for Microsoft's [High Level Shading Language (HLSL)](http://msdn.microsoft.com/en-us/library/windows/desktop/bb509561%28v=vs.85%29.aspx). In this post, I will describe my experience with Nitra and how to get started with it, and show a little of what it can do.
+Computer languages and parsers are [an area](/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction) [of great interest](/blog/archive/2010/10/25/introducing-dotliquid-the-secure-open-source-template-engine) [for me](/blog/archive/2010/11/13/introducing-stitchup-generating-shaders-from-hlsl-shader-fragments). So when I [first heard about](http://blog.jetbrains.com/blog/2013/11/12/an-introduction-to-nitra/) the [Nitra](https://github.com/JetBrains/Nitra) project from JetBrains, I was intrigued. Over the last weekend, I finally found some time to use Nitra to write a parser for Microsoft's [High Level Shading Language (HLSL)](http://msdn.microsoft.com/en-us/library/windows/desktop/bb509561%28v=vs.85%29.aspx). In this post, I will describe my experience with Nitra and how to get started with it, and show a little of what it can do.
 
 But first, if you're wondering whether to keep reading: this whole post is about computer language parsing. Hopefully you find that as fascinating as I do.
 
@@ -85,7 +85,7 @@ That's it for installation. Now, you can go ahead and create a Nitra project.
 
 Open Visual Studio, and go to File > New Project. On the left, expand Nemerle and select Nitra. You should see something like this:
 
-![](/assets/5471eb47f51f27ea9000000f/standard/create-nitra-project.png)
+![](/assets/posts/create-nitra-project.png)
 
 Choose **Empty Parser Library**, type in a project name, and click OK. That will create a new Nitra project, with a mostly empty syntax module. I renamed the syntax module file to `HlslGrammar.nitra`.
 
@@ -335,11 +335,11 @@ And then restart Visual Studio.
 
 I used the `.nhlsl` extension, so I didn't mess with Visual Studio's built-in `.hlsl` syntax highlighting. Now when I open a `.nhlsl` file, I see syntax highlighting and code folding. Pretty cool! (As I mentioned earlier, syntax highlighting isn't working for regex rules, so it's not quite as "highlighted" as it should be.)
 
-![](/assets/5472bcb8f51f2731aa000001/standard/nitra-syntax-highlighting.png)
+![](/assets/posts/nitra-syntax-highlighting.png)
 
 Even better - and this is something that even Visual Studio's HLSL editor doesn't offer - I get **real-time** parse errors highlighted and included in the error list. To be clear - this is real-time, just like ReSharper's parse errors. You don't need to compile to see these errors.
 
-![](/assets/5472bcb9f51f27f20c000005/standard/nitra-parse-errors.png)
+![](/assets/posts/nitra-parse-errors.png)
 
 It will be so much cooler once it supports code completion...
 

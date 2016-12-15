@@ -7,7 +7,7 @@ date:    2014-12-28 07:48:00 UTC
 
 It's the holiday season, so let's make a game. Here's what it will look like:
 
-![](/assets/549e6cabf51f276f2a000008/standard/make-santa-jump.png)
+![](/assets/posts/make-santa-jump.png)
 
 It looks *even better* in action, if that's possible. And for a game that's taken about 5 hours to put together, it's pretty fun to play, if I do say so myself. Here's a short, poor-quality video that I took with my phone (it's harder than you might think to take a video with one hand while playing a game with the other hand):
 
@@ -33,19 +33,19 @@ I'm also assuming, if you're reading this, that you already have Visual Studio i
 
 Go to File > New > Project. On the left, under Templates, choose "Other Languages", then "Visual F#". Choose "Console Application", give it a name, and click OK.
 
-![](/assets/549e75daf51f276f2a00000a/standard/make-santa-jump-file-new-project.png)
+![](/assets/posts/make-santa-jump-file-new-project.png)
 
 We're going to use MonoGame. In Solution Explorer, right-click on "References", and click "Manage NuGet Packages...". Search for "MonoGame". The package you want is [MonoGame.Binaries](http://www.nuget.org/packages/MonoGame.Binaries). At the time of writing, the current version is 3.2.0. Click "Install", wait for it to install, and then click "Close".
 
-![](/assets/549e75daf51f27acac000005/standard/make-santa-jump-nuget.png)
+![](/assets/posts/make-santa-jump-nuget.png)
 
 Next, right-click on the project in Solution Explorer, and click "Properties". In the Application tab, change the "Output type" to "Windows Application". (I don't know why there isn't a Windows application project template, which would save us this step. If we leave it as Console Application, it will still work, but it will show a console window behind our game window.)
 
-![](/assets/549e7945f51f27acac000007/standard/make-santa-jump-output-type.png)
+![](/assets/posts/make-santa-jump-output-type.png)
 
 We'll write all our game code in a new file, and keep `Program.fs` mostly empty. Right-click `Program.fs`, then "Add Above" > "New Item...". Call the new file `Game.fs`. Replace the contents with this code:
 
-``` fsharp
+``` ocaml
 module MakeSantaJump
 
 open System.Collections.Generic 
@@ -74,7 +74,7 @@ type MakeSantaJumpGame() as this =
 
 Now open `Program.fs`, and replace the contents with the following code:
 
-``` fsharp
+``` ocaml
 open MakeSantaJump
 
 [<EntryPoint>]
@@ -86,7 +86,7 @@ let main argv =
 
 Hit "Start" in the toolbar, or press F5, to run it. You should see an 800x600 window, cleared to black. That was easy, right? MonoGame, like XNA before it, makes it exceptionally straightforward to get *something* on the screen. Especially if that "something" is... an empty window.
 
-![](/assets/549e900cf51f271ca3000007/standard/make-santa-jump-blank-screen.png)
+![](/assets/posts/make-santa-jump-blank-screen.png)
 
 ## Obstacles
 
@@ -100,7 +100,7 @@ Let's write some code. You'll notice that I've gone with a hybrid object-oriente
 
 First, add these lines of code to the top of `Game.fs`, just below the `open` statements. We don't need all of them yet, but for simplicity we'll add them all now.
 
-``` fsharp
+``` ocaml
 // Change these values to alter game balance.
 let gravity = 0.03f
 let speed = -0.3f
@@ -112,7 +112,7 @@ let maxObstacleHeight = 40
 
 Here's the code for our `Obstacle` type. Add it below the `let` statements you just added:
 
-``` fsharp
+``` ocaml
 type Obstacle(startX, width, height) =
     let mutable x = startX
 
@@ -137,7 +137,7 @@ Let's break that down. Each obstacle has an `x` position, and a `width` and `hei
 
 Now we need a way to generate new obstacles. We'll apply some randomness to the width, height, and position of new obstacles, to keep the player on their toes. Here's the code:
 
-``` fsharp
+``` ocaml
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Obstacle =
     let rng = System.Random()
@@ -174,7 +174,7 @@ The return value of `addNewObstacles` is the new obstacle, added to the front of
 
 After Santa has jumped over each obstacle, the obstacles will disappear off the left edge of the screen. We could just leave them lying around, since they won't be rendered. And it's unlikely that anybody will be able to play the game for long enough for memory usage to become a problem! But still, we'll be good citizens by cleaning up after ourselves. Add the following at the end of the `Obstacle` module, after `addNewObstacles`:
 
-``` fsharp
+``` ocaml
 module Obstacle =
     // ...
 
@@ -184,7 +184,7 @@ module Obstacle =
 
 We've written a lot of code, without being able to run it and see something on the screen. We'll fix that soon; but we've got some more work to do first. For now, we'll just draw one "track" on the screen, but later, we'll want to make the game more interesting (a.k.a. harder) by drawing multiple tracks. So we'll do some of that work upfront by making a `Track` to manage our obstacles. Add the following code below the `Obstacle` module:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle) =
     let mutable obstacles = List.empty<Obstacle>
 
@@ -210,7 +210,7 @@ In `Update`, we first update each obstacle. Then old obstacles are removed, and 
 
 Let's hook all this up, by making some changes to our `MakeSantaJumpGame` type. Add the following code after the `do graphics.*` calls and before `LoadContent`:
 
-``` fsharp
+``` ocaml
     let mutable spriteBatch = Unchecked.defaultof<SpriteBatch>
     let mutable texture = Unchecked.defaultof<Texture2D>
 
@@ -221,7 +221,7 @@ Let's hook all this up, by making some changes to our `MakeSantaJumpGame` type. 
 
 Change `LoadContent` to this:
 
-``` fsharp
+``` ocaml
     override this.LoadContent() =
         spriteBatch <- new SpriteBatch(this.GraphicsDevice)
 
@@ -233,7 +233,7 @@ Change `LoadContent` to this:
 
 Change `Update` to this:
 
-``` fsharp
+``` ocaml
     override this.Update(gameTime) =
         let deltaTime = single(gameTime.ElapsedGameTime.TotalMilliseconds)
         for track in tracks do
@@ -242,7 +242,7 @@ Change `Update` to this:
 
 Finally, change `Draw` to this:
 
-``` fsharp
+``` ocaml
     override this.Draw(gameTime) =
         this.GraphicsDevice.Clear Color.Black
 
@@ -256,7 +256,7 @@ Finally, change `Draw` to this:
 
 Now run the game, and marvel at the glorious green boxes making their way left-ward! Okay, it's not much, but we're on our way.
 
-![](/assets/549e900cf51f270b01000001/standard/make-santa-jump-obstacles.png)
+![](/assets/posts/make-santa-jump-obstacles.png)
 
 ## Santa
 
@@ -264,7 +264,7 @@ Now that we're animating and drawing some obstacles, we need a Santa to jump ove
 
 We'll start with a `Santa` type. Add this above the `Obstacle` type, near the top of `Game.fs`:
 
-``` fsharp
+``` ocaml
 type Santa(startBottom) =
     let santaX = 50
     let santaWidth = 30
@@ -281,7 +281,7 @@ type Santa(startBottom) =
 
 We need to update our `Track` type to create and draw Santa. Add this after the existing `obstacles` binding:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds) =
     // ...
     let santa = Santa(bounds.Bottom)
@@ -289,7 +289,7 @@ type Track(color, bounds) =
 
 Then replace `Track.Draw` with this:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds) =
     // ...
     member this.Draw(spriteBatch : SpriteBatch, texture) =
@@ -301,17 +301,17 @@ type Track(color, bounds) =
 
 This is another chance to run the game! Hit F5 and you should see a white box in the bottom left. Don't worry, we'll make Santa look a little more interesting in the next section.
 
-![](/assets/549ebf79f51f27064e000001/standard/make-santa-jump-santa-texture.png)
+![](/assets/posts/make-santa-jump-santa-texture.png)
 
 ### Santa sprite
 
 I can't draw at all, but after searching for a while, I found a suitable Santa sprite with a permissive licence [here on OpenGameArt](http://opengameart.org/content/santa-claus). (Thank you Casey!) Here's the original image:
 
-![](/assets/549eb777f51f271ca300000a/standard/make-santa-jump-sprite-original.png)
+![](/assets/posts/make-santa-jump-sprite-original.png)
 
 The original image has 2 frames at the beginning with Santa standing still, and 1 frame at the end with him jumping, which interrupt the running animation. I cracked open my trusty [paint.net](http://www.getpaint.net/index.html), figured out that each sprite in the animation is 64 pixels wide, and then removed the first 2 and last sprites, ending up with this:
 
-![](/assets/549eb777f51f270b01000003/standard/make-santa-jump-sprite.png)
+![](/assets/posts/make-santa-jump-sprite.png)
 
 I also made the background transparent, and saved it as a non-indexed PNG (because MonoGame complained when I tried to load an indexed PNG).
 
@@ -323,11 +323,11 @@ The first thing to do is [download the Santa sprite texture](https://github.com/
 
 Select `Santa.png` in Solution Explorer, and in the Properties window, change "Build Action" to "Content" and "Copy to Output Directory" to "Copy if newer":
 
-![](/assets/549ec512f51f27ffac000002/standard/make-santa-jump-santa-properties.png)
+![](/assets/posts/make-santa-jump-santa-properties.png)
 
 Now we'll add the code to load and draw the Santa texture. At the top of `Game.fs`, below the `let` statements controlling game difficulty, add this code:
 
-``` fsharp
+``` ocaml
 type SpriteTexture =
     {
         texture : Texture2D;
@@ -339,7 +339,7 @@ type SpriteTexture =
 
 Then change the `Santa` declaration and first few lines to this:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, startBottom) =
     let santaX = 50
     let santaWidth = spriteTexture.spriteWidth
@@ -353,7 +353,7 @@ We'll use `spriteIndex` later to control cycling through each frame of the anima
 
 Replace `Santa.Draw` with this code:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, startBottom) =
     // ...
     member this.Draw(spriteBatch : SpriteBatch) =
@@ -368,7 +368,7 @@ type Santa(spriteTexture : SpriteTexture, startBottom) =
 
 We need to pass the `spriteTexture` into the `Track` constructor, and use it when creating Santa:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture) =
     let mutable obstacles = List.empty<Obstacle>
     let santa = Santa(spriteTexture, bounds.Bottom)
@@ -376,19 +376,19 @@ type Track(color, bounds : Rectangle, spriteTexture) =
 
 In `Track.Draw`, change the `santa.Draw` line to this:
 
-``` fsharp
+``` ocaml
         santa.Draw(spriteBatch)
 ```
 
 In `MakeSantaGame`, add this code below `let mutable texture = ...`:
 
-``` fsharp
+``` ocaml
     let mutable spriteTexture = Unchecked.defaultof<SpriteTexture>
 ```
 
 We're almost done with this part! Replace the last line of `LoadContent` with this code:
 
-``` fsharp
+``` ocaml
         use santaStream = System.IO.File.OpenRead("Santa.png")
         let santaTexture = Texture2D.FromStream(this.GraphicsDevice, santaStream)
         let santaTextureData = Array.create<Color> (santaTexture.Width * santaTexture.Height) Color.Transparent
@@ -405,7 +405,7 @@ Since we're not using the content pipeline, we load the texture ourselves using 
 
 Run the game, and if everything went right, you should see something like this:
 
-![](/assets/549ec47df51f27064e000002/standard/make-santa-jump-santa-sprite-static.png)
+![](/assets/posts/make-santa-jump-santa-sprite-static.png)
 
 That was a lot of fairly boring but necessary code. The next section - animating Santa - should be more fun!
 
@@ -417,7 +417,7 @@ We'll do the animation by keeping track of the time since we last cycled to the 
 
 Let's write some code. First, add this code, just above the existing `spriteIndex` binding, to keep track of the timer value:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, startBottom) =
     // ...
     let mutable spriteTimer = 0.0f
@@ -425,7 +425,7 @@ type Santa(spriteTexture : SpriteTexture, startBottom) =
 
 Now add a new `Santa.Update` method, just above the existing `Draw` method:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, startBottom) =
     // ...
     member this.Update(deltaTime, trackBounds : Rectangle) =
@@ -443,7 +443,7 @@ Hopefully that makes sense. Each time `Update` is called, `spriteTimer` is incre
 
 Then we just need to call `Santa.Update`. Add this code at the very start of `Track.Update`:
 
-``` fsharp
+``` ocaml
 member this.Update(deltaTime) =
     santa.Update(deltaTime, bounds)
     // ...
@@ -457,28 +457,28 @@ When you run the game right now, it's not very... interactive. We've got an anim
 
 We won't hardcode the trigger key inside the `Santa` type, because later we'll be drawing multiple tracks, each with their own Santa, and each Santa will need a different trigger key. So we need to update the `Santa` constructor to pass in the trigger key:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, trigger, startBottom) =
     // ...
 ```
 
 Once Santa has started jumping, we need to keep track of his vertical speed, as well as whether he is jumping at all. Add these two lines of code just above the existing `spriteTimer` binding:
 
-``` fsharp
+``` ocaml
     let mutable dy = 0.0f
     let mutable isJumping = false
 ```
 
 Let's assume that we have a function, `isKeyPressedSinceLastFrame`, which tells us whether any given key has been pressed since the last frame. (We'll actually write that function shortly.) We'll pass that function in to `Santa.Update`.
 
-``` fsharp
+``` ocaml
     member this.Update(deltaTime, isKeyPressedSinceLastFrame : Keys -> bool, trackBounds : Rectangle) =
         // ...
 ```
 
 Next, we'll see if the trigger key (i.e. Space) was pressed between the last frame and this one. Add this code at the top of `Santa.Update` (don't delete the existing code to update the sprite index):
 
-``` fsharp
+``` ocaml
     member this.Update(deltaTime, isKeyPressedSinceLastFrame : Keys -> bool, trackBounds : Rectangle) =
         // Should we start a jump?
         if not isJumping && isKeyPressedSinceLastFrame(trigger) then
@@ -496,7 +496,7 @@ As soon as Santa starts jumping, we need to apply some gravity to drag him back 
 
 Here's how we implement our game's "physics". Add this code to `Santa.Update`, below the code we just added to start a jump, and above the existing sprite update code. If this is getting a bit confusing, feel free to [have a look at the final source code on GitHub](https://github.com/tgjones/make-santa-jump/blob/master/src/MakeSantaJump/Game.fs).
 
-``` fsharp
+``` ocaml
         if isJumping then
             // Physics!
             y <- y + dy * deltaTime
@@ -514,7 +514,7 @@ Here's how we implement our game's "physics". Add this code to `Santa.Update`, b
 
 Now we need to update `Track`. First, add `triggerKey` to the type declaration, and pass it to the `Santa` constructor:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
     // ...
     let santa = Santa(spriteTexture, triggerKey, bounds.Bottom)
@@ -522,14 +522,14 @@ type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
 
 Then change the definition and first line of `Track.Update` to this:
 
-``` fsharp
+``` ocaml
     member this.Update(deltaTime, isKeyPressedSinceLastFrame) =
         santa.Update(deltaTime, isKeyPressedSinceLastFrame, bounds)
 ```
 
 In `MakeSantaJumpGame.LoadContent`, change the last line of code (that creates the track) to this:
 
-``` fsharp
+``` ocaml
         tracks <- [ Track(Color.Red, this.GraphicsDevice.Viewport.Bounds, spriteTexture, Keys.Space) ]
 ```
 
@@ -537,7 +537,7 @@ MonoGame gives us a nice way to interact with the keyboard. We can ask the keybo
 
 Replace `MakeSantaJumpGame.Update` with this code:
 
-``` fsharp
+``` ocaml
     override this.Update(gameTime) =
         let currentKeyState = Keyboard.GetState()
         let deltaTime = single(gameTime.ElapsedGameTime.TotalMilliseconds)
@@ -555,7 +555,7 @@ The main change is adding `isKeyPressedSinceLastFrame`, which returns true if th
 
 Finally, add this line below the `tracks` binding just above `LoadContent`:
 
-``` fsharp
+``` ocaml
     let mutable lastKeyState = KeyboardState()
 ```
 
@@ -579,7 +579,7 @@ We're going to implement two-phase collision detection:
 
 We'll implement this with a new method, `HasCollisions`. Add this code to the `Track` type, after `Draw`:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
     // ...
     member this.HasCollisions() =
@@ -608,7 +608,7 @@ The `List.exists` call on the last line means that we'll call `obstacleColliding
 
 Now add this code to the end of the `Santa` type, after `Draw`:
 
-``` fsharp
+``` ocaml
 type Santa(spriteTexture : SpriteTexture, trigger, startBottom) =
     // ...
     member this.AnyNonTransparentPixels(x1, x2, y1, y2) =
@@ -626,7 +626,7 @@ As soon as we find a non-transparent pixel inside the search region, we want to 
 
 Now we can detect collisions, but we're not yet calling this code. Soon, we'll implement a proper "Game Over" screen, but for now, let's just stop the game as soon as we detect a collision. Add this code to `MakeSantaJumpGame`, just below the `lastKeyState` binding:
 
-``` fsharp
+``` ocaml
 type MakeSantaJumpGame() as this =
     // ...
     let mutable gameOver = false
@@ -634,7 +634,7 @@ type MakeSantaJumpGame() as this =
 
 Then in `MakeSantaJumpGame.Update`, replace the loop which updates each track with this code:
 
-``` fsharp
+``` ocaml
     override this.Update(gameTime) =
         // ...
         if not gameOver then
@@ -647,7 +647,7 @@ Then in `MakeSantaJumpGame.Update`, replace the loop which updates each track wi
 
 Now run the game again. When Santa hits an obstacle, the game should come to an abrupt halt. That's collision detection done!
 
-![](/assets/549f65b3f51f2721f2000003/standard/make-santa-jump-collision-detection.png)
+![](/assets/posts/make-santa-jump-collision-detection.png)
 
 ## Multiple tracks
 
@@ -657,7 +657,7 @@ Fortunately, we've done most of the work already. We have a `Track` type, which 
 
 This is all implemented in the following code. Add it below the `Track` type, and above the `MakeSantaJumpGame` type:
 
-``` fsharp
+``` ocaml
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Track =
     let createTracks (gameBounds : Rectangle) spriteTexture numTracks =
@@ -684,7 +684,7 @@ The `colors` and `keys` lists are hardcoded to 5 items, so this code will crash 
 
 Now change the last line in `MakeSantaJump.LoadContent`, which populates the `tracks` list, to this:
 
-``` fsharp
+``` ocaml
     override this.LoadContent() =
         // ...
         tracks <- Track.createTracks this.GraphicsDevice.Viewport.Bounds spriteTexture 3
@@ -696,7 +696,7 @@ With 3 tracks, the trigger keys are "D", "F", and "Space", respectively. I've tr
 
 If you run the game now, hopefully you'll agree that it's starting to become quite playable! Have a try - and if you want to try adjusting the difficulty level by tweaking the parameters at the top of `Game.fs`, now is a good time.
 
-![](/assets/549f6927f51f27fc57000001/standard/make-santa-jump-multiple-tracks.png)
+![](/assets/posts/make-santa-jump-multiple-tracks.png)
 
 ## Drawing text
 
@@ -721,11 +721,11 @@ You'll also need some boilerplate code to load the font file and use it draw tex
 
 `FontRendering.fs` makes use of some XML types, so you'll need to add a reference to `System.XML`. In Solution Explorer, right-click the References node, and "Add Reference...". In the Assemblies > Framework tab, find the `System.XML` assembly, check the box next to it, and click OK.
 
-![](/assets/549f6d3bf51f27dc7c000004/standard/make-santa-jump-xml-reference.png)
+![](/assets/posts/make-santa-jump-xml-reference.png)
 
 Now add this code to `MakeSantaJumpGame.LoadContent`, just before the last line that creates the tracks:
 
-``` fsharp
+``` ocaml
     override this.LoadContent() =
         // ...
         use fontTextureStream = System.IO.File.OpenRead("GameFont_0.png")
@@ -736,7 +736,7 @@ Now add this code to `MakeSantaJumpGame.LoadContent`, just before the last line 
 
 Then, add this line just below the existing `spriteTexture` binding:
 
-``` fsharp
+``` ocaml
 type MakeSantaJumpGame() as this =
     // ...
     let mutable fontRenderer = Unchecked.defaultof<FontRendering.FontRenderer>
@@ -744,13 +744,13 @@ type MakeSantaJumpGame() as this =
 
 Just to prove it works, add this line to `MakeSantaJumpGame.Draw`, just before the last line (`spriteBatch.End()`):
 
-``` fsharp
+``` ocaml
     override this.Draw(gameTime) =
         // ...
         fontRenderer.DrawText(spriteBatch, 50, 50, "HO HO HO")
 ```
 
-![](/assets/549f6fb2f51f27fc57000004/standard/make-santa-jump-drawing-text.png)
+![](/assets/posts/make-santa-jump-drawing-text.png)
 
 Once you've run the game and checked it works, remove this line - we don't want it in our final game :)
 
@@ -764,7 +764,7 @@ We're nearly there! We've got the majority of the game in place. Santa can jump 
 
 First, add this enumeration type just above the `MakeSantaJumpGame` type:
 
-``` fsharp
+``` ocaml
 type GameState =
     | MainMenu
     | Game
@@ -774,7 +774,7 @@ type GameState =
 
 Then add this line just above the `tracks` binding:
 
-``` fsharp
+``` ocaml
 type MakeSantaJumpGame() as this =
     // ...
     let mutable gameState = MainMenu
@@ -786,7 +786,7 @@ Also remove the last line of `LoadContent` (the line which populates `tracks`) -
 
 Replace `MakeSantaJumpGame.Update` with this:
 
-``` fsharp
+``` ocaml
 type MakeSantaJumpGame() as this =
     // ...
     override this.Update(gameTime) =
@@ -835,7 +835,7 @@ Finally, in the `GameOver` state, pressing Space will return the player to the m
 
 We also need to update the `Draw` method. Replace `MakeSantaJumpGame.Draw` with this code:
 
-``` fsharp
+``` ocaml
 type MakeSantaJumpGame() as this =
     // ...
     override this.Draw(gameTime) =
@@ -866,7 +866,7 @@ type MakeSantaJumpGame() as this =
 
 We want to show the player the trigger key for each track. So update `Track.Draw` to have this signature:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
     // ...
     member this.Draw(spriteBatch : SpriteBatch, texture, fontRenderer : FontRendering.FontRenderer) =
@@ -874,7 +874,7 @@ type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
 
 And then add this as the last line in `Track.Draw`:
 
-``` fsharp
+``` ocaml
     member this.Draw(spriteBatch : SpriteBatch, texture, fontRenderer : FontRendering.FontRenderer) =
         // ...
         fontRenderer.DrawText(spriteBatch, 10, 10 + bounds.Y, triggerKey.ToString())
@@ -882,17 +882,17 @@ And then add this as the last line in `Track.Draw`:
 
 Run the game now, and be impressed with yourself for getting this far! We almost have a fully working, albeit very simple, game.
 
-![](/assets/549f743cf51f27fc57000008/standard/make-santa-jump-menu.png)
+![](/assets/posts/make-santa-jump-menu.png)
 
-![](/assets/549f743cf51f27fc57000007/standard/make-santa-jump-game.png)
+![](/assets/posts/make-santa-jump-game.png)
 
-![](/assets/549f743cf51f27dc7c000006/standard/make-santa-jump-game-over.png)
+![](/assets/posts/make-santa-jump-game-over.png)
 
 One final touch - let's the show the player the current score. It's not really a game if you can't compete with yourself and / or your friends!
 
 Add this line at the top of the `Track` type, above the existing `santa` binding:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
     // ...
     let mutable avoidedObstacles = 0
@@ -900,7 +900,7 @@ type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
 
 Then add this code just below the `santa` binding:
 
-``` fsharp
+``` ocaml
 type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
     // ...
     member this.AvoidedObstacles
@@ -909,7 +909,7 @@ type Track(color, bounds : Rectangle, spriteTexture, triggerKey) =
 
 In `Track.Update`, after the loop which updates the obstacles, and before the last line which removes old obstacles and adds new ones, add this code:
 
-``` fsharp
+``` ocaml
     member this.Update(deltaTime, isKeyPressedSinceLastFrame) =
         // ...
         let oldObstaclesCount =
@@ -924,7 +924,7 @@ This isn't a perfect implementation. It won't count an obstacle until it has dis
 
 Then in `MakeSantaJumpGame.Draw`, add this line just after `spriteBatch.Begin(...)`:
 
-``` fsharp
+``` ocaml
     override this.Draw(gameTime) =
         // ...
         let avoidedObstacles = List.sumBy (fun (o : Track) -> o.AvoidedObstacles) tracks
@@ -932,7 +932,7 @@ Then in `MakeSantaJumpGame.Draw`, add this line just after `spriteBatch.Begin(..
 
 **Finally**, still in `MakeSantaJumpGame.Draw`, add this line at the end of *both* the `Game`/`GamePaused` and also the `GameOver` cases:
 
-``` fsharp
+``` ocaml
             // ...
             fontRenderer.DrawText(spriteBatch, this.GraphicsDevice.Viewport.Bounds.Right - 60, 30,
                                   avoidedObstacles.ToString())
@@ -940,7 +940,7 @@ Then in `MakeSantaJumpGame.Draw`, add this line just after `spriteBatch.Begin(..
 
 Now run the game, and you'll see the current score in the top right, both while playing the game, and also on the "game over" screen.
 
-![](/assets/549f76f2f51f278b9c000001/standard/make-santa-jump-score.png)
+![](/assets/posts/make-santa-jump-score.png)
 
 ## Conclusion
 

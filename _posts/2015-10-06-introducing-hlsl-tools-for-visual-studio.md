@@ -13,7 +13,7 @@ HLSL Tools is a Visual Studio extension - for VS2013 and VS2015, Community Editi
 
 ## What?
 
-![HLSL Tools screenshot](/assets/560f4b98f51f27f694000002/standard/hlsl-tools.png)
+![HLSL Tools screenshot](/assets/posts/hlsl-tools.png)
 
 Visual Studio, since VS2013, has included limited language support for HLSL. This support is built on top of the C++ editor (you can tell that in a couple of ways; changing C++ options affects HLSL, and sometimes the automatic formatting after you type a `;` or `}` is a bit off, presumably because the C++ automatic formatter doesn't recognise all HLSL syntax constructs). It's certainly better than not having it at all, but we Visual Studio users are used to a bit more. So HLSL Tools adds these features:
 

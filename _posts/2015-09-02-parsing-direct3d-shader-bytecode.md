@@ -25,7 +25,7 @@ So why am I interested in understanding how HLSL shader bytecode works? The simp
 
 The longer answer is: I got started on all of this while writing a software rasteriser - [Rasterizr](https://github.com/tgjones/rasterizr) - and I wanted to use real HLSL shaders in the software rasterisation pipeline. I didn't want to take a dependency on Direct3D - so instead, I figured out how to disassemble compiled HLSL shaders back to assembly instructions, and then I wrote a [virtual machine that can execute these assembly instructions](https://github.com/tgjones/slimshader/tree/master/src/SlimShader.VirtualMachine) entirely on the CPU. I implemented both an interpreter and a [JIT compiler](https://github.com/tgjones/slimshader/tree/master/src/SlimShader.VirtualMachine.Jitter) (the JIT compiler actually has pretty good performance, although obviously it's still orders of magnitude slower than a GPU). Admittedly, that was a huge amount of effort for what is mostly a pointless (albeit fun) project. Here's a screenshot of the debugging GUI I built for Rasterizr.
 
-![](/assets/55e7159cf51f273b1d000003/standard/rasterizr-studio.png)
+![](/assets/posts/rasterizr-studio.png)
 
 I intentionally modelled Rasterizr's API (and debugging tools) on Direct3D - I wanted Rasterizr to serve as an educational tool, to help me (and perhaps others) understand what's going on under the bonnet (or "hood", if you speak [Simplified English](https://i.imgur.com/kn488mY.jpg)) in Direct3D.
 
@@ -89,7 +89,7 @@ But that's not what we want to do; we want to understand how this file is struct
 
 This is what Binary Viewer looks like after I open `TestShader.o`:
 
-[![](/assets/55e41bfbf51f273003000008/standard/d3d-bytecode-binary-viewer.png)](/assets/55e41bfbf51f273003000008/d3d-bytecode-binary-viewer.png)
+[![](/assets/posts/d3d-bytecode-binary-viewer.png)](/assets/posts/d3d-bytecode-binary-viewer.png)
 
 I've made the assumption that if you've got this far, you're familiar with binary files - if not, have a look at [Wikipedia's entry on binary files](https://en.wikipedia.org/wiki/Binary_file).
 
@@ -101,7 +101,7 @@ If you compile enough different shaders, and compare / contrast the resulting bi
 
 It turns out that compiled HLSL shaders are composed of a header, followed by a number of chunks. This is hinted at by the ASCII strings at the start of each chunk - in this case "RDEF", "ISGN", "OSGN", "SHDR", and "STAT". You can see the chunks more clearly if I overlay each one with a different colour:
 
-![](/assets/55e57c14f51f27ff77000003/standard/d3d-bytecode-chunks.png)
+![](/assets/posts/d3d-bytecode-chunks.png)
 
 The uncoloured section at the beginning of the file is the header. The header contains information we'll need to successfully parse the file, such as the location of the start of each chunk.
 
@@ -156,7 +156,7 @@ Now that we've got an overview of how the file is structured, let's turn our att
 
 ## RDEF chunk
 
-![](/assets/55e66a27f51f27614a000004/standard/d3d-bytecode-chunk-rdef.png)
+![](/assets/posts/d3d-bytecode-chunk-rdef.png)
 
 * [ResourceDefinitionChunk.cs](https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Rdef/ResourceDefinitionChunk.cs)
 
@@ -268,7 +268,7 @@ But we also know a bit more than that; we know that:
 
 ## ISGN chunk
 
-![](/assets/55e66a24f51f27614a000002/standard/d3d-bytecode-chunk-isgn.png)
+![](/assets/posts/d3d-bytecode-chunk-isgn.png)
 
 * [InputSignatureChunk.cs](https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Xsgn/InputSignatureChunk.cs)
 
@@ -334,7 +334,7 @@ We've lost some information - such as the name of the `struct`, and the names of
 
 ## OSGN chunk
 
-![](/assets/55e66a25f51f27614a000003/standard/d3d-bytecode-chunk-osgn.png)
+![](/assets/posts/d3d-bytecode-chunk-osgn.png)
 
 * [OutputSignatureChunk.cs](https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Xsgn/OutputSignatureChunk.cs)
 
@@ -361,7 +361,7 @@ We've kept the important information, and the HLSL compiler has assigned registe
 
 ## SHDR chunk
 
-![](/assets/55e66a28f51f275def000002/standard/d3d-bytecode-chunk-shdr.png)
+![](/assets/posts/d3d-bytecode-chunk-shdr.png)
 
 * [ShaderProgramChunk.cs](https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Shex/ShaderProgramChunk.cs)
 
@@ -489,7 +489,7 @@ In older versions of Direct3D, you could author shaders using assembly instructi
 
 ## STAT chunk
 
-![](/assets/55e66a26f51f275def000001/standard/d3d-bytecode-chunk-stat.png)
+![](/assets/posts/d3d-bytecode-chunk-stat.png)
 
 * [StatisticsChunk.cs](https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Stat/StatisticsChunk.cs)
 
