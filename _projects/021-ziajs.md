@@ -1,6 +1,6 @@
 ---
 title: "Zia.js"
-permalink: /projects/zia.js
+permalink: /projects/ziajs
 excerpt: "Zia.js is an XNA-inspired, object-oriented, WebGL-based game framework."
 year: 2014
 header:
