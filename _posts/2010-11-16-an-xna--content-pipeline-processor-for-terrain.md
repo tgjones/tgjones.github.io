@@ -23,7 +23,7 @@ The repository includes a demo project, which is a derivation of the GeneratedGe
 
 This is the properties pane for the heightmap in the demo project:
 
-![](/assets/520c908af51f27a5a3000008/geomipmapping3.jpg)
+![](/assets/posts/geomipmapping3.jpg)
 
 And here is ALL the code you need to write to add the terrain to your game. The `TerrainComponent` will take care of adjusting level of detail and drawing itself.
 
@@ -54,9 +54,9 @@ Services.AddService(typeof (ICameraService), camera);
 
 Here are some screenshots of it in action (use B to toggle wireframe in the demo):
 
-![](/assets/520c9089f51f27a1dd000007/geomipmapping1.jpg)
+![](/assets/posts/geomipmapping1.jpg)
 
-![](/assets/520c908af51f27a1dd000008/geomipmapping2.jpg)
+![](/assets/posts/geomipmapping2.jpg)
 
 ## The future
 

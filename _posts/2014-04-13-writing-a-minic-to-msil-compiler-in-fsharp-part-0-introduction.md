@@ -58,6 +58,6 @@ What we'll end up with is a compiler that accepts [a subset of] C source code, p
 
 As a little preview, here is a screenshot of a tool I wrote to accompany the compiler. When you edit the source code in the left panel, the AST and IL panels update in real-time.
 
-![Mini-C GUI](/assets/52cd6886f51f2758e7000011/standard/mini-c.png)
+![Mini-C GUI](/assets/posts/mini-c.png)
 
 Stay tuned for [Part 1](/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree)!

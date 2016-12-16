@@ -13,6 +13,6 @@ I have pushed the changes up to the [github repository](https://github.com/tgjon
 
 Some screenshots of the terrain demo running in the emulator:
 
-![](/assets/520c908af51f27a5a3000009/geomipmappingwp7-1.jpg)
+![](/assets/posts/geomipmappingwp7-1.jpg)
 
-![](/assets/520c908bf51f27a5a300000a/geomipmappingwp7-2.jpg)
+![](/assets/posts/geomipmappingwp7-2.jpg)

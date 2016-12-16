@@ -47,7 +47,7 @@ using (WarpSceneRenderer renderer = new WarpSceneRenderer(scene, 550, 350))
 
 Which results in this, which is not terribly interesting:
 
-![](/assets/520c9086f51f27a5a3000002/dotwarp1.jpg)
+![](/assets/posts/dotwarp1.jpg)
 
 To control the camera, we can setup a `PerspectiveCamera` or `OrthographicCamera` with the desired parameters. But it's hard to get the position and direction right, and I'm lazy, so I like to use the `CreateFromBounds` method on `PerspectiveCamera`, which lets you set yaw and pitch like this (angles are in radians):
 
@@ -63,7 +63,7 @@ Camera camera = PerspectiveCamera.CreateFromBounds(
 
 Keeping everything else the same, results in this image, which is slightly better:
 
-![](/assets/520c9086f51f27a1dd000001/dotwarp2.jpg)
+![](/assets/posts/dotwarp2.jpg)
 
 Of course only rendering primitives is not really very useful, so let's render a mesh from a 3DS file:
 
@@ -88,7 +88,7 @@ using (WarpSceneRenderer renderer = new WarpSceneRenderer(scene, 550, 250))
 
 That's a little more interesting:
 
-![](/assets/520c9086f51f27a5a3000003/dotwarp3.jpg)
+![](/assets/posts/dotwarp3.jpg)
 
 There are a few options that can be configured (not many options in this first version):
 
@@ -115,7 +115,7 @@ using (WarpSceneRenderer renderer = new WarpSceneRenderer(scene, 550, 350))
 }
 ```
 
-![](/assets/520c9087f51f27a5a3000004/dotwarp4.jpg)
+![](/assets/posts/dotwarp4.jpg)
 
 Finally, the camera can of course be positioned manually:
 
@@ -142,7 +142,7 @@ using (WarpSceneRenderer renderer = new WarpSceneRenderer(scene, 550, 350))
 }
 ```
 
-![](/assets/520c9087f51f27a5a3000005/dotwarp5.jpg)
+![](/assets/posts/dotwarp5.jpg)
 
 DotWarp can also be used from the command line, but the command line tool only lets you specify an input model and an output file, and it positions the camera automatically, so it's not terribly useful for anything other than testing:
 

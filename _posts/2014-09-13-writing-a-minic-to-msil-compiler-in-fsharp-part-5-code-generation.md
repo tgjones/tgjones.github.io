@@ -19,7 +19,7 @@ int main() {
 
 and turn it into an intermediate representation (IR) like this:
 
-``` fsharp
+``` ocaml
 { // ILClass
   Fields  = [ { Type = typeof<int>; Name = "a" } ];
   Methods = [
@@ -85,7 +85,7 @@ ldc.i4 123
 
 we can just call this method:
 
-``` fsharp
+``` ocaml
 ilGenerator.Emit(OpCodes.Ldc_I4, 123)
 ```
 
@@ -101,7 +101,7 @@ The main `System.Reflection.Emit` types that we'll need are:
 
 In the Mini-C compiler, at least, most of the hard work in code generation is expended in generating methods. So that's where we'll start. First, a couple of helpful type aliases:
 
-``` fsharp
+``` ocaml
 type MethodMappingDictionary = Dictionary<string, MethodInfo>
 type FieldMappingDictionary = Dictionary<ILVariable, FieldInfo>
 ```
@@ -111,7 +111,7 @@ These will help us keep track of the generated versions of methods and fields.
 We'll wrap all the code to generate methods into a `MethodGenerator` type (I'll discuss in the next part my feelings on my use of classes / types in this compiler. I think I'd put the pieces together differently 
 if I was doing it now. I have been a C# developer for a long time, and I think it shows. There are often better ways of doing things in F#.)
 
-``` fsharp
+``` ocaml
 type MethodGenerator(typeBuilder : TypeBuilder, ilMethod : ILMethod,
                      methodMappings : MethodMappingDictionary,
                      fieldMappings : FieldMappingDictionary) =
@@ -122,20 +122,20 @@ The `ILMethod` object is the intermediate representation that we built in the la
 
 First, we'll create a new `MethodBuilder`:
 
-``` fsharp
+``` ocaml
 let methodAttributes = MethodAttributes.Public ||| MethodAttributes.Static
 let methodBuilder = typeBuilder.DefineMethod(ilMethod.Name, methodAttributes)
 ```
 
 Later on, when we're generating the IL for a method call, we need to pass as the argument a `MethodInfo` object. To support that, we need to keep track of all the `MethodInfo` objects we've created for the functions in our program. That's what the `methodMappings` dictionary is for.
 
-``` fsharp
+``` ocaml
 do methodMappings.Add(ilMethod.Name, methodBuilder)
 ```
 
 (Rather confusingly, the `*Builder` types inherit from the `*Info` types; i.e. `MethodBuilder` inherits from `MethodInfo`.)
 
-``` fsharp
+``` ocaml
 let ilGenerator = methodBuilder.GetILGenerator()
 ```
 
@@ -145,13 +145,13 @@ Next, we need some code to handle labels. In the IL examples above, the labels a
 
 We'll keep track of labels using another dictionary:
 
-``` fsharp
+``` ocaml
 let labelMappings = new Dictionary<IL.ILLabel, System.Reflection.Emit.Label>()
 ```
 
 And then for a given `IL.ILLabel`, we'll create a corresponding `System.Reflection.Emit.Label` if we haven't already, and return it:
 
-``` fsharp
+``` ocaml
 let getLabel ilLabel =
   if labelMappings.ContainsKey ilLabel then
     labelMappings.[ilLabel]
@@ -163,7 +163,7 @@ let getLabel ilLabel =
 
 Now we get to one of the core functions in this whole compiler - the function that actually generates IL instructions from the intermediate representation. In a real-world compiler, this function would be *much* larger. But in Mini-C, we can get away with using a small subset of the [available MSIL instructions](http://msdn.microsoft.com/en-us/library/system.reflection.emit.opcodes.aspx).
 
-``` fsharp
+``` ocaml
 let emitOpCode (ilGenerator : ILGenerator) = function
   | Add        -> ilGenerator.Emit(OpCodes.Add)
   | Br(l)      -> ilGenerator.Emit(OpCodes.Br, getLabel l)
@@ -213,7 +213,7 @@ The only two that aren't direct mappings are `IL.Cge` (`>=`) and `IL.Cle` (`<=`)
 
 And finally, let's bring it all together:
 
-``` fsharp
+``` ocaml
 member x.Generate() =
   methodBuilder.SetReturnType ilMethod.ReturnType
   methodBuilder.SetParameters (List.toArray (ilMethod.Parameters |> List.map (fun p -> p.Type)))
@@ -249,7 +249,7 @@ We can now generate IL for each of the functions in our Mini-C programs. Next, w
 
 First, some code to generate fields, and store the mapping from `IL.Field` to `System.Reflection.FieldInfo` (when we refer to fields inside method IL instructions, we need to use the `FieldInfo` object):
 
-``` fsharp
+``` ocaml
 type CodeGenerator(moduleBuilder : ModuleBuilder, ilClass : ILClass, moduleName : string) =
   let fieldMappings = new FieldMappingDictionary()
 
@@ -263,7 +263,7 @@ type CodeGenerator(moduleBuilder : ModuleBuilder, ilClass : ILClass, moduleName 
 
 Next, the all-important method that creates a new type, generates the fields and methods for that type, and finally returns both the type and the `main` method that will act as the program entry point:
 
-``` fsharp
+``` ocaml
 type CodeGenerator(moduleBuilder : ModuleBuilder, ilClass : ILClass, moduleName : string) =
   ...
   

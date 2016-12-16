@@ -7,7 +7,7 @@ Are you confused by the phrase "second cousin once removed", and wonder how its 
 
 Actually, it's quite simple. As my complicated chart below shows. If you wish to determine what type of cousin another family member is to you, find the closest common ancestor. Count the number of generations that you and your cousin are from your ancestor. If you are the same number of generations away from your ancestor as your cousin, then you are first, second etc. cousins, where the number is one less than the number of generations that you and your cousin are from the ancestor.
 
-<a href="http://bp0.blogger.com/_Wywrr60_Hxc/RdESOfKg39I/AAAAAAAAAAw/o8G-NW4meVE/s1600-h/Cousins.jpg"><img src="http://bp0.blogger.com/_Wywrr60_Hxc/RdESOfKg39I/AAAAAAAAAAw/o8G-NW4meVE/s400/Cousins.jpg" alt="" id="BLOGGER_PHOTO_ID_5030822298842619858" border="0" /></a>
+![](/assets/posts/cousins.jpg)
 
 As an example, if your nearest common ancestor is your great great grandfather, four generations away, then you are third cousins.
 

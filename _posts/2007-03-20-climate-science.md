@@ -7,4 +7,4 @@ date:    2007-03-20 22:31:00 UTC
 
 While I'm complaining about other people / entities doing their best to destroy the world, allow me to mention Shell - this year's sponsor of the Wildlife Photographer of the Year competition. <a href="http://www.foe.co.uk/index.html">Friends of the Earth</a> has an interesting set of photos highlighting their more accurate role as <a href="http://www.foe.co.uk/campaigns/corporates/news/shell_wildlife_gallery.html">Shell: Wildlife Destroyer of the Year</a>.
 
-Okay, enough green politics. I don't know what I'm talking about anyway.<div style="clear:both; padding-bottom:0.25em"></div>
+Okay, enough green politics. I don't know what I'm talking about anyway.

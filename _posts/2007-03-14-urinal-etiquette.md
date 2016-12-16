@@ -5,7 +5,7 @@ date:    2007-03-14 08:42:00 UTC
 
 Relatively speaking, there has been very little written on the subject of urinals. This is strange, as urinals are very much a part of the life of the modern day man. I have decided to redress this shortcoming, and provide a detailed explanation of the usage of said conveniences.
 
-## Introduction
+## Introduction
 
 There are many, many different factors to be taken into account during the use of urinals. It is not, as some people uneducated in the field may think, a simple matter of walking into the men's toilets, doing one's business, washing one's hands, and leaving. Oh no. Using a urinal correctly has as much etiquette and as many rules as eating at a high-class restaurant. Not that those two things are in any way related.
 

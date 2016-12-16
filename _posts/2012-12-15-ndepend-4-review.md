@@ -16,7 +16,7 @@ NDepend 4 comes in two versions: standalone, and integrated with Visual Studio. 
 
 When you first open NDepend, you'll be greeted by a familiar IDE-style interface.
 
-![NDepend interface](/assets/520c908cf51f27a1dd00000a/ndepend1.png)
+![NDepend interface](/assets/posts/ndepend1.png)
 
 Analysing a Project
 -------------------
@@ -25,7 +25,7 @@ For the purposes of this review, I'll be analysing [DotLiquid](http://dotliquidm
 
 After analysis, NDepend will open an HTML report in your browser:
 
-![HTML report](/assets/520c908ef51f27a5a3000011/ndepend5.png)
+![HTML report](/assets/posts/ndepend5.png)
 
 You can use Visual NDepend to browse the same information as shown in the report. The rest of this review will focus on Visual NDepend.
 
@@ -56,14 +56,14 @@ select new { n, types }
 
 Selecting a query in the "Queries and Rules Explorer" panel will highlight (in the "Metrics" panel) the methods, types, namespaces or assemblies matched by that query. After selecting the "Quick summary of methods to refactor" query, this is what the "Metrics" panel looks like for DotLiquid:
 
-![Metrics panel](/assets/520c908df51f27a5a300000f/ndepend2.png)
+![Metrics panel](/assets/posts/ndepend2.png)
 
 Dependency Matrix
 -----------------
 
 The Dependency Matrix panel is more useful than it first appears. It shows you whether, and how, each part (namespace, type, method) of your project depends on other parts of your project or other libraries. For example, the `Extends` tag in DotLiquid depends on `IFileSystem`, so there is a blue 1 in that column and row to indicate that 1 member in the `Extends` type uses the `IFileSystem` type.
 
-![Dependency Matrix](/assets/520c908df51f27a5a300000e/ndepend3.png)
+![Dependency Matrix](/assets/posts/ndepend3.png)
 
 The Dependency Matrix is perhaps most useful for spotting dependencies that you didn't expect, or that shouldn't exist.
 
@@ -72,14 +72,14 @@ Dependency Graph
 
 The Dependency Graph panel is more straightforward - as far as I can see, it's a graphical version of the Dependency Matrix panel, although it gives you several more display options. You can drill into each assembly, and view dependencies right down to the method level. You get a bird's-eye view of the relative size of each assembly / type / method, as well as a graphic depiction of their inter-dependencies.
 
-![Dependency Graph](/assets/520c908ef51f27a5a3000010/ndepend4.png)
+![Dependency Graph](/assets/posts/ndepend4.png)
 
 Code Diff
 ---------
 
 With the DotLiquid project, we have committed to semantic versioning. NDepend can help with this – I can compare previous versions with the trunk version, and check that I haven’t accidentally broken API compatibility in a minor version bump. Here's what it looks like – note that you can filter by added code, removed code, changed code, etc. You can even edit the CQLinq query to completely customise the filter. 
 
-![Code Diff](/assets/520c908ff51f27a1dd00000c/ndepend6.png)
+![Code Diff](/assets/posts/ndepend6.png)
 
 Build Server Integration
 ------------------------

@@ -17,4 +17,4 @@ How about you? Would you buy all your belongings again, or would you, like me, t
 
 On an unrelated note - this is a still, of the beach at St Bees, taken from my very-much-in-progress Coast to Coast documentary:
 
-<img src="http://photos1.blogger.com/blogger/3747/1168/400/01_07_2006%2020_21_0001.jpg" />
+![](/assets/posts/coast-to-coast.jpg)

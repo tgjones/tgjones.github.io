@@ -21,7 +21,7 @@ int main(bool b) {
 
 and turn it into an abstract syntax tree like this:
 
-``` fsharp
+``` ocaml
 [Ast.FunctionDeclaration(
   Ast.Int, "main",
   [ Ast.ScalarVariableDeclaration (Ast.Bool, "b") ],
@@ -65,7 +65,7 @@ The [symbol table](http://en.wikipedia.org/wiki/Symbol_table) is a structure tha
 
 I originally started off with F#'s [map](http://en.wikibooks.org/wiki/F_Sharp_Programming/Sets_and_Maps#Maps) type, but I found that creating the symbol table using only immutable data structures was hard work. So `SymbolTable` will subclass .NET's `Dictionary` type:
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   inherit Dictionary<IdentifierRef, VariableDeclaration>(HashIdentity.Reference)
 
@@ -74,7 +74,7 @@ type SymbolTable(program) as self =
 
 The keys in the symbol table are `IdentifierRef`s. This is a [record](http://en.wikibooks.org/wiki/F_Sharp_Programming/Tuples_and_Records#Defining_Records) type that we defined as part of the AST:
 
-``` fsharp
+``` ocaml
 let IdentifierRef = { Identifier : string; }
 ```
 
@@ -82,7 +82,7 @@ Records are reference types, not value types, but by default they use structural
 
 The values in the symbol table are `VariableDeclaration`s, which are defined as:
 
-``` fsharp
+``` ocaml
 let VariableDeclaration = 
   | ScalarVariableDeclaration of TypeSpec * Identifier
   | ArrayVariableDeclaration of TypeSpec * Identifier
@@ -108,7 +108,7 @@ our symbol table will look like this:
 
 To build the symbol table, we're going to need some helper functions and types. We'll define a type to store all the variable declarations for a single "scope", where scope means what it normally does in programming languages.
 
-``` fsharp
+``` ocaml
 type private SymbolScope(parent : SymbolScope option ) =
   let mutable list = List.empty<VariableDeclaration>
 
@@ -159,7 +159,7 @@ int main(bool b) { // 2. Function scope
 
 Here is `SymbolScopeStack`:
 
-``` fsharp
+``` ocaml
 type private SymbolScopeStack() =
   let stack = new Stack<SymbolScope>()
   do stack.Push(new SymbolScope(None))
@@ -173,7 +173,7 @@ type private SymbolScopeStack() =
 
 Let's carry on with defining `SymbolTable`:
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …
   let whileStatementStack = Stack<WhileStatement>()
@@ -184,7 +184,7 @@ We have to keep track of nested while statements, so that we know which while st
 
 `symbolScopeStack` will grow and shrink as we initialise the symbol table.
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …
   let rec scanDeclaration =
@@ -195,7 +195,7 @@ type SymbolTable(program) as self =
 
 Straightforward enough. When we hit a static variable declaration, add it to the current symbol scope. But we'll have to dig deeper into function declarations…
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, parameters, compoundStatement) =
@@ -208,7 +208,7 @@ type SymbolTable(program) as self =
 
 Compound statements (i.e. a group of statements nested inside curly braces) get their own symbol scope. We add each local declaration to that scope, and then scan each statement inside the compound statement. (Compound statements might be nested, so `scanStatement` might end up calling `scanCompoundStatement`, hence the `rec` keyword.) Note also that we're making use of F#'s ability to declare functions within functions - it's really nice for this sort of helper function that is only useful within its parent function.
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, parameters, compoundStatement) =
@@ -246,7 +246,7 @@ Most of these are straightforward. We 'walk' down the AST, breaking each type of
 
 The only thing we need to do for a `BreakStatement` is check that there is a parent `WhileStatement` to break out of. That's not really related to building a symbol table, so [SRP](http://en.wikipedia.org/wiki/Single_responsibility_principle) purists might balk at it, but… this is my compiler, I'll break SRP if I want to :-).
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, parameters, compoundStatement) =
@@ -258,7 +258,7 @@ type SymbolTable(program) as self =
 
 `addIdentifierMapping` adds an entry to the symbol table, where the key is an `IdentifierRef`, and the value is the declaration of that identifier. Because we set our symbol table up to use referential equality for `IdentifierRef` instances, we can have multiple usages of the same identifier, resulting in multiple entries in the symbol table.
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …  
   and scanFunctionDeclaration (functionReturnType, _, parameters, compoundStatement) =
@@ -295,7 +295,7 @@ Here we scan each type of expression, looking for symbol usages. Many of these a
 
 Now that we've got all our `scanFunctionDeclaration` helper functions, we can write the actual implementation:
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …  
   and scanFunctionDeclaration (functionReturnType, _, parameters, compoundStatement) =
@@ -308,7 +308,7 @@ type SymbolTable(program) as self =
 
 We've almost finished `SymbolTable` - here are the final parts:
 
-``` fsharp
+``` ocaml
 type SymbolTable(program) as self =
   …  
   do program |> List.iter scanDeclaration
@@ -328,7 +328,7 @@ The function table is going to serve a similar purpose to the symbol table. But 
 
 As usual, we need some helpers. We'll start with a record, and a related helper function:
 
-``` fsharp
+``` ocaml
 type VariableType =
   {
     Type    : TypeSpec;
@@ -347,7 +347,7 @@ The `typeOfDeclaration` function builds a `VariableType` record from a variable 
 
 Next, we'll need a type to store as the "value" in the function table dictionary. We'll use another record:
 
-``` fsharp
+``` ocaml
 type FunctionTableEntry =
   {
     ReturnType     : TypeSpec;
@@ -357,7 +357,7 @@ type FunctionTableEntry =
 
 Finally, we can define the function table itself:
 
-``` fsharp
+``` ocaml
 type FunctionTable(program) as self =
   inherit Dictionary<Identifier, FunctionTableEntry>()
 
@@ -421,7 +421,7 @@ we'd end up with this expression types table:
 
 We initialize the expression types table by walking all the way through the tree, from top to bottom, looking at and storing the type of every expression. Let's get started:
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   inherit Dictionary<Expression, VariableType>(HashIdentity.Reference)
   …
@@ -429,7 +429,7 @@ type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbo
 
 We're going to make use of the function table and symbol table that we made earlier.
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   …
   let rec scanDeclaration =
@@ -441,7 +441,7 @@ type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbo
 
 Nothing too exciting here; we handle function declarations, and ignore global variable declarations, because there are no expressions in global variable declarations (in Mini-C).
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, _, compoundStatement) =
@@ -453,7 +453,7 @@ This structure might look familiar from the symbol table code. It is quite simil
 
 Now the code to peek inside statements:
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, _, compoundStatement) =
@@ -486,7 +486,7 @@ Apart from walking further down the tree, we do another semantic analysis check 
 
 Next, the biggest function so far: the function to extract an expression type from an expression. Because expressions can contain expressions, this is quite recursive in nature. Instead of doing one big code dump, I'll break it down into separate parts. Here is the basic structure:
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, _, compoundStatement) =
@@ -508,7 +508,7 @@ We'll use the `checkArrayIndexType` helper function later, to ensure that expres
 
 Let's go through each expression type.
 
-``` fsharp
+``` ocaml
 | ScalarAssignmentExpression(i, e) -> // e.g. i = 1
   let typeOfE = scanExpression e
   let typeOfI = symbolTable.GetIdentifierTypeSpec i
@@ -518,7 +518,7 @@ Let's go through each expression type.
 
 Here we recursively call `scanExpression` to get the type of the right-hand side of the assignment. Then, we lookup the identifier on the left-hand side in the symbol table. We take the opportunity to check that these two types match. Finally, we return the type of the left-hand side (which we now know is exactly as the type of the right-hand side).
 
-``` fsharp
+``` ocaml
 | ArrayAssignmentExpression(i, e1, e2) -> // e.g. j[i] = 3
   checkArrayIndexType e1
 
@@ -543,7 +543,7 @@ Array assignments are a bit more involved than scalar assignments. We need to:
 * check that the expression on the right-hand side is a scalar (in Mini-C, you can't have multi-dimensional arrays)
 * check that the type of the right-hand side matches the array type
 
-``` fsharp
+``` ocaml
 | BinaryExpression(e1, op, e2) -> // e.g. 1 + 2
   let typeOfE1 = scanExpression e1
   let typeOfE2 = scanExpression e2
@@ -571,7 +571,7 @@ Array assignments are a bit more involved than scalar assignments. We need to:
 
 F#'s pattern matching again comes to the rescue (exercise for the reader: how much code would this take in C#?). Armed with a knowledge of how binary expressions work in C, hopefully this function makes sense. As an example, for the `Ast.Equal` (i.e. `==`), we make sure that both sides are scalar, both sides are the same type, and that type is not `Ast.Void`.
 
-``` fsharp
+``` ocaml
 | UnaryExpression(_, e) -> // e.g. -1
   scanExpression e
 | IdentifierExpression(i) -> // e.g. i
@@ -583,7 +583,7 @@ F#'s pattern matching again comes to the rescue (exercise for the reader: how mu
 
 We use the symbol table to lookup variable types. This is why we needed to make the symbol table use referential equality; if we keyed on a string, then the same variable name in various different scopes would resolve to the same type, which would be wrong. In Mini-C (and C), you can declare multiple variables with the same name, in different scopes.
 
-``` fsharp
+``` ocaml
 | FunctionCallExpression(i, a) -> // e.g. myFunc(1, "a")
   if not (functionTable.ContainsKey i) then
     raise (nameDoesNotExist i)
@@ -603,7 +603,7 @@ Function calls are more interresting. We check:
 * that the function exists
 * that the number and type of the arguments in the function call match the number and type of the parameters in the function declaration
 
-``` fsharp
+``` ocaml
 | ArraySizeExpression(i) -> // e.g. myArray.size
   scalarType Int
 | LiteralExpression(l) -> // e.g. 1
@@ -620,7 +620,7 @@ Function calls are more interresting. We check:
 
 Now we can finish writing the `scanExpression` function:
 
-``` fsharp
+``` ocaml
 type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbolTable : SymbolTable) as self =
   …
   and scanFunctionDeclaration (functionReturnType, _, _, compoundStatement) =
@@ -634,7 +634,7 @@ type ExpressionTypeDictionary(program, functionTable : FunctionTable, symbo
 
 And finally, we initialize the expression types table by calling `scanDeclaration` with the top-level program:
 
-``` fsharp
+``` ocaml
 do program |> List.iter scanDeclaration 
 ```
 
@@ -642,7 +642,7 @@ do program |> List.iter scanDeclaration
 
 We're almost there! We're going to send some of the results of this semantic analysis to the next compiler stage. Let's declare a record for that purpose:
 
-``` fsharp
+``` ocaml
 type SemanticAnalysisResult =
   {
     SymbolTable     : SymbolTable;
@@ -652,7 +652,7 @@ type SemanticAnalysisResult =
 
 And last but not least, we'll define the entry point to this whole semantic analysis stage:
 
-``` fsharp
+``` ocaml
 let analyze program =
   let symbolTable   = new SymbolTable(program)
   let functionTable = new FunctionTable(program)

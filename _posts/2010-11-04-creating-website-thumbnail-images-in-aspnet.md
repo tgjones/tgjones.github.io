@@ -29,7 +29,7 @@ string imageUrl = new DynamicImageBuilder()
 
 The preceding code will result in this image:
 
-![](/assets/520c9093f51f27a5a3000016/websitethumbnaillayer1.jpg)
+![](/assets/posts/websitethumbnaillayer1.jpg)
 
 As you can see, the image is of the whole web page, not just the cropped window you'd normally see. If you want that, you can use the `Crop` filter:
 
@@ -48,7 +48,7 @@ As you can see, the image is of the whole web page, not just the cropped window 
 
 Now you should have:
 
-![](/assets/520c9092f51f27a1dd000012/websitethumbnaillayer2.jpg)
+![](/assets/posts/websitethumbnaillayer2.jpg)
 
 You can optionally specify a timeout, after which if the screenshot capture process hasn't finished, it will terminate and not produce an image. 
 

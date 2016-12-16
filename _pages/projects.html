@@ -4,9 +4,19 @@ title: "Projects"
 permalink: /projects/
 ---
 
-<div class="grid__wrapper">
-  {% assign projects = site.projects | sort 'year' | reverse %}
-  {% for post in projects %}
-    {% include archive-single.html type="grid" %}
-  {% endfor %}
-</div>
+{% include base_path %}
+{% capture written_year %}'None'{% endcapture %}
+{% assign projects = site.projects | reverse %}
+{% for post in projects %}
+  {% capture year %}{{ post.year }}{% endcapture %}
+  {% if year != written_year %}
+    {% unless forloop.first %}</div>{% endunless %}
+    <h2 id="{{ year | slugify }}" class="archive__subtitle" style="clear:both">{{ year }}</h2>
+    <div class="grid__wrapper" style="margin-top:15px">
+    {% capture written_year %}{{ year }}{% endcapture %}
+  {% endif %}
+
+  {% include archive-single.html type="grid" %}
+
+  {% if forloop.last %}</div>{% endif %}
+{% endfor %}

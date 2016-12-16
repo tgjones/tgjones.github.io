@@ -82,6 +82,6 @@ I hadn't heard of [NShader](http://nshader.codeplex.com/) before - that's a nice
 
 After installing this custom version of NShader, your `.fragment` files should look like this:
 
-![](/assets/520c9092f51f27a1dd000011/stitchup5.jpg)
+![](/assets/posts/stitchup5.jpg)
 
 Hope this helps - as always, please post thoughts, feedback, etc. below.

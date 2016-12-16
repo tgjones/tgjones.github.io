@@ -9,6 +9,6 @@ I'm going to call it "XNA Inspector", since it was partially inspired by the ins
 
 Here's a sneak peek of it in action:
 
-<object width="640" height="470"><param name="movie" value="http://www.youtube.com/v/73KdeBpS57I?fs=1&amp;hl=en_US"></param><param name="allowFullScreen" value="true"></param><param name="allowscriptaccess" value="always"></param><embed src="http://www.youtube.com/v/73KdeBpS57I?fs=1&amp;hl=en_US" type="application/x-shockwave-flash" allowscriptaccess="always" allowfullscreen="true" width="640" height="470"></embed></object>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/73KdeBpS57I" frameborder="0" allowfullscreen></iframe>
 
 I'm not sure when it will be finished - not for a couple of weeks at least, but I'll post updates here as I go.

@@ -21,7 +21,7 @@ int main(bool b) {
 
 and turn it into an abstract syntax tree like this:
 
-``` fsharp
+``` ocaml
 [
   Ast.StaticVariableDeclaration(Ast.ScalarVariableDeclaration(Ast.Int, "a")),
   Ast.FunctionDeclaration(
@@ -61,7 +61,7 @@ Instead of building an .exe file directly from the AST (which is possible), we'r
 
 By the end of this part, we'll be able to build this intermediate representation of the sample code above:
 
-``` fsharp
+``` ocaml
 { // ILClass
   Fields  = [ { Type = typeof<int>; Name = "a" } ];
   Methods = [
@@ -90,7 +90,7 @@ Similar to the abstract syntax tree, we're going to use F# records and discrimin
 
 At the top level we have `ILClass`:
 
-``` fsharp
+``` ocaml
 type ILClass = 
   {
     Fields  : ILVariable list;
@@ -100,7 +100,7 @@ type ILClass = 
 
 Variables are represented with `ILVariable`, whose `Type` field is a `System.Type` instance (we're getting closer to MSIL, so it will make things easier if we switch to `System.Type` rather than our own `Ast.Type` that we've been using until now):
 
-``` fsharp
+``` ocaml
 and ILVariable =
   {
     Type  : Type;
@@ -110,7 +110,7 @@ and ILVariable =
 
 Methods are represented with, you guessed it, `ILMethod`:
 
-``` fsharp
+``` ocaml
 and ILMethod =
   {
     Name       : string;
@@ -123,13 +123,13 @@ and ILMethod =
 
 We're going to make use of [MSIL labels](http://msdn.microsoft.com/en-us/library/system.reflection.emit.ilgenerator.marklabel(v=vs.110).aspx) to handle branching:
 
-``` fsharp
+``` ocaml
 and ILLabel = int
 ```
 
 And finally, `ILOpCode` contains the actual opcodes used in method bodies. These map one-to-one to [MSIL opcodes](http://msdn.microsoft.com/en-us/library/system.reflection.emit.opcodes.aspx).
 
-``` fsharp
+``` ocaml
 and ILOpCode =
   | Add
   | Br of ILLabel
@@ -177,7 +177,7 @@ As noted above, the output of this compiler stage will always be a single `ILCla
 
 We'll need a few helper types and functions. The first is `ILVariableScope`, which stores whether a variable has field, argument or local scope. The `int16` values are used as indices in the various MSIL opcodes that deal with arguments and locals.
 
-``` fsharp
+``` ocaml
 type private ILVariableScope =
   | FieldScope of ILVariable
   | ArgumentScope of int16
@@ -186,13 +186,13 @@ type private ILVariableScope =
 
 We're going to need a mapping between `Ast.VariableDeclaration`s and `ILVariableScope`s:
 
-``` fsharp
+``` ocaml
 type private VariableMappingDictionary = Dictionary<Ast.VariableDeclaration, ILVariableScope>
 ```
 
 And finally, some helper functions to get the .NET type from an `Ast.Type`, and to create an `ILVariable` from an `Ast.VariableDeclaration`:
 
-``` fsharp
+``` ocaml
 module private ILBuilderUtilities =
   let typeOf =
     function
@@ -263,7 +263,7 @@ The lines beginning with a word, followed by a colon, are labels. They are used 
 
 `while` statements are the exception - most of the abstract syntax tree will map much more directly to our IR. We just need to recurse through the AST, building a list of MSIL instructions as we go. Let's get started.
 
-``` fsharp
+``` ocaml
 type ILMethodBuilder(semanticAnalysisResult : SemanticAnalysisResult,
                      variableMappings : VariableMappingDictionary) =
   let mutable argumentIndex = 0s
@@ -279,7 +279,7 @@ Array assignment expressions (`i[0] = j`), being an expression, have a value. Fo
 
 It's possible to have nested `while` statements. In order to correctly handle `break` statements, we need to keep track of the end label for the "current" while statement, so that we can branch to the right place.
 
-``` fsharp
+``` ocaml
 let lookupILVariableScope identifierRef =
   let declaration = semanticAnalysisResult.SymbolTable.[identifierRef]
   variableMappings.[declaration]
@@ -287,7 +287,7 @@ let lookupILVariableScope identifierRef =
 
 Given an identifier, this function finds its variable scope (a value indicating whether it is a field, argument or local, along with its index for the latter two).
 
-``` fsharp
+``` ocaml
 let makeLabel() =
   let result = labelIndex
   labelIndex <- labelIndex + 1
@@ -296,7 +296,7 @@ let makeLabel() =
 
 Labels, at least in our IR, are really just integers. This helper function returns a unique label index.
 
-``` fsharp
+``` ocaml
 let rec processBinaryExpression =
   function
   | (l, Ast.ConditionalOr, r) ->
@@ -349,7 +349,7 @@ When converting this to MSIL, we need to linearise it as follows:
 
 We can accomplish these steps using a combination of labels and branches, as follows:
 
-``` fsharp
+``` ocaml
 let leftIsFalseLabel = makeLabel()
 let endLabel = makeLabel()
 List.concat [ processExpression l          // 1. Evaluate the LHS
@@ -361,7 +361,7 @@ List.concat [ processExpression l          // 1. Evaluate the LHS
               [ Label endLabel ] ]
 ```
 
-``` fsharp
+``` ocaml
 and processBinaryOperator =
   function
   | Ast.Add -> Add
@@ -379,7 +379,7 @@ and processBinaryOperator =
 
 The `processBinaryOperator` function converts binary operators from their AST to their respective MSIL opcodes. Implicit in this conversion process is that the stack-based CLR uses a reverse Polish notation instruction set, in which operators follow their operands.
 
-``` fsharp
+``` ocaml
 and processIdentifierLoad identifierRef =
   match lookupILVariableScope identifierRef with
   | FieldScope(v)    -> [ Ldsfld v ]
@@ -399,7 +399,7 @@ This pair of functions generates the instructions necessary to load and store va
 
 The two functions to convert expressions and statements to IR are the biggest of this stage. I'll break them into smaller chunks, instead of doing one big code dump.
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   | Ast.ScalarAssignmentExpression(i, e) ->
@@ -418,7 +418,7 @@ For a scalar assignment expression (`i = 1`) we need to make sure that the value
 
 We do that with the `dup` MSIL instruction, which copies the current topmost item on the stack, and pushes the copy onto the stack. Then, `processIdentifierStore` generates, for example, a `stloc` instruction, which will pop one of the copies from the stack, leaving the other copy intact on top of the stack.
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -443,7 +443,7 @@ Array assignments (`a[i] = b`) are somewhat more complicated than scalar assignm
 * Pop the original and store it in the array. `Stelem` pops three items off the stack: the array, the array index, and the value to store. It takes as a parameter the type of the value to store.
 * Push the "temp" local variable back to the top of the stack. This is how we make the RHS of this array assignment expression available to a calling expression (i.e. `c = a[i] = b`).
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -458,7 +458,7 @@ We've already covered `processBinaryExpression`. There's no special reason for i
 
 Unary expressions are handled by first pushing the result of the expression on to the stack, and then the instruction representing the unary operation. Here is `processUnaryOperator`:
 
-``` fsharp
+``` ocaml
 and processUnaryOperator =
   function
   | Ast.LogicalNegate -> [ Ldc_I4 0; Ceq ]
@@ -466,7 +466,7 @@ and processUnaryOperator =
   | Ast.Identity      -> [ ]
 ```
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -484,7 +484,7 @@ We've already looked at `processIdentifierLoad`. Array identifier expressions (`
 * Pushing the array index expression onto the stack
 * Calling `Ldelem`, which pops the array and array index from the stack, and pushes the value of the array at that index onto the stack
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -496,7 +496,7 @@ and processExpression expression =
 
 Function calls, as with most of the rest of MSIL, are handled in the reverse order to higher level code. First, we push all the arguments onto the stack, and then we issue the `call` instruction. The parameter to the `call` instruction is the name of the function to call; later, we'll map this to a `MethodInfo`.
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -508,7 +508,7 @@ and processExpression expression =
 
 For array size expressions (`myArray.size`), we push the array onto the stack, and then call `ldlen`, which pops the array and pushes the array length onto the stack.
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -527,7 +527,7 @@ MSIL has separate instructions for loading each type of literal. We only need to
 
 The .NET CLR doesn't have a representation of a boolean type on the stack, so we just use `int32` values: `1` for `true` and `0` for `false`.
 
-``` fsharp
+``` ocaml
 and processExpression expression =
   match expression with
   ...
@@ -545,7 +545,7 @@ Array allocations (`new float[2]`) are handled by:
 
 The next big function is `processStatement`, which maps statements from their AST representation to their intermediate representation. We'll break it down into (hopefully) more readable chunks.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   | Ast.ExpressionStatement(x) ->
@@ -560,7 +560,7 @@ and processStatement =
 
 Expression statements (which are, roughly, an expression with a semicolon on the end) have an interesting wrinkle. We have to be careful about the stack; we can't leave extra values lying around if they're not going to be used. An expression statement, by definition, doesn't return a value to anything else, so it shouldn't leave anything on the stack. We make sure of that by checking if the expression returns a value. If it does, then do an extra `Pop` to throw away the topmost item on the stack.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   ...
@@ -570,7 +570,7 @@ and processStatement =
 
 Compound statements are easy; we just collect all the instructions generated by recursively calling `processStatement` for each of the statements in the compound statement.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   ...
@@ -609,7 +609,7 @@ First, there's the type that has an `else` block. Whenever we're dealing with br
 
 There's also the type of `if` statement without an `else` block. This is handled very similarly.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   ...
@@ -634,7 +634,7 @@ While statements are interesting. While statements can be nested, and if there i
 
 This tracking of the current while loop is done with the `currentWhileStatementEndLabel` stack.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   ...
@@ -644,7 +644,7 @@ and processStatement =
 
 And here is where `currentWhileStatementEndLabel` is used - we branch to the `endLabel` of whichever while loop is "closest" to this break statement.
 
-``` fsharp
+``` ocaml
 and processStatement =
   function
   ...
@@ -666,7 +666,7 @@ Now that we've got functions to build an abstract representation of MSIL for our
 
 The following functions extract all the required local declarations from a function. They're actually only pulling local declarations out from the two sources just mentioned; the rest of these functions handle traversing down through the AST. (There's potential for separating out the tree traversal code from the actual operation being performed.)
 
-``` fsharp
+``` ocaml
 let processVariableDeclaration (mutableIndex : byref<_>) f d =
   let v = createILVariable d
   variableMappings.Add(d, f mutableIndex)
@@ -725,7 +725,7 @@ let rec collectLocalDeclarations statement =
 
 We're almost there, at least for methods. Here is `ILMethodBuilder`'s only public method. It creates a record with a complete intermediate representation of the MSIL we're going to output in the next part.
 
-``` fsharp
+``` ocaml
 member x.BuildMethod(returnType, name, parameters, (localDeclarations, statements)) =
   {
     Name       = name;
@@ -741,7 +741,7 @@ member x.BuildMethod(returnType, name, parameters, (localDeclarations, statement
 
 So far, we've seen the `ILMethodBuilder` type, which can turn a function declaration from the AST into an `ILMethod`. Now, let's look at `ILBuilder`, which converts a whole program into its IR:
 
-``` fsharp
+``` ocaml
 type ILBuilder(semanticAnalysisResult) =
   let variableMappings = new VariableMappingDictionary(HashIdentity.Reference)
 
@@ -759,7 +759,7 @@ type ILBuilder(semanticAnalysisResult) =
 
 `ILBuilder`'s only public method is `BuildClass`, which starts by creating hard-coded `ILMethod` objects for Mini-C's built-in methods. In a real language, you wouldn't want to do this. Instead, you'd provide a way to import classes and / or methods from arbitrary .NET namespaces. But Mini-C doesn't have any of that; the only functions you can call are either the ones you write yourself, or these four:
 
-``` fsharp
+``` ocaml
 member x.BuildClass (program : Ast.Program) =
   let builtInMethods = [
     {
@@ -805,7 +805,7 @@ member x.BuildClass (program : Ast.Program) =
 
 `ILClass` stores fields and methods separately, because that's what we're going to need when we turn our IR into real executable files. So let's separate those out:
 
-``` fsharp
+``` ocaml
 member x.BuildClass (program : Ast.Program) =
   ...
 
@@ -826,8 +826,8 @@ member x.BuildClass (program : Ast.Program) =
 
 And, *finally*, we can create an `ILClass` record, which wraps up our entire IR for a single Mini-C program:
 
-``` fsharp
-``` fsharp
+``` ocaml
+``` ocaml
 member x.BuildClass (program : Ast.Program) =
   ...
   
@@ -852,7 +852,7 @@ int main(bool b) {
 
 ... and turn it into this intermediate representation (IR):
 
-``` fsharp
+``` ocaml
 { // ILClass
   Fields  = [ { Type = typeof<int>; Name = "a" } ];
   Methods = [

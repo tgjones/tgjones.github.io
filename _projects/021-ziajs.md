@@ -1,10 +1,13 @@
 ---
 title: "Zia.js"
+permalink: /projects/zia.js
 excerpt: "Zia.js is an XNA-inspired, object-oriented, WebGL-based game framework."
 year: 2014
+header:
+  teaser: /assets/projects/ziajs.png
 gallery:
-  - url: /assets/images/ziajs.png
-    image_path: assets/images/ziajs-th.png
+  - url: /assets/projects/ziajs.png
+    image_path: assets/projects/ziajs.png
     alt: "Zia.js screenshot"
 ---
 
@@ -17,4 +20,4 @@ Just like XNA gave game developers a friendly set of APIs to use to build games 
 * [Source Code](https://github.com/tgjones/zia.js)
 * [Website](http://tgjones.github.io/zia.js/)
 
-{% include gallery caption="This is a sample gallery to go along with this case study." %}
+{% include gallery %}

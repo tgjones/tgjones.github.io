@@ -9,15 +9,15 @@ I didn't know about this technique until a friend pointed me in the direction of
 
 An example might make things clearer. Here is the original image:
 
-![](/assets/520c9087f51f27a5a3000006/dynamicimagecair1.jpg)
+![](/assets/posts/dynamicimagecair1.jpg)
 
 Here is the image reduced in width using scaling:
 
-![](/assets/520c9088f51f27a1dd000003/dynamicimagecair2.jpg)
+![](/assets/posts/dynamicimagecair2.jpg)
 
 And here is the image reduced in width using content aware image resizing:
 
-![](/assets/520c9088f51f27a1dd000004/dynamicimagecair3.jpg)
+![](/assets/posts/dynamicimagecair3.jpg)
 
 The DynamicImage markup for the final image above is:
 
@@ -45,15 +45,15 @@ string imageUrl = new DynamicImageBuilder()
 
 Here's another example (you might recognise [this one](http://commons.wikimedia.org/wiki/File:Broadway_tower_edit.jpg) from the [Wikipedia article](http://en.wikipedia.org/wiki/Seam_carving), but the images below are created using DynamicImage). The original image:
 
-![](/assets/520c9088f51f27a5a3000007/dynamicimagecair4.jpg)
+![](/assets/posts/dynamicimagecair4.jpg)
 
 Reduced in width using scaling:
 
-![](/assets/520c9088f51f27a1dd000005/dynamicimagecair5.jpg)
+![](/assets/posts/dynamicimagecair5.jpg)
 
 Reduced in width using content aware image resizing:
 
-![](/assets/520c9089f51f27a1dd000006/dynamicimagecair6.jpg)
+![](/assets/posts/dynamicimagecair6.jpg)
 
 In some situations, I think this effect is potentially very useful.
 

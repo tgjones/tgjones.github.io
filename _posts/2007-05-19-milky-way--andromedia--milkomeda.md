@@ -7,4 +7,4 @@ Astronomers have calculated that, in five billion years, the Milky Way and our c
 
 If you'd like to see what the "merger" might look like, watch this video. I find it oddly beautiful, given how cataclysmically destructive the whole thing is. It's funny to think that each of the two spirals of white contains hundreds of billions of stars.
 
-<object classid="clsid:02BF25D5-8C17-4B23-BC80-D3488ABDDC6B" codebase="http://www.apple.com/qtactivex/qtplugin.cab" height="260" width="320"> <param name="src" value="http://www.cita.utoronto.ca/%7Edubinski/Gravitas/mov320/6_SpiralMetamorphosis.mov" /><param name="autoplay" value="false" /><param name="controller" value="true" /><param name="loop" value="false" /><embed src="http://www.cita.utoronto.ca/%7Edubinski/Gravitas/mov320/6_SpiralMetamorphosis.mov" autoplay="false" controller="true" loop="false" pluginspage="http://www.apple.com/quicktime/download/" height="260" width="320"></embed></object>
+<video controls="controls" width="100%" name="Video Name" src="http://www.cita.utoronto.ca/%7Edubinski/Gravitas/mov320/6_SpiralMetamorphosis.mov"></video>

@@ -9,6 +9,6 @@ The current entry point is to right-click on a model file in a Content project, 
 
 Right now it only loads the model, but I could add some more tools to change the effect, change effect parameters, etc.
 
-![image](/assets/520c908cf51f27a5a300000d/modelviewer1small.jpg)
+![image](/assets/posts/modelviewer1small.jpg)
 
 What do you think? It's actually surprisingly easy to write a tool window for Visual Studio - so (armed with the Windows Forms samples from App Hub) this whole thing only took an hour. I like projects like that...

@@ -9,3 +9,9 @@
 .page__content dl {
     font-size: 0.9em;
 }
+
+video {
+    max-width: 100%;
+    width: auto\9;
+    height: auto;
+}

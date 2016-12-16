@@ -8,7 +8,7 @@ Wow, it's June and this is my first post of 2013! I probably should do this more
 
 I just wanted to mention that I've published v0.3.0 of Gemini, a framework I've written for WPF that allows you to create IDE-like applications fairly easily.
 
-![](/assets/520e19aef51f2777790000c5/standard/gemini-everything.png)
+![](/assets/posts/gemini-everything.png)
 
 * [Source code](https://github.com/tgjones/gemini)
 * [Documentation](http://documentup.com/tgjones/gemini)

@@ -9,7 +9,7 @@ XBuilder is an extension for Visual Studio 2010 which lets you preview your XNA 
 
 I've finished work on XBuilder v0.2, and it's available either using Visual Studio Extension Manager, or from the [Visual Studio Gallery](http://visualstudiogallery.msdn.microsoft.com/en-us/30e6bc7d-4d92-49da-ac40-adab43fd94a1).
 
-XBuilder is open source, and the code is available in the [GitHub repository](https://github.com/formosatek/xbuilder).
+XBuilder is open source, and the code is available in the [GitHub repository](https://github.com/tgjones/xbuilder).
 
 ## What's new since v0.1?
 
@@ -23,7 +23,7 @@ You can customise the minor and major grid line spacing, as well as minor, major
 
 Click and drag this to rotate the camera. This is quite helpful for keeping track of what direction you're looking in.
 
-![xbuilder image](/assets/520c9097f51f27a5a300001c/xbuilder8.jpg)
+![xbuilder image](/assets/posts/xbuilder8.jpg)
 
 * Mouse wheel zoom
 
@@ -47,17 +47,17 @@ My third, and successful, attempt was a bit different - I used a similar techniq
 
 If you select this option, a bounding box will be drawn for each mesh within your model.
 
-![](/assets/520c9096f51f27a5a300001a/xbuilder10.jpg)
+![](/assets/posts/xbuilder10.jpg)
 
 * Solid+Wireframe shading mode
 
-![](/assets/520c9096f51f27a5a300001b/xbuilder11.jpg)
+![](/assets/posts/xbuilder11.jpg)
 
 Again, self-explanatory - I'm using something similar to [Catalin Zima's technique for wireframe without z-fighting](http://www.catalinzima.com/samples/12-months-12-samples-2008/drawing-wireframes-without-z-fighting/). You can configure the wireframe colour and z-bias values. Note that this shading mode will only work with models that use `BasicEffect`.
 
 * Render normals
 
-![](/assets/520c9099f51f27a5a3000020/xbuilder12.jpg)
+![](/assets/posts/xbuilder12.jpg)
 
 Helpful for debugging - you can customise the length of the rendered normals as a proportion of the model bounding sphere radius.
 
@@ -71,16 +71,16 @@ Ctrl+Shift+Alt+F10 will open the content preview window.
 
 * More configurable options
 
-![](/assets/520c9096f51f27a1dd000015/xbuilder9.jpg)
+![](/assets/posts/xbuilder9.jpg)
 
 * Available from Visual Studio Extension Manager
 
-![](/assets/520c9097f51f27a5a300001d/xbuilder13.jpg)
+![](/assets/posts/xbuilder13.jpg)
 
 You can download and install XBuilder right within Visual Studio Extension Manager. When new versions are released, I'll be adding them to the gallery, so this is the route I'd recommend for installing XBuilder.
 
 ## What's next?
 
-I'm going to take a bit of a break, and perhaps actually work on a game project... when I come back to XBuilder, I am going to clean up the code (which got a bit messy while working on v0.2), and then work on the [features I've got planned for v0.3](https://github.com/formosatek/xbuilder/issues). It's not too late to suggest features for v0.3 though - I'd really like this to become a community-driven project. (I know several people have asked for animation support - this is planned for v0.3.)
+I'm going to take a bit of a break, and perhaps actually work on a game project... when I come back to XBuilder, I am going to clean up the code (which got a bit messy while working on v0.2), and then work on the [features I've got planned for v0.3](https://github.com/tgjones/xbuilder/issues). It's not too late to suggest features for v0.3 though - I'd really like this to become a community-driven project. (I know several people have asked for animation support - this is planned for v0.3.)
 
-This is really just a hobby project for me, so it lives or dies on your feedback - please let me know what you think, if it's useful for you, what would make it useful for you, etc. If you find any bugs, please let me know [here](https://github.com/formosatek/xbuilder/issues).
+This is really just a hobby project for me, so it lives or dies on your feedback - please let me know what you think, if it's useful for you, what would make it useful for you, etc. If you find any bugs, please let me know [here](https://github.com/tgjones/xbuilder/issues).

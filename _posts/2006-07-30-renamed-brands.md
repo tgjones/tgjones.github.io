@@ -9,4 +9,4 @@ While I'm on the topic, maybe I should have kept hold of some Opal Fruits and [M
 
 Work continues on the C2C video (still editing the footage from day 1 out of 12)...
 
-<img src="http://photos1.blogger.com/blogger/3747/1168/400/02_07_2006%2015_38_0001.jpg" />
+![](/assets/posts/coast-to-coast-flies.jpg)

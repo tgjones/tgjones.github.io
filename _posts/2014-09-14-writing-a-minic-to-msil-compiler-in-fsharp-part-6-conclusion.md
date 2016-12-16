@@ -18,7 +18,7 @@ Each blog post in this [series](/blog/archive/2014/04/13/writing-a-minic-to-msil
 
 We can now bring all those pieces of the compiler pipeline together in the `compile` function, defined in [Compiler.fs](https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Compiler.fs):
 
-``` fsharp
+``` ocaml
 let compile (assemblyBuilder : AssemblyBuilder) code =
   let assemblyName = assemblyBuilder.GetName()
   let moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName.Name, assemblyName.Name + ".exe", true)
@@ -39,7 +39,7 @@ This function uses a `System.Reflection.Emit` type we haven't seen before: [Asse
 
 The `compile` function isn't used directly by calling code; instead, there are a couple of wrapper functions to compile to an in-memory assembly, or save to disk. They mainly differ in how the `AssemblyBuilder` object is created:
 
-``` fsharp
+``` ocaml
 let compileToMemory assemblyName code =
   let assemblyBuilder =
     AppDomain.CurrentDomain.DefineDynamicAssembly(
@@ -47,7 +47,7 @@ let compileToMemory assemblyName code =
   compile assemblyBuilder code
 ```
 
-``` fsharp
+``` ocaml
 let compileToFile fileName code =
   let assemblyName = new AssemblyName (Path.GetFileNameWithoutExtension fileName)
   let assemblyBuilder =
@@ -66,7 +66,7 @@ Talking about unit tests: I haven't really mentioned them in this series, but th
 
 In addition to unit tests, there are also [some integration tests](https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler.Tests/CompilerTests.fs) that compile the code into an executable file, run the executable file, and check for the correct return value:
 
-``` fsharp
+``` ocaml
 [<TestCase("test1.minic", Result = -5)>]
 [<TestCase("test2.minic", Result = 55)>]
 [<TestCase("test3.minic", Result = 3)>]
@@ -108,7 +108,7 @@ void main(void) {
 
 I also wrote a number of tests that check error handling works as expected:
 
-``` fsharp
+``` ocaml
 [<TestCase("error1.minic", "MC003 A variable named 'x' is already defined in this scope")>]
 [<TestCase("error2.minic", "MC003 A variable named 'y' is already defined in this scope")>]
 [<TestCase("error3.minic", "MC001 Lexer error: Invalid character '^'")>]
@@ -139,7 +139,7 @@ This is one of the areas that, in my opinion, I got right: in most cases I wrote
 
 Towards the end of the project, I added a GUI to showcase the most interesting parts of the compiler pipeline:
 
-![](/assets/52cd6886f51f2758e7000011/standard/mini-c.png)
+![](/assets/posts/mini-c.png)
 
 If you've followed along this far, I encourage you to [download the code](https://github.com/tgjones/mini-c) and try out the GUI by running the MiniC.Compiler.Demo application.
 

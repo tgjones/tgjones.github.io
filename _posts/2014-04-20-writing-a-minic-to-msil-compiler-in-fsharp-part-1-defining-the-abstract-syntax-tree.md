@@ -103,13 +103,13 @@ When you're writing an F# program, as soon as you hear the word "tree", you can 
 
 Let's write some code. I'm not going to explain F#'s syntax, because there are plenty of other places that do a better job than I could. If you're not familiar with F#, it might look a bit weird at first, but it grows on you.
 
-``` fsharp
+``` ocaml
 type Program = Declaration list
 ```
 
 This makes `Program` essentially an alias for a list of declarations. (In C#, we'd write `List<Declaration>`.)
 
-``` fsharp
+``` ocaml
 and Declaration =
   | StaticVariableDeclaration of VariableDeclaration
   | FunctionDeclaration of FunctionDeclaration
@@ -117,7 +117,7 @@ and Declaration =
 
 A declaration is either a static variable declaration or a function declaration.
 
-``` fsharp
+``` ocaml
 and TypeSpec =
   | Void
   | Bool
@@ -127,7 +127,7 @@ and TypeSpec =
 
 The supported types in Mini-C are `void`, `bool`, `int` and `float`.
 
-``` fsharp
+``` ocaml
 and VariableDeclaration = 
     | ScalarVariableDeclaration of TypeSpec * Identifier
     | ArrayVariableDeclaration of TypeSpec * Identifier
@@ -135,13 +135,13 @@ and VariableDeclaration =
 
 A variable declaration can either be a scalar variable declaration or an array variable declaration. Both types of variable declaration consist of a type and an identifier. The `*` character is what F# uses to define tuples. In C#, we might write `Tuple<TypeSpec, Identifier>` (except we wouldn't because nobody uses tuples in C#).
 
-``` fsharp
+``` ocaml
 and FunctionDeclaration = TypeSpec * Identifier * Parameters * CompoundStatement
 ```
 
 A function declaration consists of a type, an identifier, some function parameters, and a "compound statement". We'll see what compound statements are shortly.
 
-``` fsharp
+``` ocaml
 and Identifier = string
 
 and Parameters = VariableDeclaration list
@@ -151,7 +151,7 @@ and IdentifierRef = { Identifier : string; }
 
 An identifier is simply a string. The `Parameters` type (as used in `FunctionDeclaration`) is an alias for a list of variable declarations. It's worth noting that the `VariableDeclaration` type is used for both function parameters and global variable declarations. Although the grammar is a bit different in these two contexts, the actual data we need to store after parsing is the same.
 
-``` fsharp
+``` ocaml
 and Statement =
   | ExpressionStatement of ExpressionStatement
   | CompoundStatement of CompoundStatement
@@ -172,7 +172,7 @@ Here are examples of each type of Mini-C statement:
 | Return Statement     | `return true;`                  |
 | Break Statement      | `break;`                        |
 
-``` fsharp
+``` ocaml
 and ExpressionStatement =
   | Expression of Expression
   | Nop
@@ -185,7 +185,7 @@ Many languages, including Mini-C, differentiate between *expressions* and *state
 
 **Expression statements** are where the two come together. An expression statement is simply a statement composed of an expression. We'll soon see what expressions are.
 
-``` fsharp
+``` ocaml
 and CompoundStatement = LocalDeclarations * Statement list
 
 and LocalDeclarations = VariableDeclaration list
@@ -193,7 +193,7 @@ and LocalDeclarations = VariableDeclaration list
 
 A compound statement is composed of a list of local variable declarations, and a list of statements. You might notice that there's some recursion going on here: one of the `Statement` types is `CompoundStatement`, which itself is composed of a list of `Statement`s. That simplifies AST construction, and will also make working with the AST easier later on.
 
-``` fsharp
+``` ocaml
 and IfStatement = Expression * Statement * Statement option
 ```
 
@@ -205,13 +205,13 @@ An `if` statement is composed of:
 
 Note that adding `option` after a type such as `Statement` is roughly analogous to writing `Statement?` or `Nullable<Statement>` in C#, except that F# is more awesome and allows the use of `option` for reference types too.
 
-``` fsharp
+``` ocaml
 and WhileStatement = Expression * Statement
 ```
 
 While statements, at least far as the AST goes, are similar to if statements. They are composed of an expression - which is the condition to test on each time through the loop, and a statement (which again, could be a compound statement).
 
-``` fsharp
+``` ocaml
 and Expression =
   | ScalarAssignmentExpression of IdentifierRef * Expression
   | ArrayAssignmentExpression of IdentifierRef * Expression * Expression
@@ -242,7 +242,7 @@ In partnership with statements, expressions make up the core of most languages. 
 
 Note that many of these definitions are recursive. `ScalarAssignmentExpression`, for example, is composed of an `IdentifierRef` and an `Expression`. If you think about it, this makes sense - on the right hand side of an assignment, you want to be able to use any arbitrary expression, including other assignments (at least in C-like languages).
 
-``` fsharp
+``` ocaml
 and BinaryOperator =
   | ConditionalOr
   | Equal
@@ -266,7 +266,7 @@ and UnaryOperator =
 
 Binary and unary operators are hopefully self-explanatory, and comparable to the operators in most C-based languages.
 
-``` fsharp
+``` ocaml
 and Literal =
   | BoolLiteral of bool
   | IntLiteral of int

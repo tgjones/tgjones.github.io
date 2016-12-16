@@ -21,7 +21,7 @@ int main(bool b) {
 
 into a tree of objects (or, an abstract syntax tree) like this:
 
-``` fsharp
+``` ocaml
 [Ast.FunctionDeclaration(
   Ast.Int, "main",
   [ Ast.ScalarVariableDeclaration (Ast.Bool, "b") ],
@@ -67,7 +67,7 @@ A parser takes the stream of tokens output by a lexer, and builds some sort of s
 
 Mini-C's parser will build this abstract syntax tree:
 
-``` fsharp
+``` ocaml
 Ast.WhileStatement(
   Ast.IdentifierExpression { Identifier = "b" },
   Ast.BreakStatement
@@ -98,7 +98,7 @@ To parse source code using Piglet, we have to tell Piglet about the the followin
 
 Before any of that, Piglet requires us to create an `IParserConfigurator` object:
 
-``` fsharp
+``` ocaml
 let configurator = ParserFactory.Configure<obj>()
 ```
 
@@ -108,7 +108,7 @@ Nonterminal symbols are composed of other (nonterminal or terminal) symbols. For
 
 Here is how we define nonterminal symbols using Piglet. I'm only including a few here - the full list is in the [source code](https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L14). (I wrote some [F#-friendly wrappers](https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/ParsingUtilities.fs) on top of Piglet's API, which I'm using here; they make for a more pleasant experience when using Piglet from F#.)
 
-``` fsharp
+``` ocaml
 let nonTerminal<'T> () = new NonTerminalWrapper<'T>(configurator.CreateNonTerminal())
 
 let program                   = nonTerminal<Program>()
@@ -126,7 +126,7 @@ Terminal symbols are those symbols which are *not* composed of other symbols. If
 
 First, we define a couple of helper methods - don't pay too much attention to them, they just allow us to write terminal symbols in a strongly-typed way, which Piglet itself doesn't really support:
 
-``` fsharp
+``` ocaml
 let terminalParse<'T> regex (onParse : (string -> 'T)) =
     new TerminalWrapper<'T>(configurator.CreateTerminal(regex, (fun s -> box (onParse s))))
 
@@ -136,7 +136,7 @@ let terminal regex =
 
 Now we can define some terminals. I'll include a few of each type here; again, the rest are in the [source code](https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L49).
 
-``` fsharp
+``` ocaml
 // Keywords
 let ifKeyword    = terminal      "if"
 let elseKeyword  = terminal      "else"
@@ -172,7 +172,7 @@ Does this mean `1 + (2 * 3)` or `(1 + 2) * 3`? Precedence rules define exactly h
 
 With Piglet, we call the `LeftAssociative` method multiple times in increasing order of precedence. For each call, we pass in the terminal symbols that should be grouped together at the same precedence level. Here is the code to tell Piglet that multiplications and divisions have a *greater precedence* than additions and subtractions:
 
-``` fsharp
+``` ocaml
 configurator.LeftAssociative(downcast exclamation.Symbol,
                              downcast plus.Symbol,
                              downcast minus.Symbol)
@@ -199,13 +199,13 @@ program → decl_list
 
 And here is how we defined the abstract syntax tree node for a program:
 
-``` fsharp
+``` ocaml
 type Program = Declaration list
 ```
 
 Now, here is the production rule:
 
-``` fsharp
+``` ocaml
 program.AddProduction(declarationList).SetReduceToFirst()
 ```
 
@@ -229,7 +229,7 @@ This is a recursive definition. A declaration list is composed of either:
 
 And here is how we turn that into F# code:
 
-``` fsharp
+``` ocaml
 declarationList.AddProduction(declarationList, declaration)
   .SetReduceFunction (fun a b -> a @ [b])
 declarationList.AddProduction(declaration).SetReduceFunction (fun a -> [a])
@@ -247,7 +247,7 @@ decl → var_decl | fun_decl
 
 And here are the productions:
 
-``` fsharp
+``` ocaml
 declaration.AddProduction(staticVariableDeclaration)
   .SetReduceFunction (fun a -> Ast.StaticVariableDeclaration a)
 declaration.AddProduction(functionDeclaration)
@@ -274,7 +274,7 @@ expr → IDENT = expr | IDENT [ expr ] = expr
 
 And here are (some of) the production rules for expressions:
 
-``` fsharp
+``` ocaml
 expression.AddProduction(expression, doublePipes, expression)
   .SetReduceFunction (fun a _ c -> Ast.BinaryExpression(a, Ast.ConditionalOr, c))
 expression.AddProduction(expression, doubleEquals, expression)
@@ -302,7 +302,7 @@ Here is the [full code for configuring productions](https://github.com/tgjones/m
 
 The final step is to define an entry point to the parser. This turns out to be straightforward:
 
-``` fsharp
+``` ocaml
 let parser = configurator.CreateParser()
 
 let parse (s : string) =
@@ -329,81 +329,81 @@ And here is how Piglet will parse this code (more accurately, it is first lexing
 
 1. Shift-reduce parsers start from the "bottom" and work their way up. The first symbol that Piglet will parse will be `int`. This matches the `intKeyword` terminal.
 
-    ``` fsharp
+    ``` ocaml
     let intKeyword = terminalParse "int" (fun s -> Ast.Int)
     ```
 
 2. Next, Piglet sees that the `typeSpec` nonterminal has a production rule composed of (only) the `intKeyword` terminal:
 
-    ``` fsharp
+    ``` ocaml
     typeSpec.AddProduction(intKeyword).SetReduceToFirst()
     ```
 
 3. Piglet calls that production's reduce function, resulting in:
 
-    ``` fsharp
+    ``` ocaml
     Ast.Int
     ```
 
 4. Next, Piglet sees that `a` matches the `identifier` terminal:
 
-    ``` fsharp
+    ``` ocaml
     let identifier = terminalParse "[a-zA-Z_][a-zA-Z_0-9]*" (fun s -> s)
     ```
 
 5. Next, Piglet parses `;` and finds that it matches the `semicolon` terminal:
 
-    ``` fsharp
+    ``` ocaml
     let semicolon = terminal ";"
     ```
 
 6. So Piglet has now matched three symbols - `typeSpec`, `identifier` and `semicolon`. It sees that one of the nonterminals has a production rule that matches these three terminals (order is important):
 
-    ``` fsharp
+    ``` ocaml
     staticVariableDeclaration.AddProduction(typeSpec, identifier, semicolon)
       .SetReduceFunction (fun a b _ -> Ast.ScalarVariableDeclaration(a, b))
     ```
 
 7. Piglet calls that production's reduce function, resulting in:
 
-    ``` fsharp
+    ``` ocaml
     Ast.ScalarVariableDeclaration(Ast.Int, "a")
     ```
 
 8. The `declaration` nonterminal has a production rule which matches a single `staticVariableDeclaration` symbol:
 
-    ``` fsharp
+    ``` ocaml
     declaration.AddProduction(staticVariableDeclaration)
       .SetReduceFunction (fun a -> Ast.StaticVariableDeclaration a)
     ```
 
 9. Piglet calls that production rule's reduce function, resulting in: 
 
-    ``` fsharp
+    ``` ocaml
     Ast.StaticVariableDeclaration(Ast.ScalarVariableDeclaration(Ast.Int, "a"))
     ```
 
 10. The `declarationList` nonterminal has a matching production rule:
 
-    ``` fsharp
+    ``` ocaml
     declarationList.AddProduction(declaration).SetReduceFunction (fun a -> [a])
     ```
 
 11. Calling `declarationList`'s reduce function gives us: 
 
-    ``` fsharp
+    ``` ocaml
     [Ast.StaticVariableDeclaration(Ast.ScalarVariableDeclaration(Ast.Int, "a"))]
     ```
 
 12. Finally, the top-level `program` nonterminal has a production rule which matches `declarationList`:
 
-    ``` fsharp
+    ``` ocaml
     program.AddProduction(declarationList).SetReduceToFirst()
     ```
 
 13. `SetReduceToFirst` gives us the same result as `declarationList`'s reduce function:
 
-    ``` fsharp
+    ``` ocaml
     [Ast.StaticVariableDeclaration(Ast.ScalarVariableDeclaration(Ast.Int, "a"))]
     ```
 

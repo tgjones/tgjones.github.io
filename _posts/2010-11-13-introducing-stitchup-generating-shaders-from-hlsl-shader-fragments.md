@@ -94,19 +94,19 @@ Sure! There's a demo project in the [repository](https://github.com/tgjones/stit
 
 The fragments are included in the demo content project like this:
 
-![](/assets/520c9091f51f27a5a3000013/stitchup1.jpg)
+![](/assets/posts/stitchup1.jpg)
 
 The file properties for a `.fragment` file look like this:
 
-![](/assets/520c9091f51f27a1dd00000f/stitchup2.jpg)
+![](/assets/posts/stitchup2.jpg)
 
 The file properties for a `.stitchedeffect` file look like this:
 
-![](/assets/520c9091f51f27a5a3000012/stitchup3.jpg)
+![](/assets/posts/stitchup3.jpg)
 
 The file properties for one of the models file look like this:
 
-![](/assets/520c9091f51f27a1dd000010/stitchup4.jpg)
+![](/assets/posts/stitchup4.jpg)
 
 At runtime, the effect parameter values are set in the `DrawModel` method in `ChaseCameraGame.cs`. Because the parameter names for each fragment will get mangled to ensure they are unique, it's slightly awkward to refer to parameters by name (this is an area I'd like to improve in the future). So I generally use semantics, if I know I'll only use a fragment once per effect.
 

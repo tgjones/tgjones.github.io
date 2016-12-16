@@ -55,6 +55,6 @@ You can browse the Meshellator source code [here](https://github.com/tgjones/mes
 
 The source code (but not the binary downloads) includes a viewer application.
 
-![](/assets/520c908bf51f27a1dd000009/meshellatorviewer1.jpg)
+![](/assets/posts/meshellatorviewer1.jpg)
 
 The viewer application is not developed enough to be that useful, but it may be of technical interest - it combines [AvalonDock](http://avalondock.codeplex.com/), [FluentRibbon](http://fluent.codeplex.com/) and [SlimDX](http://slimdx.org/) in a WPF MVVM application based on [Caliburn](http://caliburn.codeplex.com/). As a historical aside, this viewer application is what eventually became [XBuilder](/blog/archive/2010/12/09/xbuilder-v-released), after I realised that the world didn't need another general-purpose model viewer, and the "model viewer as a Visual Studio extension" niche was more interesting.

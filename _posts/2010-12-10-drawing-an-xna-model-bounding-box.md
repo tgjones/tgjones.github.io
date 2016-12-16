@@ -228,6 +228,6 @@ private void DrawBoundingBox(BoundingBoxBuffers buffers, BasicEffect effect, Gra
 
 If everything went right, you should have something that looks like this on your screen:
 
-![bounding box image](/assets/520c9048f51f27a5a3000001/boundingbox.jpg)
+![bounding box image](/assets/posts/boundingbox.jpg)
 
 If you don't have that, or if I didn't explain it properly, maybe looking at [my version](https://github.com/tgjones/xna-tutorials/tree/master/DrawBoundingBox) will help. I hope this is useful - let me know if you have any comments or questions.

@@ -44,10 +44,10 @@ My todo list:
 
 ## Screenshots
 
-![](/assets/520c908ff51f27a1dd00000d/standard/raytrace1.png)
+![](/assets/posts/raytrace1.png)
 
-![](/assets/520c9098f51f27a5a300001f/standard/xna1.png)
+![](/assets/posts/xna1.png)
 
-![](/assets/520c9091f51f27a1dd00000e/standard/raytrace2.png)
+![](/assets/posts/raytrace2.png)
 
-![](/assets/520c9098f51f27a5a300001e/standard/xna2.png)
+![](/assets/posts/xna2.png)

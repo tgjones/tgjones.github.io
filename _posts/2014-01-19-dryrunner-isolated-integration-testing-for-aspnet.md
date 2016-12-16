@@ -43,23 +43,23 @@ I think a concrete example will help more than an abstract explanation would, so
 
 First, we'll create a new ASP.NET MVC 4 Web Application.
 
-![](/assets/52dc2aeef51f272915000080/standard/dryrunner-new-project.png)
+![](/assets/posts/dryrunner-new-project.png)
 
 Choose the Internet Application template, and don't create a unit test project. We'll create one ourselves later.
 
-![](/assets/52dc2aeef51f2758e7000036/standard/dryrunner-choose-template.png)
+![](/assets/posts/dryrunner-choose-template.png)
 
 If we start the website now, we'll see this in the browser. Later on, we'll write an integration test that ensures the phrase "To learn more" is present on the page.
 
-![](/assets/52dc2af0f51f2758e7000038/standard/dryrunner-browser.png)
+![](/assets/posts/dryrunner-browser.png)
 
 Before using DryRunner, we need to create a Test configuration for the website you want to test. DryRunner will build the website using the Test configuration, including the relevant web.config transform, if you have one. Right-click on the solution name in Solution Explorer, and click "Configuration Manager...". Find your web project, and in the Configuration column, choose "<New...>". In the Name textbox, enter "Test". Uncheck the box to create new solution configurations.
 
-![](/assets/52dc2af0f51f272915000081/standard/dryrunner-solution-configuration.png)
+![](/assets/posts/dryrunner-solution-configuration.png)
 
 Now add a new Class Library project named [ProjectName].AcceptanceTests. Install the NUnit and DryRunner NuGet packages (skip NUnit if you prefer MSTest or another test framework):
 
-![](/assets/52dc2aeff51f2758e7000037/standard/dryrunner-nuget.png)
+![](/assets/posts/dryrunner-nuget.png)
 
 Add a test class named HomePageTests.cs to the test project:
 
@@ -111,7 +111,7 @@ Run this test - it should pass. **And that's pretty much it** - we're now able t
 
 So far, there's not really any benefit over running integration tests in-place on your development website. But you will almost certainly want to manipulate a database as part of your tests. Here's where DryRunner comes into its own: it let you use test-specific settings, such as a test-specific database connection string. This is best done using web.config transforms. In your web project, right-click on Web.config, and choose Add Config Transform. You'll see a `Web.Test.config` file is added to the project. Refer to the [web.config transformation syntax](http://msdn.microsoft.com/en-us/library/dd465326(v=vs.110).aspx) to see how you can insert new settings or replace settings inherited from the base `Web.config`.
 
-![](/assets/52dc2aedf51f2758e7000035/standard/dryrunner-solution-explorer.png)
+![](/assets/posts/dryrunner-solution-explorer.png)
 
 ### Give it a try
 

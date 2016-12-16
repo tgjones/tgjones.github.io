@@ -6,7 +6,7 @@ excerpt: "Gemini now has a module for integrating SharpDX-rendered content into 
 
 I've just added a new module (and demo) to [Gemini](http://documentup.com/tgjones/gemini), which is designed to integrate [SharpDX](http://sharpdx.org)-rendered content into documents and tool panes. Specifically, I'm using SharpDX Toolkit, because it has a nice simple API, but you can still drop down to the lower-level API when you need to.
 
-![](/assets/52d0312ff51f272915000005/standard/gemini-sharpdx.png)
+![](/assets/posts/gemini-sharpdx.png)
 
 It's quite easy to use. In the XAML for your document or tool pane view, add the `DrawingSurface` control: 
 
