@@ -1,6 +1,6 @@
 ---
 title:   "Syntax highlighting for HLSL in Visual Studio Code"
-date:    2017-03-01 23:00:00 UTC
+date:    2017-03-01 22:25:00 UTC
 excerpt: "My pull request to add syntax highlighting to HLSL files in VSCode was merged."
 ---
 
