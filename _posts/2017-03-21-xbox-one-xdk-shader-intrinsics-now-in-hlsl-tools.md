@@ -14,4 +14,6 @@ If you don't write games for the Xbox One, then feel free to stop reading now; b
 
 If you write shaders for the Xbox One, then give [HLSL Tools for Visual Studio](https://marketplace.visualstudio.com/items?itemName=TimGJones.HLSLToolsforVisualStudio) a try! As always, let me know if you find any bugs. In terms of feature requests, please [read this note before requesting additional intrinsics or other functionality from the XDK](https://github.com/tgjones/HlslTools/blob/master/CONTRIBUTING.md#note-about-the-xbox-one-xdk) (basically, if you've signed an NDA for this stuff, then you're still under that NDA).
 
+I'd like to give a big shout-out to [Adam Miles](https://twitter.com/adamjmiles) for making this feature possible; he did almost all the hard work, including documenting the intrinsics themselves.
+
 Happy coding!
