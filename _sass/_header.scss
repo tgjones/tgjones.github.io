@@ -1,0 +1,40 @@
+header.masthead {
+    margin-bottom: 4rem;
+    padding-top: 1.4rem;
+    padding-bottom: 1rem;
+    color: #888;
+    font-size: 1.2rem;
+    border-bottom: 1px solid #CCC;
+    line-height: 1.5rem;
+
+    nav ul {
+        text-align: right;
+        margin: 0;
+        padding: 0;
+
+        li {
+            display: inline-block;
+            font-weight: 600;
+            list-style: none;
+
+            &:first-child {
+                float: left;
+                color: #555;
+            }
+
+            &:last-child {
+                margin-left: 2rem;
+            }
+
+            h3 {
+                margin: 0;
+                line-height: inherit;
+            }
+
+            a {
+                text-decoration: none;
+                color: inherit;
+            }
+        }
+    }
+}

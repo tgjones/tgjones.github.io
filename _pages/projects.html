@@ -1,22 +1,36 @@
 ---
-layout: archive
 title: "Projects"
 permalink: /projects/
 ---
 
-{% include base_path %}
+<h1>Open Source Projects</h1>
+
 {% capture written_year %}'None'{% endcapture %}
 {% assign projects = site.projects | reverse %}
 {% for post in projects %}
   {% capture year %}{{ post.year }}{% endcapture %}
   {% if year != written_year %}
     {% unless forloop.first %}</div>{% endunless %}
-    <h2 id="{{ year | slugify }}" class="archive__subtitle" style="clear:both">{{ year }}</h2>
-    <div class="grid__wrapper" style="margin-top:15px">
+    <h2>{{ year }}</h2>
+    <div class="projects-container">
     {% capture written_year %}{{ year }}{% endcapture %}
   {% endif %}
 
-  {% include archive-single.html type="grid" %}
+  <div class="project">
+    <div class="project-image">
+      <a href="{{ post.url }}">
+      {% if post.teaser %}
+      <img src="{{ post.teaser }}" />
+      {% else %}
+      <img src="{{ post.gallery.first }}" />
+      {% endif %}
+      </a>
+    </div>
+    <div class="project-details">
+      <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
+      <p>{{ post.excerpt }}</p>
+    </div>
+  </div>
 
   {% if forloop.last %}</div>{% endif %}
 {% endfor %}

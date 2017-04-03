@@ -1,8 +1,9 @@
 ---
-layout: single
 title: "About Me"
 permalink: /about/
 ---
+
+<h1>About Me</h1>
 
 I'm Tim Jones, a software developer living in Taipei, Taiwan with my wife and son.
 

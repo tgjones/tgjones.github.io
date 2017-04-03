@@ -1,0 +1,65 @@
+*, *:before, *:after {
+    box-sizing: border-box
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    font-family: 'Noto Serif', serif;
+    font-size: 18px;
+    line-height: 1.6;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    line-height: 1.1;
+    margin-top: 3rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+}
+
+a {
+    text-decoration: none;
+}
+
+video {
+    max-width: 100%;
+    width: auto\9;
+    height: auto;
+}
+
+main img {
+    max-width: 100%;
+}
+
+table {
+    width: 100%;
+    border: 1px solid #CCC;
+    border-collapse: collapse;
+
+    thead {
+        background-color: #f2f3f3;
+        border-bottom: 1px solid #CCC;
+    }
+
+    tr, td, th {
+        vertical-align: middle;
+    }
+
+    th {
+        white-space: nowrap;
+    }
+
+    th, td {
+        border-right: 1px solid #CCC;
+        padding: 0.5rem;
+    }
+
+    td {
+        border-bottom: 1px solid #bdc1c4;
+    }
+}

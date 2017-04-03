@@ -1,0 +1,13 @@
+---
+layout: master
+---
+
+<h1>Tag: {{ page.title }}</h1>
+
+<div class="posts-container">
+
+    {% for post in page.posts %}
+    <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
+    {% endfor %}
+
+</div>

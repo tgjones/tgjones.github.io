@@ -1,0 +1,27 @@
+---
+layout: master
+---
+
+<article>
+    <h1 class="post-title">{{ page.title }}</h1>
+
+    <div class="post-date">
+        <time datetime="{{ page.date | date_to_xmlschema }}">{{ page.date | date_to_long_string }}</time>
+    </div>
+
+    {% if page.tags.size > 0 %}
+    <div class="post-tags">
+        <ul>
+            {% for tag in page.tags %}
+            <li><a href="/blog/tags/{{ tag | downcase | url_encode }}">{{ tag }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {{ content }}
+</article>
+
+{% include page-navigation.html %}
+
+{% include comments.html %}
