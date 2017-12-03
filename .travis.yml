@@ -1,10 +1,8 @@
 language: ruby
 rvm:
 - 2.2
-
 script:
 - bundle exec jekyll build
-
 after_success:
 - git clone https://$GITHUB_REPO
 - cd $(basename ${GITHUB_REPO%.git})
@@ -16,11 +14,10 @@ after_success:
 - git add -A .
 - git commit -m "Generated Jekyll site by Travis CI - ${TRAVIS_BUILD_NUMBER}"
 - git push --force "https://${DEPLOY_KEY}@${GITHUB_REPO}" HEAD:${REPO_TARGET_BRANCH}
-
 env:
   global:
   - NOKOGIRI_USE_SYSTEM_LIBRARIES=true
   - GITHUB_REPO: github.com/tgjones/timjones.io.git
   - REPO_TARGET_BRANCH: gh-pages
   - secure: f5kus5bJK5FZSPRTQnhZD9sZLz7Ut7/wMWdfGraWUsGJs31MpAVtQcFdISRIE3T+7CyA/+dDa8LgGijRPX6IsiexfM7ouC9FOlE6hHZwyXVR+IPszO//jk+dI8BxVD0tP0rEeqBcpVC4DL9QvSx0ZYH3gTE9j2TmaZsv5krSMGYIyqhYaLSE3t0kXkZC+M+wb+x2vnDlCHtRnbkbXIfG9cD1RWoVaL/3bjIkiybqdFgLIgC119DuMbL3lM6UVYa4MRCA00sfdCS1jUDioQAPl9Rl1VNt1LGrAFsShSB2+kQbfKDB6oQMuGxo7WNapfemPHBHsNnEvEpWuLePdGnwzn+eBT3IP+AxmIC1/CkB5l2rwFBOD1EStM1RJe/Wkp/MC9c1UdtOP7CWg9frK9flAQa/bcQDCfeE8hdQtZjZJfKeGVzpDIqH6fgBw06XKalVr5ZMul0Ww+uvIUTYzU6XsikVY1dVKEOsgQIPP95ckgU861yGZQpiF6n/VSh7eRLTnJ1XLToXQiAG2N2WKl5ysm1URcFgx5nKRIKgBKviTgCgpe+2yMEvMBH75ndV37WDbikFlCi/INA9Rdf8W0JvKbJteu9RTnn+lkScQP8TfOo8/MThO1OpZGswsPEn/HSVaAQirHLeW0WZuG8esM8U4X0OPRMra8Dk+WhDcCs4gqA=
-  - secure: KzsZ9biHXPqhbxGRd5vRPIY8+8Ld5uJA4Pxl9eoVZNArqf76dXDR6Q4/HSrSHh+mRAkwUiQ6fPJdlxSMw6lf/p0wJCvK+6X+kqQkC+irRCdhR64hxvyH/iOABy0vpwPgCVZepMiaGzyxzACy/LiO2WtVCYsyskQD5H9UWjmLl6EvqJX/24OTiyrH4iqbMOIo9lGyzca0grbPtNOgt0x+eV3yVC5nWjMzQOv2YQFXzwT1fX470fy/+PV/s7QFYpvzdND8+RMRTmLzPPe+PM9wloup8Jp8rIQnGm6xDNxrFmzEH+IETxFpyhR1TsrhYfQRRq7y8tTq973UuyVm51V2+0lcRLmwnL1oddqlJKph8qwUQjJCRD8JaeZrCVk9v0nM2jmotMp97dMP/E8QqeESgKwYD1Mvnxm+7HrHqo4n+nZ1nBss84NQQAG38JyQsV/0GJRYhxucja9qIvXfd+Dh5j6UD5ww57gIzyznCGCbVd/TRY8s6E23aNxugzSYI/q4/hjiOLQgl0U1VL+lWvTlNSVKg6S0cmKg01jxr+GaIgiHFM6mjTVTEFrmgtZ6CHINfpqleZMk7Bp466BLTob+T30/p5b8lNTYz5iahlnimlMinx3j9D7sKiIiVv1HJI4ZJXymfO5N/cn23FbFTXywZ0KbM7Iy9bbAV+A+js37vIg=
+  - secure: ScBniNRmyZwkRIJbRq1jZSzYlbjFrG19xtV+wYKSOxVS+rtw8VWoy3thjHPm2h8YADiWLWl/rnvhh1XqTqH8zASXAYOGN7Xj8ZXdTiYLEht5j3BYNIKOuXZKDrPLO26CDSqpjAJOefBP+Ri5zU+lGoexUBfGQusaX6WRkXNMla+yc56CgHwDSMSDJhD0RRCjBOWKufYOtL2Jah4ugzBy4R/TItlXBezBaSIRiZWDWj9wgaeEK86ZCmcGQ/YFxCpnnL/cCBbqJry6CsDZK9rJtFmWQdCb/Di+FIf7Ic5hZUUjFoZjgfKIZph2FKbp60cv0Pf3uR0jKw4MQ8cnC5ipjPiFRR2euPhst0ST/L5VaG5P2vf/dIRkCIzFuoLNpR4OXBUyU45MFxdJzmOSr/ekjLSB+njv20U7CyZXSnpyFhY20vKxbRo6t5b848stAgnRtoJbkLqPIW2GaNpLJ+bsAu00BAE86pOSH0nBxOAs1i3LZJISRMLgPhUhDiC/KtVtcz9G33MMHRi+TlGbMpJ1IUEiXCdkF1JIui5qrWuaonHRNl7tari8xKwAUYUIjKzauw4lbFLp5AU5PmDoOXfZBEgvBmUOV4oSKb/9mOUUuP99jGYML88fk0FkbWvOkzyf6M/VkVs4748wgeBjnlyHPDrvPVjfunquljSyxqelF7I=
