@@ -1,6 +1,6 @@
 ---
 title:   "OpenSAGE Dev Diary #5 (2018-01-07)"
-date:    2017-12-24 11:00:00 UTC
+date:    2018-01-07 15:00:00 UTC
 excerpt: "What's been happening this week in OpenSAGE"
 tags:    OpenSAGE
 ---
@@ -22,7 +22,7 @@ In the last two weeks:
 
 * Paavo [fixed parsing of floating-point values in .ini files for locales with decimal separators other than "."](https://github.com/OpenSAGE/OpenSAGE/pull/13), and [fixed a related issue](https://github.com/OpenSAGE/OpenSAGE/pull/24).
 
-* Paavo [fixed .wnd controls with a null header template](https://github.com/OpenSAGE/OpenSAGE/pull/14).
+* Paavo [fixed .wnd controls that have a null header template](https://github.com/OpenSAGE/OpenSAGE/pull/14).
 
 * I [simplified the render pipeline](https://github.com/OpenSAGE/OpenSAGE/commit/61994bee78f963a40eb4fea2c86c8113ceef78ab), because it was getting unnecessarily complex.
 
@@ -31,7 +31,6 @@ In the last two weeks:
 * Paavo [created an Xunit test discoverer to allow skipping of tests that depend on games that aren't currently installed](https://github.com/OpenSAGE/OpenSAGE/pull/16).
 
 * I parsed BFME I and BFME II `.map` files. It turned out there were lots of new and modified chunks for these games: `CameraAnimationList`, `EnvironmentData`, `LibraryMapLists`, `MPPositionList`, `NamedCameras`, `PolygonTriggers`, `PostEffectsChunk`, `RiverAreas`, `SkyboxSettings`, `StandingWaterAreas`, `StandingWaveAreas`, and `Teams`. There aren't any existing specifications for these chunks so I had to figure them out by hand. BFME scripts have a few new fields, like `Enabled` and `Inverted` and some related to sequential scripts. There's a problem with terrain tile texture blending in BFME maps that I still need to fix, as you can see this in screenshot:
-
   {% responsive_image path: assets/posts/opensage-2018-01-08-bfmeii-map.png alt: "BFME II map" %}
 
 * Stephan [fixed .dds and .tga previews in the Data Viewer](https://github.com/OpenSAGE/OpenSAGE/pull/20).
