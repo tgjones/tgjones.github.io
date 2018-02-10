@@ -32,6 +32,8 @@ This first release contains two separate applications: a "Data Viewer" and a "La
 
 The Data Viewer can preview files (including 3D models, maps, .ini files, and more) from any SAGE-based games that you have on your computer. We are using it as a development tool, but it may well be of interest to modders and anybody curious about how RTS games are built.
 
+{% responsive_image path: assets/posts/opensage-2018-02-10-map-viewer.png alt: "Data Viewer" %}
+
 It's probably not worth logging issues on GitHub yet, because it's so early in development. Nothing works, except for the stuff that does. But if you're pretty sure that you've found a bug in something that *should* work, then feel free to [log an issue](https://github.com/OpenSAGE/OpenSAGE/issues).
 
 ## Progress since the last dev diary
