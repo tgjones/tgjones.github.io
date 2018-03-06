@@ -71,6 +71,7 @@ It was at this point, when I first looked at Generals' replay files, that I wond
 > In the simplest case, `number_of_commands` is zero and `signature` and `arguments` are empty. Otherwise, there are `number_of_commands` many pairs of bytes {`cmd`,`nargs`}, where `cmd` refers to one of about ten commands and `nargs` is the number of arguments. The size of an argument depends on the command type. Finally, `arguments`  consists of all the arguments of all the commands, simply one after the other.
 > The meaning of the chunk codes is unknown in general. Only a handful of values seem to occur, all in the range 0x300 - 0x500, and 0x1B, 0x1D. Many codes only ever seem to appear with a fixed, specific signature of commands.
 > These are the known commands and their argument sizes.
+> 
 > | command | argument size (bytes) | Description/Notes              |
 > |---------|-----------------------|--------------------------------|
 > | 0x00    | 4                     | ?                              |
@@ -83,6 +84,7 @@ It was at this point, when I first looked at Generals' replay files, that I wond
 > | 0x08    | 16                    | 4 uint32\_t's?                 |
 > | 0x09    | 4/16                  | 4 bytes in BFME2, 16 otherwise |
 > | 0x0A    | 4                     | 4 uint32\_t's?                 |
+> 
 > There is no footer. The final chunk has `number_of_commands` set to zero, and it appears to have command code 0x1B or 0x1D.
 
 ## Parsing the header
@@ -328,7 +330,7 @@ As I mentioned at the beginning, my motivation for parsing Generals replay files
     <iframe width="560" height="315" src="https://www.youtube.com/embed/XNP_DfLrVQw" frameborder="0" gesture="media" allow="encrypted-media" allowfullscreen></iframe>
 </div>
 
-The code for "playing" a replay iterates through the chunks, with the appropriate timing, and executes each chunk's order - for example, creating a building or setting the camera's position. There's a huge amount still to do. There are some mysteries that will have to be solved, such as the random number generator (RNG) used by Generals, so there are no guarantees that we'll really be able to do it - but if I worried too much about that, I wouldn't have started OpenSAGE in the first place. On the bright side, much of the code for viewing a replay will carry over, as-is, to actually playing single-player and multi-player games.
+The code for "playing" a replay iterates through the chunks, with the appropriate timing, and executes each chunk's order - for example, creating a building or setting the camera's position. There's a huge amount still to do. There are some mysteries that will have to be solved, such as the random number generator (RNG) used by Generals, so there are no guarantees that we'll really be able to do it - but if I worried too much about that, I wouldn't have started OpenSAGE in the first place. On the bright side, much of the code for running through a replay will carry over, as-is, to actually playing single-player and multi-player games.
 
 ## The end
 
