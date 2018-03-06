@@ -44,3 +44,20 @@
         position:absolute;
     }
 }
+
+article {
+    table {
+        display: block;
+        overflow-x: scroll;
+
+        td {
+            white-space: nowrap;
+        }
+    }
+
+    blockquote {
+        border-left: solid 5px lightgray;
+        margin-left: 0;
+        padding-left: 1em;
+    }
+}

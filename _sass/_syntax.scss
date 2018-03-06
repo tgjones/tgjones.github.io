@@ -8,7 +8,7 @@ code {
   background-color: #EEE;
   border-radius: 4px;
   font-family: $monospace;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
 div.highlighter-rouge,
@@ -48,6 +48,7 @@ pre.highlight {
 
 pre.highlight code {
   background-color: inherit;
+  padding: 0;
 }
 
 figure.highlight {
