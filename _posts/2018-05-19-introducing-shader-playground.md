@@ -1,6 +1,6 @@
 ---
 title:   "Introducing Shader Playground"
-date:    2018-05-19 09:00:00 UTC
+date:    2018-05-19 05:00:00 UTC
 excerpt: "Introducing a new shader playground website, supporting compilation and transpilation of HLSL and GLSL"
 tags:    shaders HLSL GLSL SPIR-V
 ---
