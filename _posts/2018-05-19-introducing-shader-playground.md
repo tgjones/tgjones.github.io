@@ -13,7 +13,7 @@ However, the Try HLSL website was always a bit limited. It only worked with HLSL
 
 * [Shader Playground](http://shader-playground.timjones.io).
 
-{% responsive_image path: assets/posts/shader-playground-compiler.png alt: "Screenshot of Shader Playground website" %}
+{% responsive_image path: assets/posts/shader-playground.png alt: "Screenshot of Shader Playground website" %}
 
 Let me first list the features:
 
