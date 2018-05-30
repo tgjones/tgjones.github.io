@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>The Matrix Inverted - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">The Matrix Inverted</h1>
+
+    <div class="post-date">
+        <time datetime="2014-10-20T15:19:00+00:00">20 October 2014</time>
+    </div>
+
+    
+
+    <blockquote>
+  <p>No one can be told what matrix inversion is. You have to see it for yourself.</p>
+</blockquote>
+
+<h2 id="introduction">Introduction</h2>
+
+<ul>
+  <li>The code for this blog post can be found <a href="https://gist.github.com/tgjones/06ddde4d9f7794d3883a">in this Gist</a>.</li>
+</ul>
+
+<p>I find it refreshing, every now and then, to step outside of my programming comfort zone. In this post, I’m going to do that in two dimensions: language (C++) and domain (maths). On the language front, C# and Ruby are syntactically comfortable for me; F# is relatively new to me, although <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">I do love a bit of significant whitespace</a>. I learnt the basics of C++ in uni, but that’s about it.</p>
+
+<p>A little while ago, I started writing a ray tracer in C++, for “fun”, and to learn some of the new things that were added in C++11. I didn’t get far with the ray tracer, but I did write some of the pre-requisite maths code, including a matrix inversion function. Perhaps it’s <em>because</em> I was doing things like writing a matrix inversion function, and not using someone else’s maths library, that I didn’t get far with the ray tracer. Anyway, let’s get this out of the way: I’m not a C++ expert. So take all this with a dose of skepticism, because I might be and probably am wrong.</p>
+
+<p>I’m going to explain the matrix inversion function that I wrote, but before that I’m going to attempt to briefly explain how to do matrix inversion at a mathematical level. Again, a warning: I <em>think</em> I’ve got the details right, but if your Mars rover accidentally lands on Venus because you copied and pasted my matrix code, don’t blame me.</p>
+
+<p>With that said, let’s jump right in. I will present an implementation of matrix inversion using C++ templates. If you’re familiar with generics in .NET, then templates are a related but separate concept: templates are compile-time-only, unlike generics, and templates are more powerful than generics in many respects; for example they support non-type template parameters and template specialisation (I’ll go into more detail on both of those below).</p>
+
+<p><img src="/assets/posts/the-matrix-inverted.jpg" alt="The Matrix Inverted" /></p>
+
+<p>(Get it? Yeah, sorry about that.)</p>
+
+<p>Let’s see what templates look like in C++. We’ll start by defining a matrix class:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">int</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="k">class</span> <span class="nc">Matrix</span>
+<span class="p">{</span>
+<span class="k">protected</span><span class="o">:</span>
+  <span class="c1">// Protected data
+</span>  <span class="kt">float</span> <span class="n">m</span><span class="p">[</span><span class="n">Order</span> <span class="o">*</span> <span class="n">Order</span><span class="p">];</span>
+<span class="p">};</span>
+</code></pre>
+</div>
+
+<p>Note that, unlike with .NET generics, we aren’t constrained to just type parameters. The <code class="highlighter-rouge">Order</code> parameter is an integer, and we can use it at compile-time within the class definition to initialise the array, <code class="highlighter-rouge">m</code>, to the correct size.</p>
+
+<p>We can declare an instance of the class like this:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">auto</span> <span class="n">myMatrix</span> <span class="o">=</span> <span class="n">Matrix</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span><span class="p">();</span>
+</code></pre>
+</div>
+
+<p>Using variadic templates, a nice feature of C++11, we can provide a constructor that takes a variable number of arguments (similar to C#’s <code class="highlighter-rouge">params</code> keyword). But this is C++. So we’re able to assert, at compile time, that the constructor has been called with the correct number of arguments:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">int</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span><span class="p">...</span> <span class="n">Arguments</span><span class="o">&gt;</span>
+<span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;::</span><span class="n">Matrix</span><span class="p">(</span><span class="n">Arguments</span><span class="p">...</span> <span class="n">values</span><span class="p">)</span>
+  <span class="o">:</span> <span class="n">m</span> <span class="p">{</span> <span class="n">values</span><span class="p">...</span> <span class="p">}</span>
+<span class="p">{</span>
+  <span class="k">static_assert</span><span class="p">(</span><span class="k">sizeof</span><span class="p">...(</span><span class="n">Arguments</span><span class="p">)</span> <span class="o">==</span> <span class="n">Order</span> <span class="o">*</span> <span class="n">Order</span><span class="p">,</span>
+                <span class="s">"Incorrect number of arguments"</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<h2 id="the-maths">The maths</h2>
+
+<p>Before we get into the matrix inversion code, let’s take a (short) journey through how matrix inversion works at a mathematical level. (I have to assume a basic understanding of matrices, because otherwise this post would be a lot longer, but <a href="http://www.mathsisfun.com/algebra/matrix-introduction.html">there’s a nice introduction here</a>.) According to Wikipedia, <a href="http://en.wikipedia.org/wiki/Invertible_matrix#Methods_of_matrix_inversion">there are many ways</a> to invert a matrix. I’m using the <a href="http://en.wikipedia.org/wiki/Invertible_matrix#Analytic_solution">analytic solution</a>, otherwise known as the adjoint method.</p>
+
+<p>Why would you want to invert a matrix? Well, in 3D graphics, matrix inverses are used all the time. For example, to transform normals correctly in the presence of non-uniform scaling, you need to use the <a href="http://www.arcsynthesis.org/gltut/Illumination/Tut09%20Normal%20Transformation.html">transpose of the inverse of the model matrix</a>. Or if you have a 3D point in world space, and you want to transform it back into model space, you can transform it using the inverse of the model matrix.</p>
+
+<p>The examples that follow use a 3x3 matrix, but the code we’re building will work on any square matrix.</p>
+
+<p>The inverse of a matrix is analogous to the reciprocal of a number. For a number $a$, the reciprocal is $\frac{1}{a}$ (or $a^{-1}$). The original number multiplied by its reciprocal is equal to 1. Let’s say $a$ is 5:</p>
+
+<script type="math/tex; mode=display">5 \times 5^{-1} = 5 \times \frac{1}{5} = 1</script>
+
+<p>But you can’t divide a matrix by a number - or rather you can, but it’s mathematically meaningless. Inverses are to matrices what reciprocals are to numbers. We’ll start with a 3x3 matrix, $A$:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+A =
+  \begin{bmatrix}
+  1 & 2 & 3 \\
+  4 & 0 & 5 \\
+  6 & 1 & 2
+  \end{bmatrix} %]]></script>
+
+<p>The inverse of $A$ is a matrix $A^{-1}$ that satisfies the following equation, where $I$ is the identity matrix:</p>
+
+<script type="math/tex; mode=display">A \times A^{-1} = I</script>
+
+<p>So now we need to figure out what $A^{-1}$ is. One method for doing so is the adjoint method, which involves these steps:</p>
+
+<ol>
+  <li>Calculate the matrix of minors</li>
+  <li>Transform that into the cofactor matrix</li>
+  <li>Transform that into the adjoint</li>
+  <li>Multiply that by 1 / determinant</li>
+</ol>
+
+<p><a href="http://uncyclopedia.wikia.com/wiki/Proof#Proof_by_Delegation">The proof is left as an exercise for the reader.</a></p>
+
+<h3 id="matrix-of-minors">Matrix of minors</h3>
+
+<p>The first step in calculating the matrix inverse is to calculate the <a href="http://en.wikipedia.org/wiki/Minor_(linear_algebra)">minor</a> of each element.</p>
+
+<blockquote>
+  <p>If A is a square matrix, then the minor of the entry in the i-th row and j-th column… is the determinant of the submatrix formed by deleting the i-th row and j-th column.</p>
+</blockquote>
+
+<p>To calculate the minors for each element, we:</p>
+
+<ul>
+  <li>ignore the values in the current row and column, and</li>
+  <li>calculate the determinant of the remaining values</li>
+</ul>
+
+<p>If you’re wondering what a <a href="http://en.wikipedia.org/wiki/Determinant">determinant</a> is, here’s what Wikipedia has to say:</p>
+
+<blockquote>
+  <p>In linear algebra, the determinant is a value associated with a square matrix. It can be computed from the entries of the matrix by a specific arithmetic expression, while other ways to determine its value exist as well.</p>
+</blockquote>
+
+<p>Take another look at our matrix:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+A =
+  \begin{bmatrix}
+  1 & 2 & 3 \\
+  4 & 0 & 5 \\
+  6 & 1 & 2
+  \end{bmatrix} %]]></script>
+
+<p>To calculate the minor for the top-left value (1), we calculate the determinant of the submatrix formed by deleting the first row and the first column:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+M_{0,0} = det
+  \begin{bmatrix}
+  \Box & \Box & \Box \\
+  \Box & 0 & 5 \\
+  \Box & 1 & 2
+  \end{bmatrix}
+= det
+  \begin{bmatrix}
+  0 & 5 \\
+  1 & 2
+  \end{bmatrix}
+= -5 %]]></script>
+
+<p>Let’s apply that to all the values in the matrix:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+M =
+  \begin{bmatrix}
+    \begin{vmatrix} 0 & 5 \\ 1 & 2 \end{vmatrix} &
+    \begin{vmatrix} 4 & 5 \\ 6 & 2 \end{vmatrix} &
+    \begin{vmatrix} 4 & 0 \\ 6 & 1 \end{vmatrix} \\
+    \begin{vmatrix} 2 & 3 \\ 1 & 2 \end{vmatrix} &
+    \begin{vmatrix} 1 & 3 \\ 6 & 2 \end{vmatrix} &
+    \begin{vmatrix} 1 & 2 \\ 6 & 1 \end{vmatrix} \\
+    \begin{vmatrix} 2 & 3 \\ 0 & 5 \end{vmatrix} &
+    \begin{vmatrix} 1 & 3 \\ 4 & 5 \end{vmatrix} &
+    \begin{vmatrix} 1 & 2 \\ 4 & 0 \end{vmatrix}
+  \end{bmatrix}
+=
+  \left[
+  \begin{array}{r}
+  -5 & -22 & 4 \\
+  1 & -16 & -11 \\
+  10 & -7 & -8
+  \end{array}
+  \right] %]]></script>
+
+<p>So now we have a matrix of minors.</p>
+
+<h3 id="cofactor-matrix">Cofactor matrix</h3>
+
+<p>The next step is to turn these minors into <a href="http://en.wikipedia.org/wiki/Minor_(linear_algebra)#Inverse_of_a_matrix">cofactors</a>. Technically, the (i,j) cofactor is calculated by multiplying the minor by $(-1)^{i+j}$. More intuitively, we can apply a “checkerboard” of pluses and minuses to the matrix of minors:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+\begin{bmatrix}
+  + & - & + \\
+  - & + & - \\
+  + & - & +
+  \end{bmatrix} %]]></script>
+
+<p>We can apply this to our matrix of minors, $M$, to find the cofactor matrix, $C$:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+C =
+  \left[
+  \begin{array}{r}
+  -5 & -(-22) & 4 \\
+  -(1) & -16 & -(-11) \\
+  10 & -(-7) & -8
+  \end{array}
+  \right]
+=
+  \left[
+  \begin{array}{r}
+  -5 & 22 & 4 \\
+  -1 & -16 & 11 \\
+  10 & 7 & -8
+  \end{array}
+  \right] %]]></script>
+
+<h3 id="adjoint-matrix">Adjoint matrix</h3>
+
+<p>Next, we calculate the adjoint, or <a href="http://en.wikipedia.org/wiki/Adjugate_matrix">adjugate</a>, matrix. The adjoint of $A$ is the transpose of its cofactor matrix, $C$. Transposing a matrix means swapping matrix element positions over the diagonal, with the diagonal staying the same:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+adj\,A = C^T =
+  \left[
+  \begin{array}{r}
+  -5 & 22 & 4 \\
+  -1 & -16 & 11 \\
+  10 & 7 & -8
+  \end{array}
+  \right]^T
+=
+  \left[
+  \begin{array}{r}
+  -5 & -1 & 10 \\
+  22 & -16 & 7 \\
+  4 & 11 & -8
+  \end{array}
+  \right] %]]></script>
+
+<h3 id="inverse-matrix">Inverse matrix</h3>
+
+<p>Finally, the <a href="http://en.wikipedia.org/wiki/Invertible_matrix">inverse matrix</a> is the adjoint matrix multiplied by the inverse of the determinant:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+A^{-1} = \frac 1 {det\,A} (adj\,A) = \frac 1 {51}
+  \left[
+  \begin{array}{r}
+  -5 & -1 & 10 \\
+  22 & -16 & 7 \\
+  4 & 11 & -8
+  \end{array}
+  \right]
+= 
+  \left[
+  \begin{array}{r}
+  \tfrac{-5}{51} & \tfrac{-1}{51} & \tfrac{10}{51} \\
+  \tfrac{22}{51} & \tfrac{-16}{51} & \tfrac{7}{51} \\
+  \tfrac{4}{51} & \tfrac{11}{51} & \tfrac{-8}{51}
+  \end{array}
+  \right] %]]></script>
+
+<p>If this is indeed an inverse, then multiplying the original matrix by it should result in the identity matrix. Let’s check that:</p>
+
+<script type="math/tex; mode=display">% <![CDATA[
+\begin{align}
+A \times A^{-1} & = 
+  \begin{bmatrix}
+  1 & 2 & 3 \\
+  4 & 0 & 5 \\
+  6 & 1 & 2
+  \end{bmatrix}
+
+  \left[
+  \begin{array}{r}
+  \tfrac{-5}{51} & \tfrac{-1}{51} & \tfrac{10}{51} \\
+  \tfrac{22}{51} & \tfrac{-16}{51} & \tfrac{7}{51} \\
+  \tfrac{4}{51} & \tfrac{11}{51} & \tfrac{-8}{51}
+  \end{array}
+  \right]
+
+\\
+& =
+
+  \left[
+  \begin{array}{r}
+  1 \tfrac{-5}{51} + 2 \tfrac{22}{51} + 3 \tfrac{4}{51} &
+  1 \tfrac{-1}{51} + 2 \tfrac{-16}{51} + 3 \tfrac{11}{51} &
+  1 \tfrac{10}{51} + 2 \tfrac{7}{51} + 3 \tfrac{-8}{51} \\
+  4 \tfrac{-5}{51} + 0 \tfrac{22}{51} + 5 \tfrac{4}{51} &
+  4 \tfrac{-1}{51} + 0 \tfrac{-16}{51} + 5 \tfrac{11}{51} &
+  4 \tfrac{10}{51} + 0 \tfrac{7}{51} + 5 \tfrac{-8}{51} \\
+  6 \tfrac{-5}{51} + 1 \tfrac{22}{51} + 2 \tfrac{4}{51} &
+  6 \tfrac{-1}{51} + 1 \tfrac{-16}{51} + 2 \tfrac{11}{51} &
+  6 \tfrac{10}{51} + 1 \tfrac{7}{51} + 2 \tfrac{-8}{51} \\
+  \end{array}
+  \right]
+
+\\
+& =
+
+  \begin{bmatrix}
+  1 & 0 & 0 \\
+  0 & 1 & 0 \\
+  0 & 0 & 1
+  \end{bmatrix}
+
+\\
+& = I
+\end{align} %]]></script>
+
+<p>Whew - that’s enough maths for now. We’ve walked through the steps required to calculate a matrix inverse; now let’s generalise it into code.</p>
+
+<h2 id="the-code">The code</h2>
+
+<h3 id="calculating-matrix-minors">Calculating matrix minors</h3>
+
+<p>A minor (technically, first minor) of a matrix is the determinant of a submatrix that has a dimension one less than the matrix. So the minor of a 3x3 matrix will be the determinant of a 2x2 submatrix. So…</p>
+
+<ul>
+  <li>first we’ll write a function - <code class="highlighter-rouge">getSubmatrix</code> - that creates a submatrix with a dimension one less than the original matrix,</li>
+  <li>and then we’ll write another function - <code class="highlighter-rouge">calculateDeterminant</code> - to compute the determinant of that submatrix,</li>
+  <li>and we’ll write an entry point to these two functions - <code class="highlighter-rouge">calculatorMinor</code>.</li>
+</ul>
+
+<p>Here’s the declaration of <code class="highlighter-rouge">getSubmatrix</code>:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">unsigned</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span> <span class="o">-</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">getSubmatrix</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span> <span class="n">src</span><span class="p">,</span> <span class="kt">int</span> <span class="n">row</span><span class="p">,</span> <span class="kt">int</span> <span class="n">col</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>I mentioned earlier that C++ lets us use integers as type parameters; well, it turns out we can apply mathematical operations to those type parameters, just like we can in normal code. But - and this is important - unlike generics in C#, type parameters are compiled away, so they won’t introduce any runtime overhead. In this case, the compiler will create a version of this function for each value of <code class="highlighter-rouge">&lt;Order - 1&gt;</code> that is actually used by our program.</p>
+
+<p>Let’s see the full definition of <code class="highlighter-rouge">getSubmatrix</code>:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">unsigned</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span> <span class="o">-</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">getSubmatrix</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span> <span class="n">src</span><span class="p">,</span> <span class="kt">int</span> <span class="n">row</span><span class="p">,</span> <span class="kt">int</span> <span class="n">col</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="kt">int</span> <span class="n">colCount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">rowCount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+	
+  <span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span> <span class="o">-</span> <span class="mi">1</span><span class="o">&gt;</span> <span class="n">dest</span><span class="p">;</span>
+  <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">Order</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+  <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">i</span> <span class="o">!=</span> <span class="n">row</span><span class="p">)</span>
+    <span class="p">{</span>
+      <span class="n">colCount</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+      <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">Order</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span>
+      <span class="p">{</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">j</span> <span class="o">!=</span> <span class="n">col</span><span class="p">)</span>
+        <span class="p">{</span>
+          <span class="n">dest</span><span class="p">(</span><span class="n">rowCount</span><span class="p">,</span> <span class="n">colCount</span><span class="p">)</span> <span class="o">=</span> <span class="n">src</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">);</span>
+          <span class="n">colCount</span><span class="o">++</span><span class="p">;</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+      <span class="n">rowCount</span><span class="o">++</span><span class="p">;</span>
+    <span class="p">}</span>
+  <span class="p">}</span>
+	
+  <span class="k">return</span> <span class="n">dest</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>We pass in <code class="highlighter-rouge">row</code> and <code class="highlighter-rouge">col</code> to specify which element we want to calculate the minor for. Then we iterate through the elements in the source matrix, skipping the specified row and column, and copy the values into the output matrix.</p>
+
+<p>Now that we can compute the submatrix for a given matrix element, let’s write a function to calculate the determinant of that submatrix:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">unsigned</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="kt">double</span> <span class="n">calculateDeterminant</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span> <span class="n">mat</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="kt">float</span> <span class="n">det</span> <span class="o">=</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">;</span>
+    
+  <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">Order</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+  <span class="p">{</span>
+    <span class="c1">// Get minor of element (0, i)
+</span>    <span class="kt">float</span> <span class="n">minor</span> <span class="o">=</span> <span class="n">calculateMinor</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span><span class="p">(</span><span class="n">mat</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">);</span>
+        
+    <span class="c1">// If this is an odd-numbered row, negate the value.
+</span>    <span class="kt">float</span> <span class="n">factor</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">?</span> <span class="o">-</span><span class="mf">1.0</span><span class="n">f</span> <span class="o">:</span> <span class="mf">1.0</span><span class="n">f</span><span class="p">;</span>
+        
+    <span class="n">det</span> <span class="o">+=</span> <span class="n">factor</span> <span class="o">*</span> <span class="n">mat</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="o">*</span> <span class="n">minor</span><span class="p">;</span>
+  <span class="p">}</span>
+    
+  <span class="k">return</span> <span class="n">det</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Do you notice anything strange about this code? At the beginning of this section, I mentioned that we’re first writing <code class="highlighter-rouge">getSubmatrix</code> and <code class="highlighter-rouge">calculateDeterminant</code>, and then we’ll call them from a 3rd function, <code class="highlighter-rouge">calculateMinor</code>. But we’re calling <code class="highlighter-rouge">calculateMinor</code> from inside <code class="highlighter-rouge">calculateDeterminant</code>! There’s clearly some recursion going on here.</p>
+
+<p>Recursion turns out to be an elegant way of calculating a determinant. The recursive method of calculating a determinant is also known as <a href="http://www.euclideanspace.com/maths/algebra/matrix/functions/determinant/">expansion by minors</a>. It’s easiest to think of <code class="highlighter-rouge">calculateDeterminant</code> calling <code class="highlighter-rouge">calculateMinor</code> as an implementation detail, although I’m sure that smarter brains than mine can point out the underlying connection. Recursion always requires a base case, and in this case, we’ll make a 2x2 matrix our base case - it’s easy to calculate the determinant for 2x2 matrices directly. And how do we do that? C++ allows us to <a href="http://www.cprogramming.com/tutorial/template_specialization.html">specialize templates</a>. So we can provide a “specialized” version of <code class="highlighter-rouge">calculateDeterminant</code> to use when <code class="highlighter-rouge">Order</code> equals 2:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="c1">// Template specialization for 2x2 matrix
+</span><span class="k">template</span> <span class="o">&lt;&gt;</span>
+<span class="kt">double</span> <span class="n">calculateDeterminant</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="mi">2</span><span class="o">&gt;</span> <span class="n">mat</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="n">mat</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">*</span> <span class="n">mat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-</span> <span class="n">mat</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">mat</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Finally, we can now write <code class="highlighter-rouge">calculateMinor</code>:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">unsigned</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="kt">double</span> <span class="n">calculateMinor</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span> <span class="n">src</span><span class="p">,</span> <span class="kt">int</span> <span class="n">row</span><span class="p">,</span> <span class="kt">int</span> <span class="n">col</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">minorSubmatrix</span> <span class="o">=</span> <span class="n">getSubmatrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">);</span>
+  <span class="k">return</span> <span class="n">calculateDeterminant</span><span class="o">&lt;</span><span class="n">Order</span> <span class="o">-</span> <span class="mi">1</span><span class="o">&gt;</span><span class="p">(</span><span class="n">minorSubmatrix</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<h3 id="calculating-the-matrix-inverse">Calculating the matrix inverse</h3>
+
+<p>The maths section above described the four steps to calculate the matrix inverse:</p>
+
+<ol>
+  <li>Calculate the matrix of minors</li>
+  <li>Transform that into the cofactor matrix</li>
+  <li>Transform that into the adjoint</li>
+  <li>Multiply that by 1 / determinant</li>
+</ol>
+
+<p>We’re now ready to implement that in code:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">int</span> <span class="n">Order</span><span class="o">&gt;</span>
+<span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span>
+<span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;::</span><span class="n">invert</span><span class="p">(</span><span class="k">const</span> <span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;&amp;</span> <span class="n">m</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="c1">// Calculate the inverse of the determinant of m.
+</span>  <span class="kt">float</span> <span class="n">det</span> <span class="o">=</span> <span class="n">calculateDeterminant</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">);</span>
+  <span class="kt">float</span> <span class="n">inverseDet</span> <span class="o">=</span> <span class="mf">1.0</span><span class="n">f</span> <span class="o">/</span> <span class="n">det</span><span class="p">;</span>
+	
+  <span class="n">Matrix</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span> <span class="n">result</span><span class="p">;</span>
+    
+  <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">j</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">Order</span><span class="p">;</span> <span class="n">j</span><span class="o">++</span><span class="p">)</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">Order</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+    <span class="p">{</span>
+      <span class="c1">// Get minor of element (j, i) - not (i, j) because
+</span>      <span class="c1">// this is where the transpose happens.
+</span>      <span class="kt">float</span> <span class="n">minor</span> <span class="o">=</span> <span class="n">calculateMinor</span><span class="o">&lt;</span><span class="n">Order</span><span class="o">&gt;</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">i</span><span class="p">);</span>
+            
+      <span class="c1">// Multiply by (−1)^{i+j}
+</span>      <span class="kt">float</span> <span class="n">factor</span> <span class="o">=</span> <span class="p">((</span><span class="n">i</span> <span class="o">+</span> <span class="n">j</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span> <span class="o">?</span> <span class="o">-</span><span class="mf">1.0</span><span class="n">f</span> <span class="o">:</span> <span class="mf">1.0</span><span class="n">f</span><span class="p">;</span>
+      <span class="kt">float</span> <span class="n">cofactor</span> <span class="o">=</span> <span class="n">minor</span> <span class="o">*</span> <span class="n">factor</span><span class="p">;</span>
+      
+      <span class="n">result</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span> <span class="o">=</span> <span class="n">inverseDet</span> <span class="o">*</span> <span class="n">cofactor</span><span class="p">;</span>
+    <span class="p">}</span>
+    
+  <span class="k">return</span> <span class="n">result</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>This function doesn’t exactly follow the four steps above. The end result is the same, but it squashes steps 2, 3 and 4 into one <code class="highlighter-rouge">for</code> loop, for efficiency.</p>
+
+<p>First, we calculate the inverse of the determinant of the whole matrix; we’ll need to multiply each element of the cofactor by this value.</p>
+
+<p>Then, for each element in the matrix:</p>
+
+<ul>
+  <li>calculate the minor for the <em>transpose</em> of the current element (remember transposing a matrix means flipping it across its diagonal),</li>
+  <li>calculate the cofactor (multiply the minor by $(-1)^{i+j}$),</li>
+  <li>multiply by the inverse of the determinant, and</li>
+  <li>place into the result matrix</li>
+</ul>
+
+<p>And that’s it! Now we can call our <code class="highlighter-rouge">invert</code> function, and then multiply the inverse by the original and check that we get the identity matrix:</p>
+
+<div class="language-cpp highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span> <span class="o">*</span> <span class="n">argv</span><span class="p">[])</span>
+<span class="p">{</span>
+  <span class="k">auto</span> <span class="n">original</span> <span class="o">=</span> <span class="n">Matrix</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;</span>
+    <span class="p">(</span><span class="mf">3.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">2.0</span><span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="n">f</span><span class="p">,</span>
+     <span class="mf">1.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">2.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.0</span><span class="n">f</span><span class="p">,</span>
+     <span class="mf">4.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">6.0</span><span class="n">f</span><span class="p">,</span> <span class="o">-</span><span class="mf">3.0</span><span class="n">f</span><span class="p">,</span>
+     <span class="mf">5.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">2.0</span><span class="n">f</span><span class="p">,</span> <span class="mf">0.0</span><span class="n">f</span><span class="p">);</span>
+    
+  <span class="k">auto</span> <span class="n">inverted</span> <span class="o">=</span> <span class="n">Matrix</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;::</span><span class="n">invert</span><span class="p">(</span><span class="n">original</span><span class="p">);</span>
+    
+  <span class="n">assert</span><span class="p">((</span><span class="n">original</span> <span class="o">*</span> <span class="n">inverted</span><span class="p">).</span><span class="n">approximatelyEquals</span><span class="p">(</span><span class="n">Matrix</span><span class="o">&lt;</span><span class="mi">4</span><span class="o">&gt;::</span><span class="n">identity</span><span class="p">()));</span>
+    
+  <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p><a href="https://gist.github.com/tgjones/06ddde4d9f7794d3883a">The code I’ve shown here, as well as some supporting code, can be found in this Gist.</a></p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>I’ve shown the adjoint method of inverting a matrix inverse, implemented in C++ using templates. There are a number of improvements that could be made. One improvement would be to cache matrix minors, to avoid recalculating the same values over and over again. Also, I’m not handling singular matrices, which don’t have an inverse.</p>
+
+<p>I’ve read that if you’re working with matrices larger than 4x4, then the adjoint method doesn’t scale well. For larger matrices there are apparently better choices, such as <a href="http://en.wikipedia.org/wiki/Invertible_matrix#Gaussian_elimination">Gauss-Jordan elimination</a>. The <a href="http://vikparuchuri.com/blog/find-the-determinant-of-a-matrix/">Laplace expansion</a> is another option for calculating the determinant of larger matrices, but I haven’t investigated it myself.</p>
+
+<p>One final caveat: you probably shouldn’t actually use this code, unless you really do need to deal with matrices of arbitrary dimension (and even then there are faster methods). In 3D graphics, for example, you know ahead of time what size of matrix you need to work with (usually <code class="highlighter-rouge">Matrix3</code>, <code class="highlighter-rouge">Matrix4</code>, and perhaps <code class="highlighter-rouge">Matrix2</code>). You’ll get better performance by hard-coding the matrix inversion functions for the sizes you need.</p>
+
+<p>However, I still think it’s interesting to know how matrix inversion works, whatever you end up using in your application. Or, to put it another way:</p>
+
+<blockquote>
+  <p>Neo: What are you trying to tell me? That I can invert arbitrarily sized matrices?<br />
+Morpheus: No, Neo. I’m trying to tell you that when you’re ready, you won’t have to.</p>
+</blockquote>
+
+<p>(With apologies to, well, everybody with a sense of humour.)</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/09/14/writing-a-minic-to-msil-compiler-in-fsharp-part-6-conclusion">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/11/24/getting-started-with-jetbrains-nitra">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

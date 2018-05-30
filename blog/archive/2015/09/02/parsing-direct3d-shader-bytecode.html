@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Parsing Direct3D shader bytecode - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Parsing Direct3D shader bytecode</h1>
+
+    <div class="post-date">
+        <time datetime="2015-09-02T15:54:00+00:00">02 September 2015</time>
+    </div>
+
+    
+
+    <h2 id="tldr">TL/DR</h2>
+
+<p>In this post, I will discuss the Direct3D shader bytecode format, and how to parse it without using the Direct3D API. This is basically a write-up of <a href="https://github.com/tgjones/slimshader">SlimShader</a>, a .NET library that can read in Direct3D 10 / 11 HLSL bytecode and give you back the shader instructions and metadata as nicely structured objects.</p>
+
+<ul>
+  <li><a href="#hlsl-sm-assembly">HLSL and Shader Model 4 / 5 assembly</a></li>
+  <li><a href="#parsing-shader-bytecode">Parsing shader bytecode</a></li>
+  <li><a href="#rdef-chunk">RDEF chunk</a></li>
+  <li><a href="#isgn-chunk">ISGN chunk</a></li>
+  <li><a href="#osgn-chunk">OSGN chunk</a></li>
+  <li><a href="#shdr-chunk">SHDR chunk</a></li>
+  <li><a href="#stat-chunk">STAT chunk</a></li>
+  <li><a href="#other-chunk-types">Other chunk types</a></li>
+  <li><a href="#conclusion">Conclusion</a></li>
+</ul>
+
+<h2 id="warning-niche-content-ahead">Warning: niche content ahead</h2>
+
+<p>This topic is not for everyone. More accurately, very few people will ever need to know any of this. The details of Direct3D’s shader bytecode format are really only useful to Microsoft and their hardware partners.</p>
+
+<p>So why am I interested in understanding how HLSL shader bytecode works? The simple answer is: <a href="https://en.wikiquote.org/wiki/George_Mallory">because it’s there</a>.</p>
+
+<p>The longer answer is: I got started on all of this while writing a software rasteriser - <a href="https://github.com/tgjones/rasterizr">Rasterizr</a> - and I wanted to use real HLSL shaders in the software rasterisation pipeline. I didn’t want to take a dependency on Direct3D - so instead, I figured out how to disassemble compiled HLSL shaders back to assembly instructions, and then I wrote a <a href="https://github.com/tgjones/slimshader/tree/master/src/SlimShader.VirtualMachine">virtual machine that can execute these assembly instructions</a> entirely on the CPU. I implemented both an interpreter and a <a href="https://github.com/tgjones/slimshader/tree/master/src/SlimShader.VirtualMachine.Jitter">JIT compiler</a> (the JIT compiler actually has pretty good performance, although obviously it’s still orders of magnitude slower than a GPU). Admittedly, that was a huge amount of effort for what is mostly a pointless (albeit fun) project. Here’s a screenshot of the debugging GUI I built for Rasterizr.</p>
+
+<p><img src="/assets/posts/rasterizr-studio.png" alt="" /></p>
+
+<p>I intentionally modelled Rasterizr’s API (and debugging tools) on Direct3D - I wanted Rasterizr to serve as an educational tool, to help me (and perhaps others) understand what’s going on under the bonnet (or “hood”, if you speak <a href="https://i.imgur.com/kn488mY.jpg">Simplified English</a>) in Direct3D.</p>
+
+<p>Something vaguely useful did come out of my work on SlimShader - <a href="http://timjones.tw/blog/archive/2014/01/07/introducing-hlslunit-unit-tests-for-your-hlsl-shader-code">HlslUnit</a>, a unit testing library for HLSL code.</p>
+
+<p>If you’re still reading, I’ll assume you’re okay with the niche-ness of this topic. Let’s get started.</p>
+
+<p><a name="hlsl-sm-assembly"></a></p>
+
+<h2 id="hlsl-and-shader-model-4--5-assembly">HLSL and Shader Model 4 / 5 assembly</h2>
+
+<p>The following code is a simple, but complete, HLSL vertex shader. We’ll be following this shader through compilation to binary bytecode. Then we’ll figure out how to parse the resulting binary, and extract the assembly instructions and metadata back out.</p>
+
+<p><em>(A brief aside: we’ll stop our journey at bytecode; GPUs often have their own <a href="http://amd-dev.wpengine.netdna-cdn.com/wordpress/media/2012/10/AMD_Intermediate_Language_(IL)_Specification_v2.pdf">intermediate</a> and assembly languages, but that differs from GPU to GPU and is lower-level than we’ll get into here.)</em></p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">struct</span> <span class="n">VertexShaderInput</span>
+<span class="p">{</span>
+    <span class="n">float3</span> <span class="n">pos</span> <span class="o">:</span> <span class="n">POSITION</span><span class="p">;</span>
+    <span class="n">float2</span> <span class="n">tex</span> <span class="o">:</span> <span class="n">TEXCOORD</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">PixelShaderInput</span>
+<span class="p">{</span>
+    <span class="n">float4</span> <span class="n">pos</span> <span class="o">:</span> <span class="n">SV_POSITION</span><span class="p">;</span>
+    <span class="n">float2</span> <span class="n">tex</span> <span class="o">:</span> <span class="n">TEXCOORD</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">float4x4</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+
+<span class="n">PixelShaderInput</span> <span class="nf">VS</span><span class="p">(</span><span class="n">VertexShaderInput</span> <span class="n">input</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">PixelShaderInput</span> <span class="n">output</span><span class="p">;</span>
+
+    <span class="n">output</span><span class="p">.</span><span class="n">pos</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">float4</span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">pos</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="n">WorldViewProjection</span><span class="p">);</span>
+    <span class="n">output</span><span class="p">.</span><span class="n">tex</span> <span class="o">=</span> <span class="n">input</span><span class="p">.</span><span class="n">tex</span><span class="p">;</span>
+
+    <span class="k">return</span> <span class="n">output</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Now let’s compile this shader using <code class="highlighter-rouge">fxc.exe</code>, the HLSL shader compiler:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>fxc.exe /Fo TestShader.o /T vs_4_0 /E VS /nologo TestShader.hlsl
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">/T</code> parameter sets the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/bb509626(v=vs.85).aspx">target profile</a> to <code class="highlighter-rouge">vs_4_0</code>, and the <code class="highlighter-rouge">/E</code> parameter sets the entry point function to <code class="highlighter-rouge">VS</code>.</p>
+
+<p>Running that will compile the shader into <code class="highlighter-rouge">TestShader.o</code>, a binary file. This is the file that we’re going to be delving into.</p>
+
+<p><a name="parsing-shader-bytecode"></a></p>
+
+<h2 id="parsing-shader-bytecode">Parsing shader bytecode</h2>
+
+<p><code class="highlighter-rouge">TestShader.o</code> contains the compiled shader, and it’s what you’d use in your game when calling  <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476524(v=vs.85).aspx">CreateVertexShader</a> or <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476513(v=vs.85).aspx">CreatePixelShader</a>.</p>
+
+<p>Direct3D has a <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/dd607326(v=vs.85).aspx">D3DDisassemble</a> function which takes this compiled shader (as a byte array), and disassembles it back to the assembly instructions. Almost all of the time, that’s what you should use, if that’s what you want to do.</p>
+
+<p>But that’s not what we want to do; we want to understand how this file is structured, and parse it ourselves. Let’s delve into this compiled shader file. Since this is a binary file, we’ll need a tool that helps us view binary files. I use <a href="http://www.proxoft.com/downloads.aspx">Binary Viewer</a>.</p>
+
+<p>This is what Binary Viewer looks like after I open <code class="highlighter-rouge">TestShader.o</code>:</p>
+
+<p><a href="/assets/posts/d3d-bytecode-binary-viewer.png"><img src="/assets/posts/d3d-bytecode-binary-viewer.png" alt="" /></a></p>
+
+<p>I’ve made the assumption that if you’ve got this far, you’re familiar with binary files - if not, have a look at <a href="https://en.wikipedia.org/wiki/Binary_file">Wikipedia’s entry on binary files</a>.</p>
+
+<p>Binary Viewer shows the raw bytes on the left, and the ASCII representation of those bytes on the right. Not all byte values are valid ASCII, which is why most of the values on the right use the <code class="highlighter-rouge">◦</code> placeholder. But the ASCII values that <em>are</em> present are interesting.</p>
+
+<p>At the very beginning of the file, the first four bytes are <code class="highlighter-rouge">0x44 0x58 0x42 0x43</code>. Those are the ASCII codes for the string “DXBC”. It turns out that every compiled HLSL shader starts with these four bytes. Looking at the rest of the file, we can see a number of bits of text that look relevant - we’ll get to those soon.</p>
+
+<p>If you compile enough different shaders, and compare / contrast the resulting binaries, you see some patterns start to emerge. That’s the key to understanding how binary files like these are structured (unless of course someone helpfully provides you with the spec, but where would the fun be in that?).</p>
+
+<p>It turns out that compiled HLSL shaders are composed of a header, followed by a number of chunks. This is hinted at by the ASCII strings at the start of each chunk - in this case “RDEF”, “ISGN”, “OSGN”, “SHDR”, and “STAT”. You can see the chunks more clearly if I overlay each one with a different colour:</p>
+
+<p><img src="/assets/posts/d3d-bytecode-chunks.png" alt="" /></p>
+
+<p>The uncoloured section at the beginning of the file is the header. The header contains information we’ll need to successfully parse the file, such as the location of the start of each chunk.</p>
+
+<p>Here’s the structure of the header, including the specific values for our example shader. In the following tables, “byte offset” always means from the start of the file.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0-3</td>
+      <td>“DXBC”</td>
+      <td>Always the string “DXBC”</td>
+    </tr>
+    <tr>
+      <td>4-19</td>
+      <td>1331666272<br />888713072<br />3052922206<br />3470416626</td>
+      <td>Checksum; the HLSL compiler uses a private algorithm to compute this</td>
+    </tr>
+    <tr>
+      <td>20-23</td>
+      <td>1</td>
+      <td>Always the number “1” - I don’t know why this exists, perhaps as a sanity check</td>
+    </tr>
+    <tr>
+      <td>24-27</td>
+      <td>848</td>
+      <td>Total size, in bytes, of the compiled shader, including the header</td>
+    </tr>
+    <tr>
+      <td>28-31</td>
+      <td>5</td>
+      <td>Chunk count</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Next up is the chunk index. For each chunk, you get the offset (in bytes) of the start of that chunk. Our example shader has 5 chunks, so we have 5 entries in the chunk index. To aid in understanding, I’ve added the chunk type as well, but this isn’t part of the chunk index; the chunk type is declared at the start of each chunk.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Byte address of start of chunk</th>
+      <th>Chunk type</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>32-35</td>
+      <td>52</td>
+      <td>RDEF</td>
+    </tr>
+    <tr>
+      <td>36-39</td>
+      <td>268</td>
+      <td>ISGN</td>
+    </tr>
+    <tr>
+      <td>40-43</td>
+      <td>352</td>
+      <td>OSGN</td>
+    </tr>
+    <tr>
+      <td>44-47</td>
+      <td>440</td>
+      <td>SHDR</td>
+    </tr>
+    <tr>
+      <td>48-51</td>
+      <td>724</td>
+      <td>STAT</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>I keep using the word “chunk”, but what exactly does that mean? Chunks are used to break the data in the compiled shader into logical parts. Direct3D (probably) doesn’t always need to load every chunk; I’d guess, for example, that it doesn’t load the STAT chunk unless you use shader reflection APIs. Here are all the chunk types that I’ve seen:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Chunk type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ICFE</td>
+      <td>Interface. Describes any <code class="highlighter-rouge">interface</code>s, and implementing <code class="highlighter-rouge">class</code>es, present in the source HLSL.</td>
+    </tr>
+    <tr>
+      <td>ISGN</td>
+      <td>Input signature</td>
+    </tr>
+    <tr>
+      <td>OSG5</td>
+      <td>Output signature (SM5)</td>
+    </tr>
+    <tr>
+      <td>OSGN</td>
+      <td>Output signature</td>
+    </tr>
+    <tr>
+      <td>PCSG</td>
+      <td>Patch constant signature</td>
+    </tr>
+    <tr>
+      <td>RDEF</td>
+      <td>Resource definition. Describes constant buffers and resource bindings.</td>
+    </tr>
+    <tr>
+      <td>SDGB</td>
+      <td>Shader debugging info (old-style)</td>
+    </tr>
+    <tr>
+      <td>SFI0</td>
+      <td>Not really sure… it stores a value that indicates whether double-precision floating point operations are enabled, but I don’t know why that needs to be in its own chunk</td>
+    </tr>
+    <tr>
+      <td>SHDR</td>
+      <td>Shader (SM4). The shader itself.</td>
+    </tr>
+    <tr>
+      <td>SHEX</td>
+      <td>Shader (SM5)</td>
+    </tr>
+    <tr>
+      <td>SPDB</td>
+      <td>Shader debugging info (new-style)</td>
+    </tr>
+    <tr>
+      <td>STAT</td>
+      <td>Statistics. Useful statistics about the shader, such as instruction count, declaration count, etc.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><a href="https://github.com/tgjones/slimshader">SlimShader</a> exposes all of the data in all of these chunks (except the debugging chunks) through a nice friendly object model. Direct3D exposes some of this data through the <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476590(v=vs.85).aspx"><code class="highlighter-rouge">ID3D11ShaderReflection</code> interface</a>.</p>
+
+<p>I figured out a lot of this stuff the hard way: I compiled multiple shaders, and looked for similarities and differences in the resulting binaries. I also got help from:</p>
+
+<ul>
+  <li>The <a href="https://devel.nuclex.org/framework">Nuclex Framework</a>, in particular the <a href="https://devel.nuclex.org/framework/browser/graphics/Nuclex.Graphics.Native/trunk/Source/Introspection/HlslShaderReflector.cpp">HlslShaderReflector class</a>, was very helpful when figuring out the RDEF, ISGN and OSGN chunks.</li>
+  <li>The <a href="https://github.com/mirrors/wine">Wine</a> project, in particular Wine’s <a href="http://source.winehq.org/source/dlls/d3dcompiler_43/reflection.c">shader reflection code</a>, had some good tips for decoding the STAT chunk.</li>
+  <li>For the SHDR chunk, I mostly just used <code class="highlighter-rouge">D3D11TokenizedProgramFormat.hpp</code>, a header file that comes with the Windows Driver Kit (WDK).</li>
+</ul>
+
+<p>Now that we’ve got an overview of how the file is structured, let’s turn our attention to parsing the individual chunks. I’m going to describe in detail the 5 chunks in our example compiled shader. If you want more details on the other chunk types, the <a href="https://github.com/tgjones/slimshader/tree/master/src/SlimShader/Chunks">SlimShader source code</a> is a good place to start.</p>
+
+<p><a name="rdef-chunk"></a></p>
+
+<h2 id="rdef-chunk">RDEF chunk</h2>
+
+<p><img src="/assets/posts/d3d-bytecode-chunk-rdef.png" alt="" /></p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Rdef/ResourceDefinitionChunk.cs">ResourceDefinitionChunk.cs</a></li>
+</ul>
+
+<p>The first chunk in our example compiled shader is of type RDEF, or “resource definition”. Resource definition chunks are split into two main parts:</p>
+
+<ol>
+  <li>Constant buffer descriptions. In our example, we have a single constant buffer named <code class="highlighter-rouge">$Globals</code>, which contains a single variable named <code class="highlighter-rouge">WorldViewProjection</code>, which is a 4x4 matrix.</li>
+  <li>Resource bindings. In our example, we only have a single constant buffer, but this is where you would find bindings for textures, samplers, structured buffers, etc.</li>
+</ol>
+
+<p>Looking at the chunk index table above, we see that the byte address of the start of the first chunk is 52. Using Binary Viewer, we start looking at the byte values starting at index 52. (If you were doing this from scratch, you’d have to painstakingly compare / contrast shader binaries until you could guess at what each value means.) Note that most of these values are stored in the binary file as 32-bit <code class="highlighter-rouge">uint</code>s, so we mostly, but not always, need to read 4 bytes at a time.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>52-55</td>
+      <td>“RDEF”</td>
+      <td>Indicates that this is a RDEF (resource definition) chunk</td>
+    </tr>
+    <tr>
+      <td>56-59</td>
+      <td>208</td>
+      <td>Length of the chunk, in bytes</td>
+    </tr>
+    <tr>
+      <td>60-63</td>
+      <td>1</td>
+      <td>Constant buffer count</td>
+    </tr>
+    <tr>
+      <td>64-67</td>
+      <td>72</td>
+      <td>Byte offset (from start of chunk data, after chunk type and chunk length) to first constant buffer description</td>
+    </tr>
+    <tr>
+      <td>68-71</td>
+      <td>1</td>
+      <td>Resource binding count</td>
+    </tr>
+    <tr>
+      <td>72-75</td>
+      <td>28</td>
+      <td>Byte offset (from start of chunk data) to first resource binding description</td>
+    </tr>
+    <tr>
+      <td>76</td>
+      <td>0</td>
+      <td>Minor version number</td>
+    </tr>
+    <tr>
+      <td>77</td>
+      <td>4</td>
+      <td>Major version number</td>
+    </tr>
+    <tr>
+      <td>78-79</td>
+      <td>0xFFFE</td>
+      <td>Program type. “0xFFFE” means vertex shader.</td>
+    </tr>
+    <tr>
+      <td>80-83</td>
+      <td>256</td>
+      <td>Flags. “256” means “NoPreshader”.</td>
+    </tr>
+    <tr>
+      <td>84-87</td>
+      <td>156</td>
+      <td>Byte offset (from start of chunk data) to “creator” string</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><em>In this blog post, I’m only describing Shader Model 4.0 shaders. Shader Model 5.0 shaders contain some additional data; SlimShader supports both SM 4.0 and SM 5.0.</em></p>
+
+<p>A number of values in the data that follows are byte offsets from the “start of chunk data”. The start of the chunk data is the byte immediately following the chunk length. In this RDEF chunk, that is the byte at offset <code class="highlighter-rouge">60</code> from the beginning of the file.</p>
+
+<p>Now we’ve parsed the “header” portion of the RDEF chunk. It’s time to parse the “body”, which is composed of constant buffer and resource binding descriptions. We know from the header that the first constant buffer description can be found at byte address <code class="highlighter-rouge">60 + 72 = 135</code> (<code class="highlighter-rouge">60</code> is the address of the start of the chunk data, and <code class="highlighter-rouge">72</code> is the offset to the first constant buffer). So let’s see what’s in the constant buffer description:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>132-135</td>
+      <td>60</td>
+      <td>Byte offset (from start of chunk data) to constant buffer name</td>
+    </tr>
+    <tr>
+      <td>136-139</td>
+      <td>1</td>
+      <td>Variable count</td>
+    </tr>
+    <tr>
+      <td>140-143</td>
+      <td>96</td>
+      <td>Byte offset (from start of chunk data) to first variable description</td>
+    </tr>
+    <tr>
+      <td>144-147</td>
+      <td>64</td>
+      <td>Size of the constant buffer, in bytes</td>
+    </tr>
+    <tr>
+      <td>148-151</td>
+      <td>0</td>
+      <td>Flags, based on <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff728729(v=vs.85).aspx">D3D_SHADER_CBUFFER_FLAGS</a></td>
+    </tr>
+    <tr>
+      <td>152-155</td>
+      <td>0</td>
+      <td>Constant buffer type, based on <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476097(v=vs.85).aspx">D3D11_CBUFFER_TYPE</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>According to the table above, the constant buffer name will be found at <code class="highlighter-rouge">60 + 60 = 120</code>. Strings are null-terminated, so we keep reading until we reach a <code class="highlighter-rouge">0</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>120</td>
+      <td>“$Globals”</td>
+      <td>Constant buffer name</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Now let’s parse the variables for this constant buffer. In this case, there is only one constant buffer, which contains one variable. We know from the table above that the variable description starts at <code class="highlighter-rouge">60 + 96 = 156</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>156-159</td>
+      <td>120</td>
+      <td>Byte offset (from start of chunk data) to variable name</td>
+    </tr>
+    <tr>
+      <td>160-163</td>
+      <td>0</td>
+      <td>Offset from start of constant buffer (in bytes)</td>
+    </tr>
+    <tr>
+      <td>164-167</td>
+      <td>64</td>
+      <td>Variable size (in bytes)</td>
+    </tr>
+    <tr>
+      <td>168-171</td>
+      <td>2</td>
+      <td>Variable flags, based on <a href="https://msdn.microsoft.com/en-us/library/Bb172442(v=VS.85).aspx">D3D10_SHADER_VARIABLE_FLAGS</a>. <code class="highlighter-rouge">2</code> means this variable is used in the shader.</td>
+    </tr>
+    <tr>
+      <td>172-175</td>
+      <td>140</td>
+      <td>Byte offset (from start of chunk data) to variable type</td>
+    </tr>
+    <tr>
+      <td>176-179</td>
+      <td>0</td>
+      <td>Byte offset (from start of chunk data) to default value. “0” means there isn’t a default value.</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Let’s parse the variable name, at address <code class="highlighter-rouge">60 + 120 = 180</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>180</td>
+      <td>“WorldViewProjection”</td>
+      <td>Variable name</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>And then the variable type, at address <code class="highlighter-rouge">60 + 140 = 200</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>200-201</td>
+      <td>3</td>
+      <td>Variable class, based on <a href="https://msdn.microsoft.com/en-us/library/bb172440(v=vs.85).aspx">D3D10_SHADER_VARIABLE_CLASS</a>. “3” means the variable is a column-major matrix.</td>
+    </tr>
+    <tr>
+      <td>202-203</td>
+      <td>3</td>
+      <td>Variable type, based on <a href="https://msdn.microsoft.com/en-us/library/bb172443(v=vs.85).aspx">D3D10_SHADER_VARIABLE_TYPE</a>. “3” means the variable is a floating-point number.</td>
+    </tr>
+    <tr>
+      <td>204-205</td>
+      <td>4</td>
+      <td>Number of rows in matrix-type variables</td>
+    </tr>
+    <tr>
+      <td>206-207</td>
+      <td>4</td>
+      <td>Number of columns in matrix-type variables</td>
+    </tr>
+    <tr>
+      <td>208-209</td>
+      <td>0</td>
+      <td>Number of elements in array-type variables</td>
+    </tr>
+    <tr>
+      <td>210-211</td>
+      <td>0</td>
+      <td>Number of members in structure-type variables</td>
+    </tr>
+    <tr>
+      <td>212-213</td>
+      <td>0</td>
+      <td>Byte offset (from start of chunk data) to first member</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Whew! As you can see, there are a <em>lot</em> of different structures contained in HLSL shader binaries. And this is just the RDEF chunk type! We’re nearly there though. Next, let’s parse the resource binding description. Going back to the first table in this section, we see that the first resource binding description can be found at address <code class="highlighter-rouge">60 + 28 = 88</code>.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>88-91</td>
+      <td>60</td>
+      <td>Byte offset (from start of chunk data) to resource binding name</td>
+    </tr>
+    <tr>
+      <td>92-95</td>
+      <td>0</td>
+      <td>Shader input type. “0” means <code class="highlighter-rouge">cbuffer</code>.</td>
+    </tr>
+    <tr>
+      <td>96-99</td>
+      <td>0</td>
+      <td>Resource return type. “0” means not applicable.</td>
+    </tr>
+    <tr>
+      <td>100-103</td>
+      <td>0</td>
+      <td>Resource view dimension. “0” means not applicable.</td>
+    </tr>
+    <tr>
+      <td>104-107</td>
+      <td>0</td>
+      <td>Number of samples</td>
+    </tr>
+    <tr>
+      <td>108-111</td>
+      <td>0</td>
+      <td>Bind point</td>
+    </tr>
+    <tr>
+      <td>112-115</td>
+      <td>1</td>
+      <td>Bind count</td>
+    </tr>
+    <tr>
+      <td>116-119</td>
+      <td>0</td>
+      <td>Shader input flags</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>One interesting thing to note is that the data is very efficiently packed in the binary file. There are very few, if any, wasted bytes. You would expect nothing less, but still, it’s nice to see this attention to detail firsthand.</p>
+
+<p>We have one last thing to parse from the RDEF chunk - the “creator”. We can find this at address <code class="highlighter-rouge">60 + 156 = 216</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>216</td>
+      <td>“Microsoft (R) HLSL Shader Compiler 6.3.9600.16384”</td>
+      <td>Creator</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>After all of that work, we know enough to reconstruct this line from our original HLSL code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">float4x4</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>But we also know a bit more than that; we know that:</p>
+
+<ul>
+  <li>the HLSL compiler automatically put this variable into a <code class="highlighter-rouge">cbuffer</code> called <code class="highlighter-rouge">$Globals</code></li>
+  <li>it is a column-major matrix</li>
+  <li>it is referenced in the shader</li>
+</ul>
+
+<p><a name="isgn-chunk"></a></p>
+
+<h2 id="isgn-chunk">ISGN chunk</h2>
+
+<p><img src="/assets/posts/d3d-bytecode-chunk-isgn.png" alt="" /></p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Xsgn/InputSignatureChunk.cs">InputSignatureChunk.cs</a></li>
+</ul>
+
+<p>ISGN chunks define the input signature for a shader. For a vertex shader like this one, the input signature describes the shape of the data coming from the application.</p>
+
+<p>ISGN chunks are much simpler than RDEF chunks. Here’s how the ISGN header is structured:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>268-271</td>
+      <td>“ISGN”</td>
+      <td>Indicates that this is a RDEF (resource definition) chunk</td>
+    </tr>
+    <tr>
+      <td>272-275</td>
+      <td>76</td>
+      <td>Length of the chunk, in bytes</td>
+    </tr>
+    <tr>
+      <td>276-279</td>
+      <td>2</td>
+      <td>Element count</td>
+    </tr>
+    <tr>
+      <td>280-283</td>
+      <td>8</td>
+      <td>I don’t know what this is used for…</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The element data immediately follows the ISGN header. We have 2 elements, with these values:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>284-287</td>
+      <td>56</td>
+      <td>Byte offset (from start of chunk data) to element name</td>
+    </tr>
+    <tr>
+      <td>288-291</td>
+      <td>0</td>
+      <td>Semantic index</td>
+    </tr>
+    <tr>
+      <td>292-295</td>
+      <td>0</td>
+      <td>System value type</td>
+    </tr>
+    <tr>
+      <td>296-299</td>
+      <td>3</td>
+      <td>Component type. “3” means floating-point</td>
+    </tr>
+    <tr>
+      <td>300-303</td>
+      <td>0</td>
+      <td>Register</td>
+    </tr>
+    <tr>
+      <td>304</td>
+      <td>7</td>
+      <td>Mask. “7” means XYZ, which means this is a 3-component vector.</td>
+    </tr>
+    <tr>
+      <td>305</td>
+      <td>7</td>
+      <td>Read-write mask. This is the same as the mask, but it is also possible for not all components to actually be used by the shader.</td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>332</td>
+      <td>“POSITION”</td>
+      <td>Element name</td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>308-311</td>
+      <td>65</td>
+      <td>Byte offset (from start of chunk data) to element name</td>
+    </tr>
+    <tr>
+      <td>312-315</td>
+      <td>0</td>
+      <td>Semantic index</td>
+    </tr>
+    <tr>
+      <td>316-319</td>
+      <td>0</td>
+      <td>System value type</td>
+    </tr>
+    <tr>
+      <td>320-323</td>
+      <td>3</td>
+      <td>Component type. “3” means floating-point</td>
+    </tr>
+    <tr>
+      <td>324-327</td>
+      <td>1</td>
+      <td>Register</td>
+    </tr>
+    <tr>
+      <td>328</td>
+      <td>3</td>
+      <td>Mask. “3” means XY, which means this is a 2-component vector.</td>
+    </tr>
+    <tr>
+      <td>329</td>
+      <td>3</td>
+      <td>Read-write mask</td>
+    </tr>
+  </tbody>
+</table>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>341</td>
+      <td>“TEXCOORD”</td>
+      <td>Element name</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>And that’s it! The input signature chunk tells us the structure of data coming into the shader:</p>
+
+<ul>
+  <li>A <code class="highlighter-rouge">float3</code> parameter whose semantic is <code class="highlighter-rouge">POSITION</code>, assigned to register <code class="highlighter-rouge">0</code></li>
+  <li>A <code class="highlighter-rouge">float2</code> parameter whose semantic is <code class="highlighter-rouge">TEXCOORD</code>, assigned to register <code class="highlighter-rouge">1</code></li>
+</ul>
+
+<p>Compare this to the original HLSL:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">struct</span> <span class="n">VertexShaderInput</span>
+<span class="p">{</span>
+    <span class="n">float3</span> <span class="n">pos</span> <span class="o">:</span> <span class="n">POSITION</span><span class="p">;</span>
+    <span class="n">float2</span> <span class="n">tex</span> <span class="o">:</span> <span class="n">TEXCOORD</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre>
+</div>
+
+<p>We’ve lost some information - such as the name of the <code class="highlighter-rouge">struct</code>, and the names of the <code class="highlighter-rouge">struct</code> fields. Those names aren’t needed by the GPU. Instead, the HLSL compiler has assigned register numbers to these two values.</p>
+
+<p><a name="osgn-chunk"></a></p>
+
+<h2 id="osgn-chunk">OSGN chunk</h2>
+
+<p><img src="/assets/posts/d3d-bytecode-chunk-osgn.png" alt="" /></p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Xsgn/OutputSignatureChunk.cs">OutputSignatureChunk.cs</a></li>
+</ul>
+
+<p>OSGN chunks define the output signature for a shader. For a vertex shader like this, the output signature describes the shape of the data being output from the vertex shader to the pixel shader (or geometry shader, or hull shader).</p>
+
+<p>Happily, OSGN chunks are structured in exactly the same way as ISGN chunks. So I’ll skip to the end and show you the parsed information. The output signature for this example shader is:</p>
+
+<ul>
+  <li>A <code class="highlighter-rouge">float4</code> parameter whose semantic is <code class="highlighter-rouge">SV_POSITION</code>, assigned to register <code class="highlighter-rouge">0</code></li>
+  <li>A <code class="highlighter-rouge">float2</code> parameter whose semantic is <code class="highlighter-rouge">TEXCOORD</code>, assigned to register <code class="highlighter-rouge">1</code></li>
+</ul>
+
+<p>Again, compare that to the original HLSL:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">struct</span> <span class="n">PixelShaderInput</span>
+<span class="p">{</span>
+    <span class="n">float4</span> <span class="n">pos</span> <span class="o">:</span> <span class="n">SV_POSITION</span><span class="p">;</span>
+    <span class="n">float2</span> <span class="n">tex</span> <span class="o">:</span> <span class="n">TEXCOORD</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre>
+</div>
+
+<p>We’ve kept the important information, and the HLSL compiler has assigned registers to each value in the output.</p>
+
+<p><a name="shdr-chunk"></a></p>
+
+<h2 id="shdr-chunk">SHDR chunk</h2>
+
+<p><img src="/assets/posts/d3d-bytecode-chunk-shdr.png" alt="" /></p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Shex/ShaderProgramChunk.cs">ShaderProgramChunk.cs</a></li>
+</ul>
+
+<p>The SHDR chunk is, as you might guess, where the actual shader can be found. The other chunks are basically metadata; the SHDR chunk is where you find the declarations and instructions that make up the shader itself.</p>
+
+<p>It is, by far, the most complicated chunk to parse. But fortunately, it’s also the (only) chunk type that is publicly documented. If you install the <a href="https://msdn.microsoft.com/en-us/windows/hardware/dn913721.aspx">Windows Driver Kit (WDK)</a>, you get a file that describes the binary format in some detail, usually located here:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>C:\Program Files (x86)\Windows Kits\10\Include\10.0.10240.0\um\d3d11TokenizedProgramFormat.hpp
+</code></pre>
+</div>
+
+<p>Because the documentation for the binary format of the SHDR chunk is readily available, I won’t go into too much detail.</p>
+
+<p>Briefly, the SHDR chunk, in common with the other chunk types, is composed of a header and a body. The header is structured as follows:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>440-443</td>
+      <td>“SHDR”</td>
+      <td>Indicates that this is a SHDR (shader) chunk</td>
+    </tr>
+    <tr>
+      <td>444-447</td>
+      <td>276</td>
+      <td>Length of the chunk, in bytes</td>
+    </tr>
+    <tr>
+      <td>448 (low 4 bits)</td>
+      <td>0</td>
+      <td>Minor version number</td>
+    </tr>
+    <tr>
+      <td>448 (high 4 bits)</td>
+      <td>4</td>
+      <td>Major version number</td>
+    </tr>
+    <tr>
+      <td>450-451</td>
+      <td>1</td>
+      <td>Program type. “1” means vertex shader.</td>
+    </tr>
+    <tr>
+      <td>452-455</td>
+      <td>69</td>
+      <td>Number of DWORDs in the chunk</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>After the header come a sequence of “opcodes”. Opcodes are the binary representation of shader assembly instructions. <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/hh447232(v=vs.85).aspx">You can see the full list of Shader Model 5 assembly instructions here</a>. Opcodes represent both declarations (i.e. texture declarations, constant buffer declarations, etc.) and instructions (i.e. add, multiply, etc.).</p>
+
+<p>Each opcode has its own binary structure, but there are some commonalities. Here’s the section of <code class="highlighter-rouge">d3d11TokenizedProgramFormat.hpp</code> that tells us how to read the first token of each opcode.</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="c1">// ----------------------------------------------------------------------------
+// Opcode Format (OpcodeToken0)
+//
+// [10:00] D3D10_SB_OPCODE_TYPE
+// if( [10:00] == D3D10_SB_OPCODE_CUSTOMDATA )
+// {
+//    Token starts a custom-data block.  See "Custom-Data Block Format".
+// }
+// else // standard opcode token
+// {
+//    [23:11] Opcode-Specific Controls
+//    [30:24] Instruction length in DWORDs including the opcode token.
+//    [31]    0 normally. 1 if extended operand definition, meaning next DWORD
+//            contains extended opcode token.
+// }
+//
+// ----------------------------------------------------------------------------
+</span></code></pre>
+</div>
+
+<p>So every opcode stores the opcode type in the first 10 bits. Once you’ve read the type, you use that to know how to parse the rest of the opcode.</p>
+
+<p>As an example, let’s look at the first opcode from our example shader.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>456-459 (bits 0 to 10)</td>
+      <td>89</td>
+      <td>Opcode type</td>
+    </tr>
+    <tr>
+      <td>456-459 (bits 24 to 30)</td>
+      <td>4</td>
+      <td>Opcode length</td>
+    </tr>
+    <tr>
+      <td>456-459 (bit 31)</td>
+      <td>0</td>
+      <td>1 if opcode is “extended”, otherwise 0</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Looking at <code class="highlighter-rouge">D3D10_SB_OPCODE_TYPE</code> in <code class="highlighter-rouge">d3d11TokenizedProgramFormat.hpp</code>, we see that opcode type 89 equates to <code class="highlighter-rouge">D3D10_SB_OPCODE_DCL_CONSTANT_BUFFER</code>. So then we look further down the file to find how constant buffer declaration opcodes are structured:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="c1">// ----------------------------------------------------------------------------
+// Constant Buffer Declaration
+//
+// OpcodeToken0:
+//
+// [10:00] D3D10_SB_OPCODE_DCL_CONSTANT_BUFFER
+// [11]    D3D10_SB_CONSTANT_BUFFER_ACCESS_PATTERN
+// [23:12] Ignored, 0
+// [30:24] Instruction length in DWORDs including the opcode token.
+// [31]    0 normally. 1 if extended operand definition, meaning next DWORD
+//         contains extended operand description.  This dcl is currently not
+//         extended.
+//
+// OpcodeToken0 is followed by 1 operand:
+// (1) Operand, starting with OperandToken0, defining which CB slot (cb#[size])
+//     is being declared. (operand type: D3D10_SB_OPERAND_TYPE_CONSTANT_BUFFER)
+//     The indexing dimension for the register must be 
+//     D3D10_SB_OPERAND_INDEX_DIMENSION_2D, where the first index specifies
+//     which cb#[] is being declared, and the second (array) index specifies the size 
+//     of the buffer, as a count of 32-bit*4 elements.  (As opposed to when the 
+//     cb#[] is used in shader instructions, and the array index represents which 
+//     location in the constant buffer is being referenced.)
+//     If the size is specified as 0, the CB size is not known (any size CB
+//     can be bound to the slot).
+//
+// The order of constant buffer declarations in a shader indicates their
+// relative priority from highest to lowest (hint to driver).
+// 
+// ----------------------------------------------------------------------------
+</span></code></pre>
+</div>
+
+<p>So for a constant buffer declaration, after the initial opcode token, we can expect to find a single operand, which defines which constant buffer slot is being declared. Operands are actually fairly complicated to parse. On the bright side, there’s a standard operand structure shared across all opcodes. But because it’s too hard (and I’m lazy), I’ll just point you at the <a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Shex/Tokens/Operand.cs">Operand</a> source code in <a href="https://github.com/tgjones/slimshader">SlimShader</a>.</p>
+
+<p>If we were to parse the operand, we’d be able to extract this assembly instruction:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>dcl_constantbuffer cb0[4], immediateIndexed
+</code></pre>
+</div>
+
+<p>We can then continue to parse all the remaining opcodes in the shader chunk. When writing SlimShader, I went through all the opcodes documented in <code class="highlighter-rouge">d3d11TokenizedProgramFormat.hpp</code>, and wrote the parsing logic for each one. For our example shader, we’d end up with these assembly instructions:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>dcl_constantbuffer cb0[4], immediateIndexed
+dcl_input v0.xyz
+dcl_input v1.xy
+dcl_output_siv o0.xyzw, position
+dcl_output o1.xy
+dcl_temps 1
+mov r0.xyz, v0.xyzx
+mov r0.w, l(1.000000)
+dp4 o0.x, r0.xyzw, cb0[0].xyzw
+dp4 o0.y, r0.xyzw, cb0[1].xyzw
+dp4 o0.z, r0.xyzw, cb0[2].xyzw
+dp4 o0.w, r0.xyzw, cb0[3].xyzw
+mov o1.xy, v1.xyxx
+ret
+</code></pre>
+</div>
+
+<p>There are 6 declarations, and 8 instructions. When you use a shader in Direct3D, these assembly instructions are parsed from the bytecode (much like we’re doing here), and sent to the GPU. Somewhere along the way (presumably in the GPU driver), the Direct3D assembly instructions will be compiled (again) into the GPU’s own assembly language, which is lower-level and hardware-specific.</p>
+
+<p>In older versions of Direct3D, you could author shaders using assembly instructions, but that hasn’t been possible for a while. These days you need to use HLSL (which is fine by me, I have enough trouble reading assembly code, let alone writing it).</p>
+
+<p><a name="stat-chunk"></a></p>
+
+<h2 id="stat-chunk">STAT chunk</h2>
+
+<p><img src="/assets/posts/d3d-bytecode-chunk-stat.png" alt="" /></p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Stat/StatisticsChunk.cs">StatisticsChunk.cs</a></li>
+</ul>
+
+<p>The STAT chunk is the least interesting chunk type (“interesting” might be a poor choice of word in a topic as dry as this one, but work with me). I don’t imagine it’s used in the Direct3D runtime, unless you use the <code class="highlighter-rouge">ID3D11ShaderReflection</code> interface.</p>
+
+<p>Here’s the data in the STAT chunk in our example shader. I’ve guessed at what some of these values mean, and some I just don’t know, despite comparing and contrasting multiple shader binaries.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Byte offset</th>
+      <th>Value</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>724-727</td>
+      <td>“STAT”</td>
+      <td>Indicates that this is a STAT (statistics) chunk</td>
+    </tr>
+    <tr>
+      <td>728-731</td>
+      <td>116</td>
+      <td>Length of the chunk, in bytes</td>
+    </tr>
+    <tr>
+      <td>732-735</td>
+      <td>8</td>
+      <td>Instruction count</td>
+    </tr>
+    <tr>
+      <td>736-739</td>
+      <td>1</td>
+      <td>Temp register count</td>
+    </tr>
+    <tr>
+      <td>740-743</td>
+      <td>0</td>
+      <td>Define count</td>
+    </tr>
+    <tr>
+      <td>744-747</td>
+      <td>4</td>
+      <td>Declaration count</td>
+    </tr>
+    <tr>
+      <td>748-751</td>
+      <td>4</td>
+      <td>Float instruction count</td>
+    </tr>
+    <tr>
+      <td>752-755</td>
+      <td>0</td>
+      <td>Int instruction count</td>
+    </tr>
+    <tr>
+      <td>756-759</td>
+      <td>0</td>
+      <td>Uint instruction count</td>
+    </tr>
+    <tr>
+      <td>760-763</td>
+      <td>1</td>
+      <td>Static flow control count</td>
+    </tr>
+    <tr>
+      <td>764-767</td>
+      <td>0</td>
+      <td>Dynamic flow control count</td>
+    </tr>
+    <tr>
+      <td>768-771</td>
+      <td>0</td>
+      <td>Macro instruction count - maybe? I guessed this</td>
+    </tr>
+    <tr>
+      <td>772-775</td>
+      <td>0</td>
+      <td>Temp array count</td>
+    </tr>
+    <tr>
+      <td>776-779</td>
+      <td>0</td>
+      <td>Array instruction count</td>
+    </tr>
+    <tr>
+      <td>780-783</td>
+      <td>0</td>
+      <td>Cut instruction count</td>
+    </tr>
+    <tr>
+      <td>784-787</td>
+      <td>0</td>
+      <td>Emit instruction count</td>
+    </tr>
+    <tr>
+      <td>788-791</td>
+      <td>0</td>
+      <td>Texture normal instructions</td>
+    </tr>
+    <tr>
+      <td>792-795</td>
+      <td>0</td>
+      <td>Texture load instructions</td>
+    </tr>
+    <tr>
+      <td>796-799</td>
+      <td>0</td>
+      <td>Texture comparison instructions</td>
+    </tr>
+    <tr>
+      <td>800-803</td>
+      <td>0</td>
+      <td>Texture bias instructions</td>
+    </tr>
+    <tr>
+      <td>804-807</td>
+      <td>0</td>
+      <td>Texture gradient instructions</td>
+    </tr>
+    <tr>
+      <td>808-811</td>
+      <td>3</td>
+      <td>Mov instruction count</td>
+    </tr>
+    <tr>
+      <td>812-815</td>
+      <td>0</td>
+      <td>Movc instruction count</td>
+    </tr>
+    <tr>
+      <td>816-819</td>
+      <td>0</td>
+      <td>Conversion instruction count</td>
+    </tr>
+    <tr>
+      <td>820-823</td>
+      <td>0</td>
+      <td>? - No idea…</td>
+    </tr>
+    <tr>
+      <td>824-827</td>
+      <td>0</td>
+      <td>Input primitive for geometry shaders</td>
+    </tr>
+    <tr>
+      <td>828-831</td>
+      <td>0</td>
+      <td>Primitive topology for geometry shaders</td>
+    </tr>
+    <tr>
+      <td>832-835</td>
+      <td>0</td>
+      <td>Max output vertex count for geometry shaders</td>
+    </tr>
+    <tr>
+      <td>836-839</td>
+      <td>0</td>
+      <td>? - No idea…</td>
+    </tr>
+    <tr>
+      <td>840-843</td>
+      <td>0</td>
+      <td>? - No idea…</td>
+    </tr>
+    <tr>
+      <td>844-847</td>
+      <td>0</td>
+      <td>1 for sample frequency shader, otherwise 0</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>This data is exposed in Direct3D through a combination of <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476209(v=vs.85).aspx">D3D11_SHADER_DESC</a> and <a href="https://msdn.microsoft.com/en-us/library/windows/desktop/ff476590(v=vs.85).aspx">ID3D11ShaderReflection methods</a>.</p>
+
+<p><a name="other-chunk-types"></a></p>
+
+<h2 id="other-chunk-types">Other chunk types</h2>
+
+<p>There are several other chunk types not found in our example shader. The other chunk types supported by SlimShader are:</p>
+
+<ul>
+  <li>IFCE - <a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Ifce/InterfacesChunk.cs">InterfacesChunk.cs</a></li>
+  <li>SFI0 - <a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Sfi0/Sfi0Chunk.cs">Sfi0Chunk.cs</a></li>
+  <li>PCSG - <a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader/Chunks/Xsgn/PatchConstantSignatureChunk.cs">PatchConstantSignatureChunk.cs</a></li>
+</ul>
+
+<p><a name="conclusion"></a></p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>That was pretty heavy going! But I didn’t think it was worth writing this blog post without going fairly deep into the details. If you found it useful, or have questions, or can fill in any of the gaps in my knowledge, please leave a comment!</p>
+
+<p>I hope to write a follow-up post describing how I used this bytecode parser to build a virtual machine that can execute Direct3D bytecode entirely on the CPU, in managed code. Stay tuned!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2015/04/13/cascaded-shadow-maps-sample-for-monogame">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2015/09/05/comparing-api-footprints-of-direct3d-12-11-10-and-9">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 4 - Building the intermediate representation - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 4 - Building the intermediate representation</h1>
+
+    <div class="post-date">
+        <time datetime="2014-08-23T15:30:00+00:00">23 August 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h3 id="introduction">Introduction</h3>
+
+<p>Let’s review where we’ve got to with our compiler. By the end of the <a href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">parsing and lexing stage</a>, we were able to take source code like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">float</span> <span class="n">c</span><span class="p">[];</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>and turn it into an abstract syntax tree like this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"a"</span><span class="o">)),</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionDeclaration</span><span class="p">(</span>
+    <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"main"</span><span class="p">,</span>
+    <span class="p">[</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Bool</span><span class="p">,</span> <span class="s2">"b"</span><span class="p">)</span> <span class="o">],</span>
+    <span class="p">(</span>
+      <span class="p">[</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Float</span><span class="p">,</span> <span class="s2">"c"</span><span class="p">)</span> <span class="o">],</span>
+      <span class="p">[</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">LiteralExpression</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">IntLiteral</span> <span class="mi">1</span><span class="o">)))</span> <span class="p">]</span>
+    <span class="p">)</span>
+  <span class="p">)</span>
+<span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Then in <a href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">semantic analysis</a>, we created a symbol table:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Variable declaration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">a</code></td>
+      <td><code class="highlighter-rouge">Ast.ScalarVariableDeclaration(Ast.Int, "a")</code></td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">b</code></td>
+      <td><code class="highlighter-rouge">Ast.ScalarVariableDeclaration(Ast.Bool, "b")</code></td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">c</code></td>
+      <td><code class="highlighter-rouge">Ast.ArrayVariableDeclaration(Ast.Float, "c")</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>and a function table:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Function declaration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">main</code></td>
+      <td><code class="highlighter-rouge"><span class="p">{</span></code><br />  <code class="highlighter-rouge">ReturnType = Ast.Int,</code><br />  <code class="highlighter-rouge">ParameterTypes = [ { Type = Ast.Bool; IsArray = false } ]</code><br /><code class="highlighter-rouge">}</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>and an expression types table:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Expression</th>
+      <th>Expression type</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">Ast.LiteralExpression(</code><br />  <code class="highlighter-rouge">Ast.IntLiteral(1)</code><br /><code class="highlighter-rouge">)</code></td>
+      <td><code class="highlighter-rouge"><span class="p">{</span><span class="w"> </span><span class="err">Type</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">Ast.Int;</span><span class="w"> </span><span class="err">IsArray</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">false</span><span class="w"> </span><span class="p">}</span></code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>I haven’t talked much about the end goal of this compiler. Just like any other .NET language (C#, F#, etc.), it outputs executable files (.exe) containing <a href="http://en.wikipedia.org/wiki/Common_Intermediate_Language">Microsoft Intermediate Language (MSIL)</a>, an intermediate language that is used by the <a href="http://en.wikipedia.org/wiki/Common_Language_Runtime">Common Language Runtime (CLR)</a> to run .NET applications. (Unlike those proper languages, there’s no option to output .dll’s, although that wouldn’t be hard to add.) MSIL is (visually, at least) closer to assembly code than to a high level language like C#, but it’s still high level enough to have concepts like classes and methods. The .NET virtual machine is stack-based, so most of the MSIL we use will push to, operate on, or pop from the stack. If you haven’t seen MSIL before, hopefully it will become clearer when looking at some concrete examples.</p>
+
+<p>Instead of building an .exe file directly from the AST (which is possible), we’re going to first build an in-memory representation of the MSIL. This intermediate representation (IR) is easier to test and reason about than if we skipped straight to code generation. In a “real” compiler, the IR is also a good place to implement optimisations. In the next part, we’ll write this IR out as real MSIL to an executable file.</p>
+
+<p>By the end of this part, we’ll be able to build this intermediate representation of the sample code above:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">{</span> <span class="o">//</span> <span class="nc">ILClass</span>
+  <span class="nc">Fields</span>  <span class="p">=</span> <span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"a"</span> <span class="p">}</span> <span class="o">];</span>
+  <span class="nc">Methods</span> <span class="p">=</span> <span class="p">[</span>
+    <span class="p">{</span> <span class="o">//</span> <span class="nc">ILMethod</span>
+<span class="err">    </span>  <span class="nc">Name</span><span class="err">       </span><span class="p">=</span><span class="err"> </span><span class="s2">"main"</span><span class="p">;</span>
+<span class="err">      </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span>
+<span class="err">      </span><span class="nc">Parameters</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">bool</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"b"</span> <span class="p">}</span> <span class="o">];</span>
+<span class="err">      </span><span class="nc">Locals</span><span class="err">     </span><span class="p">=</span><span class="err"> </span><span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="n">single</span><span class="bp">[]</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"c"</span> <span class="p">}</span> <span class="o">];</span>
+<span class="err">      </span><span class="nc">Body</span><span class="err">       </span><span class="p">=</span><span class="err"> </span><span class="p">[</span><span class="err"> </span><span class="nn">IL</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">1</span><span class="o">);</span><span class="err"> </span><span class="nn">IL</span><span class="p">.</span><span class="nc">Ret</span><span class="err"> </span><span class="o">];</span>
+<span class="err">    </span><span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>The code is in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/IL.fs">IL.fs</a> and <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/ILBuilder.fs">ILBuilder.fs</a> in the GitHub repository.</p>
+
+<h3 id="defining-the-intermediate-representation">Defining the intermediate representation</h3>
+
+<p>Our intermediate representation needs to be rich enough to express all the MSIL that we could possibly want to generate for any given Mini-C program. Fortunately, Mini-C is quite simple, so we only need to use a small subset of MSIL.</p>
+
+<p>For any Mini-C program, we will generate one (and only one) MSIL class. This is really just a container of global functions, as far as Mini-C is concerned.</p>
+
+<p>Then, for each function in the Mini-C program, we’ll generate an MSIL method. For each global variable declaration, we’ll generate a field.</p>
+
+<p>Similar to the abstract syntax tree, we’re going to use F# records and discriminated unions to define our intermediate representation. F# is famous for enabling functional programming, but the flip side of that is its strong support for a much wider variety of data types than are in, say, C#. (It looks like <a href="https://roslyn.codeplex.com/discussions/560339">C# 6 might be getting records</a>, though: welcome to the future, C#.)</p>
+
+<p>At the top level we have <code class="highlighter-rouge">ILClass</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ILClass</span><span class="err"> </span><span class="p">=</span><span class="err"> </span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">Fields</span><span class="err">  </span><span class="p">:</span><span class="err"> </span><span class="nc">ILVariable</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">Methods</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">ILMethod</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Variables are represented with <code class="highlighter-rouge">ILVariable</code>, whose <code class="highlighter-rouge">Type</code> field is a <code class="highlighter-rouge">System.Type</code> instance (we’re getting closer to MSIL, so it will make things easier if we switch to <code class="highlighter-rouge">System.Type</code> rather than our own <code class="highlighter-rouge">Ast.Type</code> that we’ve been using until now):</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span><span class="err"> </span><span class="nc">ILVariable</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">Type</span><span class="err">  </span><span class="p">:</span><span class="err"> </span><span class="nc">Type</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">Name</span><span class="err">  </span><span class="p">:</span><span class="err"> </span><span class="kt">string</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>Methods are represented with, you guessed it, <code class="highlighter-rouge">ILMethod</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span><span class="err"> </span><span class="nc">ILMethod</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">Name</span><span class="err">       </span><span class="p">:</span><span class="err"> </span><span class="kt">string</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">Type</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">Parameters</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">ILVariable</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">Locals</span><span class="err">     </span><span class="p">:</span><span class="err"> </span><span class="nc">ILVariable</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">Body</span><span class="err">       </span><span class="p">:</span><span class="err"> </span><span class="nc">ILOpCode</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>We’re going to make use of <a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.ilgenerator.marklabel(v=vs.110).aspx">MSIL labels</a> to handle branching:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span><span class="err"> </span><span class="nc">ILLabel</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="kt">int</span>
+</code></pre>
+</div>
+
+<p>And finally, <code class="highlighter-rouge">ILOpCode</code> contains the actual opcodes used in method bodies. These map one-to-one to <a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.opcodes.aspx">MSIL opcodes</a>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span><span class="err"> </span><span class="nc">ILOpCode</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Add</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Br</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILLabel</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Brfalse</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILLabel</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Brtrue</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILLabel</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Call</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="kt">string</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">CallClr</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nn">System</span><span class="p">.</span><span class="nn">Reflection</span><span class="p">.</span><span class="nc">MethodInfo</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ceq</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Cge</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Cgt</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Cle</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Clt</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Dup</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Div</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Label</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILLabel</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldarg</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="n">int16</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldc_I4</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="kt">int</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldc_R8</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="kt">float</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldelem</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">Type</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldlen</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldloc</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="n">int16</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ldsfld</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILVariable</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Mul</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Neg</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Newarr</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">Type</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Pop</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Rem</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Ret</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Starg</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="n">int16</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Stelem</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">Type</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Stloc</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="n">int16</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Stsfld</span><span class="err"> </span><span class="k">of</span><span class="err"> </span><span class="nc">ILVariable</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Sub</span> 
+</code></pre>
+</div>
+
+<p>Some of these cases have fields: for example, <code class="highlighter-rouge">Br</code> needs to know the <code class="highlighter-rouge">ILLabel</code> to break to. The cases that don’t have fields mostly take their operands directly from the stack.</p>
+
+<p>And that’s it for our abstract representation of MSIL - using ILClass, ILVariable, ILMethod, ILLabel and ILOpCode, we can represent all possible Mini-C programs.</p>
+
+<h3 id="building-the-intermediate-representation">Building the intermediate representation</h3>
+
+<p>As noted above, the output of this compiler stage will always be a single <code class="highlighter-rouge">ILClass</code>. Within that class, we can have multiple fields and multiple methods. Fields are quite easy to generate - they are more or less direct mappings from <code class="highlighter-rouge">Ast.StaticVariableDeclaration</code> objects in the abstract syntax tree. Methods are harder, which makes sense, because that’s where the the real work happens - we’re going from a higher-level AST representation (which has things like <code class="highlighter-rouge">while</code> loops) to a lower-level [abstraction of an] MSIL representation (which doesn’t).</p>
+
+<h4 id="helpers">Helpers</h4>
+
+<p>We’ll need a few helper types and functions. The first is <code class="highlighter-rouge">ILVariableScope</code>, which stores whether a variable has field, argument or local scope. The <code class="highlighter-rouge">int16</code> values are used as indices in the various MSIL opcodes that deal with arguments and locals.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="k">private</span> <span class="nc">ILVariableScope</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">FieldScope</span> <span class="k">of</span> <span class="nc">ILVariable</span>
+  <span class="p">|</span> <span class="nc">ArgumentScope</span> <span class="k">of</span> <span class="n">int16</span>
+  <span class="p">|</span> <span class="nc">LocalScope</span> <span class="k">of</span> <span class="n">int16</span>
+</code></pre>
+</div>
+
+<p>We’re going to need a mapping between <code class="highlighter-rouge">Ast.VariableDeclaration</code>s and <code class="highlighter-rouge">ILVariableScope</code>s:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="k">private</span> <span class="nc">VariableMappingDictionary</span> <span class="p">=</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">VariableDeclaration</span><span class="p">,</span> <span class="nc">ILVariableScope</span><span class="p">&gt;</span>
+</code></pre>
+</div>
+
+<p>And finally, some helper functions to get the .NET type from an <code class="highlighter-rouge">Ast.Type</code>, and to create an <code class="highlighter-rouge">ILVariable</code> from an <code class="highlighter-rouge">Ast.VariableDeclaration</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">module</span> <span class="k">private</span> <span class="nc">ILBuilderUtilities</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">typeOf</span> <span class="p">=</span>
+    <span class="k">function</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Void</span>  <span class="p">-&gt;</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Void</span><span class="p">&gt;</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Bool</span>  <span class="p">-&gt;</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">bool</span><span class="p">&gt;</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span>   <span class="p">-&gt;</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="p">&gt;</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Float</span> <span class="p">-&gt;</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">float</span><span class="p">&gt;</span>
+
+  <span class="k">let</span> <span class="n">createILVariable</span> <span class="p">=</span>
+    <span class="k">function</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">as</span> <span class="n">d</span> <span class="p">-&gt;</span>
+      <span class="p">{</span>
+        <span class="nn">ILVariable</span><span class="p">.</span><span class="nc">Type</span> <span class="p">=</span> <span class="n">typeOf</span> <span class="n">t</span><span class="p">;</span> 
+        <span class="nc">Name</span> <span class="p">=</span> <span class="n">i</span><span class="p">;</span>
+      <span class="p">}</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayVariableDeclaration</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">as</span> <span class="n">d</span> <span class="p">-&gt;</span>
+      <span class="p">{</span>
+        <span class="nn">ILVariable</span><span class="p">.</span><span class="nc">Type</span> <span class="p">=</span> <span class="p">(</span><span class="n">typeOf</span> <span class="n">t</span><span class="o">).</span><span class="nc">MakeArrayType</span><span class="bp">()</span><span class="p">;</span> 
+        <span class="nc">Name</span> <span class="p">=</span> <span class="n">i</span><span class="p">;</span>
+      <span class="p">}</span>
+</code></pre>
+</div>
+
+<h4 id="building-ilmethods">Building <code class="highlighter-rouge">ILMethod</code>s</h4>
+
+<p>Before we get into the nitty gritty of building the IR, let’s briefly talk about how the .NET virtual machine works. It is stack-based, which means that expressions (such as <code class="highlighter-rouge">1 + 2</code>) are evaluated by pushing operands onto the stack, popping operands off the stack when evaluating an instruction (such as <code class="highlighter-rouge">add</code>), and then pushing the result back onto the stack. (This is different from how CPUs actually work. Real computers are (always?) register-based, not stack-based, but fortunately for us the .NET CLR takes care of that little detail.)</p>
+
+<p>Let’s look at an example. Let’s say we want to evaluate <code class="highlighter-rouge">1 + 2</code>. Here is the MSIL for that:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">1</span>   <span class="c1">// Pushes "1" onto the stack as an int32
+</span><span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">2</span>   <span class="c1">// Pushes "2" onto the stack as an int32
+</span><span class="n">add</span>        <span class="c1">// Pops "1" and "2" from the stack, adds them, and pushes the result back onto the stack
+</span></code></pre>
+</div>
+
+<p>After this executes, we’ll have the result (hopefully <code class="highlighter-rouge">3</code>) on top of the stack, and a subsequent instruction can use that result.</p>
+
+<p>Some MSIL instructions push to the stack, some pop from the stack, some do both, and some don’t affect the stack at all.</p>
+
+<p>Most of our conversion to MSIL will be straightforward, but <code class="highlighter-rouge">while</code> statements deserve some explanation. In Mini-C, a while statement looks like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">while</span> <span class="p">(</span><span class="n">i</span> <span class="o">&gt;</span> <span class="mi">3</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">i</span> <span class="o">-=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>In MSIL, that same code looks like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code>  <span class="n">br</span> <span class="n">condition</span> <span class="c1">// Always branch to "condition" label
+</span><span class="nl">start:</span>
+  <span class="n">ldloc</span> <span class="mi">0</span>      <span class="c1">// Push local with index 0 ("i") onto stack
+</span>  <span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">1</span>     <span class="c1">// Push "1" onto stack
+</span>  <span class="n">sub</span>          <span class="c1">// Pop and subtract
+</span>  <span class="n">stloc</span> <span class="mi">0</span>      <span class="c1">// Store result back into local with index 0 ("i")
+</span><span class="nl">condition:</span>
+  <span class="n">ldloc</span> <span class="mi">0</span>      <span class="c1">// Push local with index 0 ("i") onto stack
+</span>  <span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">3</span>     <span class="c1">// Push "3" onto stack
+</span>  <span class="n">cgt</span>          <span class="c1">// Pop and compare the two values; push "1" if first is greater than second, otherwise "0"
+</span>  <span class="n">brtrue</span> <span class="n">start</span> <span class="c1">// Branch to "start" label if comparison pushed "1"
+</span><span class="nl">end:</span>
+  <span class="c1">// Next instruction
+</span></code></pre>
+</div>
+
+<p>The lines beginning with a word, followed by a colon, are labels. They are used as targets for branching instructions. We will dynamically generate these labels for each <code class="highlighter-rouge">while</code> statement that we convert to MSIL representation.</p>
+
+<p>(The <code class="highlighter-rouge">end</code> label isn’t used in this example, but if we had a <code class="highlighter-rouge">break</code> statement inside the <code class="highlighter-rouge">while</code> statement body, it would branch to the <code class="highlighter-rouge">end</code>.)</p>
+
+<p><code class="highlighter-rouge">while</code> statements are the exception - most of the abstract syntax tree will map much more directly to our IR. We just need to recurse through the AST, building a list of MSIL instructions as we go. Let’s get started.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">ILMethodBuilder</span><span class="p">(</span><span class="n">semanticAnalysisResult</span> <span class="p">:</span> <span class="nc">SemanticAnalysisResult</span><span class="p">,</span>
+                     <span class="n">variableMappings</span> <span class="p">:</span> <span class="nc">VariableMappingDictionary</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="k">mutable</span> <span class="n">argumentIndex</span> <span class="p">=</span> <span class="mi">0</span><span class="n">s</span>
+  <span class="k">let</span> <span class="k">mutable</span> <span class="n">localIndex</span> <span class="p">=</span> <span class="mi">0</span><span class="n">s</span>
+  <span class="k">let</span> <span class="n">arrayAssignmentLocals</span> <span class="p">=</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Expression</span><span class="p">,</span> <span class="n">int16</span><span class="o">&gt;()</span>
+  <span class="k">let</span> <span class="k">mutable</span> <span class="n">labelIndex</span> <span class="p">=</span> <span class="mi">0</span>
+  <span class="k">let</span> <span class="n">currentWhileStatementEndLabel</span> <span class="p">=</span> <span class="nc">Stack</span><span class="p">&lt;</span><span class="nc">ILLabel</span><span class="o">&gt;()</span>
+</code></pre>
+</div>
+
+<p>First, we’ve got some messy book-keeping declarations. <code class="highlighter-rouge">argumentIndex</code> and <code class="highlighter-rouge">localIndex</code> will keep track of the current index for method arguments and local variables, respectively.</p>
+
+<p>Array assignment expressions (<code class="highlighter-rouge">i[0] = j</code>), being an expression, have a value. For example, you could write <code class="highlighter-rouge">k = i[0] = j</code>, and <code class="highlighter-rouge">k</code> would be assigned the value of the array assignment expression. <code class="highlighter-rouge">arrayAssignmentLocals</code> is used to keep track of the local indices of these values - we could cope without it, but we’d have to store the value in the array, and then immediately load it again from the array, which is probably less efficient than using a local (admittedly, I haven’t done any profiling).</p>
+
+<p>It’s possible to have nested <code class="highlighter-rouge">while</code> statements. In order to correctly handle <code class="highlighter-rouge">break</code> statements, we need to keep track of the end label for the “current” while statement, so that we can branch to the right place.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">lookupILVariableScope</span> <span class="n">identifierRef</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">declaration</span> <span class="p">=</span> <span class="n">semanticAnalysisResult</span><span class="p">.</span><span class="nn">SymbolTable</span><span class="p">.</span><span class="err">[</span><span class="n">identifierRef</span><span class="p">]</span>
+  <span class="n">variableMappings</span><span class="o">.[</span><span class="n">declaration</span><span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Given an identifier, this function finds its variable scope (a value indicating whether it is a field, argument or local, along with its index for the latter two).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">makeLabel</span><span class="bp">()</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">result</span> <span class="p">=</span> <span class="n">labelIndex</span>
+  <span class="n">labelIndex</span> <span class="p">&lt;-</span> <span class="n">labelIndex</span> <span class="o">+</span> <span class="mi">1</span>
+  <span class="n">result</span>
+</code></pre>
+</div>
+
+<p>Labels, at least in our IR, are really just integers. This helper function returns a unique label index.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="k">rec</span> <span class="n">processBinaryExpression</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="p">|</span> <span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ConditionalOr</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">let</span> <span class="n">leftIsFalseLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">l</span>
+                  <span class="p">[</span> <span class="nc">Brfalse</span> <span class="n">leftIsFalseLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Ldc_I4</span> <span class="mi">1</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Br</span> <span class="n">endLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">leftIsFalseLabel</span> <span class="p">]</span>
+                  <span class="n">processExpression</span> <span class="n">r</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ConditionalAnd</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">let</span> <span class="n">leftIsTrueLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">l</span>
+                  <span class="p">[</span> <span class="nc">Brtrue</span> <span class="n">leftIsTrueLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Ldc_I4</span> <span class="mi">0</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Br</span> <span class="n">endLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">leftIsTrueLabel</span> <span class="p">]</span>
+                  <span class="n">processExpression</span> <span class="n">r</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="p">(</span><span class="n">processExpression</span> <span class="n">l</span><span class="o">);</span>
+                                <span class="p">(</span><span class="n">processExpression</span> <span class="n">r</span><span class="o">);</span>
+                                <span class="p">[</span> <span class="n">processBinaryOperator</span> <span class="n">op</span> <span class="p">]</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Finally, we’re generating our actual IR. This function handles binary expressions. Note the <code class="highlighter-rouge">rec</code> keyword - this function, and several that follow it, call into each other, which naturally follows from the recursive nature of expressions.</p>
+
+<p>I’ll explain how “conditional or” expressions work; “conditional and” expressions are left as an <a href="http://www.quickmeme.com/img/a3/a3fc3115766602b69975dd27c0c86d7d2ecc335eb97fbfaf3bdb3d5b6e5e6e98.jpg">exercise for the reader</a>.</p>
+
+<p>Here’s an example of a “conditional or” expression in Mini-C:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">bool</span> <span class="n">a</span><span class="p">;</span>
+<span class="n">bool</span> <span class="n">b</span><span class="p">;</span>
+<span class="n">bool</span> <span class="n">c</span><span class="p">;</span>
+
+<span class="n">b</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+<span class="n">c</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+<span class="n">a</span> <span class="o">=</span> <span class="n">b</span> <span class="o">||</span> <span class="n">c</span><span class="p">;</span> <span class="c1">// The RHS here is the actual "conditional or" expression
+</span></code></pre>
+</div>
+
+<p>When converting this to MSIL, we need to linearise it as follows:</p>
+
+<ul>
+  <li>First, evaluate the LHS (<code class="highlighter-rouge">b</code>).</li>
+  <li>If the LHS is true, we’re done - push <code class="highlighter-rouge">1</code> onto the stack, which is how we represent <code class="highlighter-rouge">true</code> on the stack.</li>
+  <li>If the LHS is false, we need to evaluate the RHS (<code class="highlighter-rouge">c</code>).</li>
+</ul>
+
+<p>We can accomplish these steps using a combination of labels and branches, as follows:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">leftIsFalseLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+<span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+<span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">l</span>          <span class="o">//</span> <span class="mi">1</span><span class="p">.</span> <span class="nc">Evaluate</span> <span class="n">the</span> <span class="nc">LHS</span>
+              <span class="p">[</span> <span class="nc">Brfalse</span> <span class="n">leftIsFalseLabel</span> <span class="p">]</span> <span class="o">//</span> <span class="mi">2</span><span class="p">.</span> <span class="nc">If</span> <span class="n">the</span> <span class="nc">LHS</span> <span class="n">is</span> <span class="bp">false</span><span class="p">,</span> <span class="n">branch</span> <span class="k">to</span> <span class="n">leftIsFalseLabel</span>
+              <span class="p">[</span> <span class="nc">Ldc_I4</span> <span class="mi">1</span> <span class="p">]</span>                 <span class="o">//</span> <span class="mi">3</span><span class="p">.</span> <span class="nc">If</span> <span class="n">the</span> <span class="nc">LHS</span> <span class="n">is</span> <span class="bp">true</span><span class="p">,</span> <span class="n">push</span> <span class="s2">"1"</span> <span class="k">to</span> <span class="n">the</span> <span class="n">stack</span>
+              <span class="p">[</span> <span class="nc">Br</span> <span class="n">endLabel</span> <span class="p">]</span>              <span class="o">//</span> <span class="mi">4</span><span class="p">.</span> <span class="nc">We're</span> <span class="k">done</span> <span class="p">-</span> <span class="n">branch</span> <span class="k">to</span> <span class="n">endLabel</span>
+              <span class="p">[</span> <span class="nc">Label</span> <span class="n">leftIsFalseLabel</span> <span class="p">]</span>
+              <span class="n">processExpression</span> <span class="n">r</span>          <span class="o">//</span> <span class="mi">5</span><span class="p">.</span> <span class="nc">Evaluate</span> <span class="n">the</span> <span class="nc">RHS</span><span class="p">,</span> <span class="n">which</span> <span class="n">will</span> <span class="n">leave</span> <span class="n">a</span> <span class="s2">"1"</span> <span class="ow">or</span> <span class="s2">"0"</span> <span class="n">on</span> <span class="n">the</span> <span class="n">stack</span><span class="p">.</span>
+              <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processBinaryOperator</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Add</span> <span class="p">-&gt;</span> <span class="nc">Add</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Divide</span> <span class="p">-&gt;</span> <span class="nc">Div</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Multiply</span> <span class="p">-&gt;</span> <span class="nc">Mul</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Modulus</span> <span class="p">-&gt;</span> <span class="nc">Rem</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Subtract</span> <span class="p">-&gt;</span> <span class="nc">Sub</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Equal</span> <span class="p">-&gt;</span> <span class="nc">Ceq</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Greater</span> <span class="p">-&gt;</span> <span class="nc">Cgt</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">GreaterEqual</span> <span class="p">-&gt;</span> <span class="nc">Cge</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Less</span> <span class="p">-&gt;</span> <span class="nc">Clt</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">LessEqual</span> <span class="p">-&gt;</span> <span class="nc">Cle</span>
+  <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="n">failwith</span> <span class="s2">"Shouldn't be here"</span>
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">processBinaryOperator</code> function converts binary operators from their AST to their respective MSIL opcodes. Implicit in this conversion process is that the stack-based CLR uses a reverse Polish notation instruction set, in which operators follow their operands.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processIdentifierLoad</span> <span class="n">identifierRef</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">lookupILVariableScope</span> <span class="n">identifierRef</span> <span class="k">with</span>
+  <span class="p">|</span> <span class="nc">FieldScope</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldsfld</span> <span class="n">v</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nc">ArgumentScope</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldarg</span> <span class="n">i</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nc">LocalScope</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldloc</span> <span class="n">i</span> <span class="p">]</span>
+
+<span class="ow">and</span> <span class="n">processIdentifierStore</span> <span class="n">identifierRef</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">lookupILVariableScope</span> <span class="n">identifierRef</span> <span class="k">with</span>
+  <span class="p">|</span> <span class="nc">FieldScope</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Stsfld</span> <span class="n">v</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nc">ArgumentScope</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Starg</span> <span class="n">i</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nc">LocalScope</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Stloc</span> <span class="n">i</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>This pair of functions generates the instructions necessary to load and store values associated with an identifier. We use different MSIL instructions for working with fields, arguments, and local variables. Arguments and locals are referred to by an index. When we’re actually writing the MSIL out, we will refer to fields by a <code class="highlighter-rouge">FieldInfo</code> object; for now, we use an <code class="highlighter-rouge">ILVariable</code> as the IR version of that.</p>
+
+<h4 id="mapping-expressions-from-ast-to-ir">Mapping expressions from AST to IR</h4>
+
+<p>The two functions to convert expressions and statements to IR are the biggest of this stage. I’ll break them into smaller chunks, instead of doing one big code dump.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="p">[</span> <span class="nc">Dup</span> <span class="p">]</span>
+                  <span class="n">processIdentifierStore</span> <span class="n">i</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Our basic strategy for converting expressions to MSIL is this:</p>
+
+<ol>
+  <li>Convert the expression itself (recursively, because expressions can contain expressions).</li>
+  <li>Make sure that the thing left on top of the stack afterwards is the value of the expression.</li>
+</ol>
+
+<p>For a scalar assignment expression (<code class="highlighter-rouge">i = 1</code>) we need to make sure that the value of the expression (<code class="highlighter-rouge">1</code>) is left on top of the stack, so that the expression can be chained (<code class="highlighter-rouge">j = i = 1</code>).</p>
+
+<p>We do that with the <code class="highlighter-rouge">dup</code> MSIL instruction, which copies the current topmost item on the stack, and pushes the copy onto the stack. Then, <code class="highlighter-rouge">processIdentifierStore</code> generates, for example, a <code class="highlighter-rouge">stloc</code> instruction, which will pop one of the copies from the stack, leaving the other copy intact on top of the stack.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e1</span><span class="p">,</span> <span class="n">e2</span><span class="p">)</span> <span class="k">as</span> <span class="n">ae</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processIdentifierLoad</span> <span class="n">i</span>
+                  <span class="n">processExpression</span> <span class="n">e1</span>
+                  <span class="n">processExpression</span> <span class="n">e2</span>
+                  <span class="p">[</span> <span class="nc">Dup</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Stloc</span> <span class="n">arrayAssignmentLocals</span><span class="o">.[</span><span class="n">ae</span><span class="p">]</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Stelem</span> <span class="p">(</span><span class="n">typeOf</span> <span class="p">(</span><span class="n">semanticAnalysisResult</span><span class="p">.</span><span class="nn">SymbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span> <span class="n">i</span><span class="o">).</span><span class="nc">Type</span><span class="p">)</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Ldloc</span> <span class="n">arrayAssignmentLocals</span><span class="o">.[</span><span class="n">ae</span><span class="p">]</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Array assignments (<code class="highlighter-rouge">a[i] = b</code>) are somewhat more complicated than scalar assignments. We need to generate instructions to:</p>
+
+<ul>
+  <li>Push the field, argument or local onto the top of the stack</li>
+  <li>Process <code class="highlighter-rouge">e1</code>, which is the array index expression. We’ll be left with the value of the expression on top of the stack, and “underneath” that will be the field, argument or local that we pushed in the previous step</li>
+  <li>Process <code class="highlighter-rouge">e2</code> - after this, we’ll have 3 items on the stack (or rather, 3 items relevant to this particular expression)</li>
+  <li>Duplicate the value on top of the stack - i.e. the result of <code class="highlighter-rouge">e2</code></li>
+  <li>Pop the duplicate and store it in a “temp” local variable</li>
+  <li>Pop the original and store it in the array. <code class="highlighter-rouge">Stelem</code> pops three items off the stack: the array, the array index, and the value to store. It takes as a parameter the type of the value to store.</li>
+  <li>Push the “temp” local variable back to the top of the stack. This is how we make the RHS of this array assignment expression available to a calling expression (i.e. <code class="highlighter-rouge">c = a[i] = b</code>).</li>
+</ul>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">processBinaryExpression</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">UnaryExpression</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="n">processUnaryOperator</span> <span class="n">op</span><span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>We’ve already covered <code class="highlighter-rouge">processBinaryExpression</code>. There’s no special reason for it to be in a separate function; it just made <code class="highlighter-rouge">processExpression</code> a bit large if it was all included inline.</p>
+
+<p>Unary expressions are handled by first pushing the result of the expression on to the stack, and then the instruction representing the unary operation. Here is <code class="highlighter-rouge">processUnaryOperator</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processUnaryOperator</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">LogicalNegate</span> <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldc_I4</span> <span class="mi">0</span><span class="p">;</span> <span class="nc">Ceq</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Negate</span>        <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Neg</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Identity</span>      <span class="p">-&gt;</span> <span class="p">[</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">processIdentifierLoad</span> <span class="n">i</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayIdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processIdentifierLoad</span> <span class="n">i</span>
+                  <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="p">[</span> <span class="nc">Ldelem</span> <span class="p">(</span><span class="n">typeOf</span> <span class="p">(</span><span class="n">semanticAnalysisResult</span><span class="p">.</span><span class="nn">SymbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span> <span class="n">i</span><span class="o">).</span><span class="nc">Type</span><span class="p">)</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>We’ve already looked at <code class="highlighter-rouge">processIdentifierLoad</code>. Array identifier expressions (<code class="highlighter-rouge">a[i]</code>) are handled by:</p>
+
+<ul>
+  <li>Pushing the array onto the stack</li>
+  <li>Pushing the array index expression onto the stack</li>
+  <li>Calling <code class="highlighter-rouge">Ldelem</code>, which pops the array and array index from the stack, and pushes the value of the array at that index onto the stack</li>
+</ul>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionCallExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">a</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">processExpression</span>
+                  <span class="p">[</span> <span class="nc">Call</span> <span class="n">i</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Function calls, as with most of the rest of MSIL, are handled in the reverse order to higher level code. First, we push all the arguments onto the stack, and then we issue the <code class="highlighter-rouge">call</code> instruction. The parameter to the <code class="highlighter-rouge">call</code> instruction is the name of the function to call; later, we’ll map this to a <code class="highlighter-rouge">MethodInfo</code>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArraySizeExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processIdentifierLoad</span> <span class="n">i</span>
+                  <span class="p">[</span> <span class="nc">Ldlen</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>For array size expressions (<code class="highlighter-rouge">myArray.size</code>), we push the array onto the stack, and then call <code class="highlighter-rouge">ldlen</code>, which pops the array and pushes the array length onto the stack.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">LiteralExpression</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">match</span> <span class="n">l</span> <span class="k">with</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IntLiteral</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldc_I4</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">FloatLiteral</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ldc_R8</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BoolLiteral</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="p">[</span> <span class="p">(</span><span class="k">if</span> <span class="n">x</span> <span class="k">then</span> <span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span> <span class="k">else</span> <span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">0</span><span class="o">))</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>MSIL has separate instructions for loading each type of literal. We only need to use two:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">ldc_i4</code> loads <code class="highlighter-rouge">System.Int32</code> values</li>
+  <li><code class="highlighter-rouge">ldc_r8</code> loads <code class="highlighter-rouge">System.Double</code> values</li>
+</ul>
+
+<p>The .NET CLR doesn’t have a representation of a boolean type on the stack, so we just use <code class="highlighter-rouge">int32</code> values: <code class="highlighter-rouge">1</code> for <code class="highlighter-rouge">true</code> and <code class="highlighter-rouge">0</code> for <code class="highlighter-rouge">false</code>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processExpression</span> <span class="n">expression</span> <span class="p">=</span>
+  <span class="k">match</span> <span class="n">expression</span> <span class="k">with</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayAllocationExpression</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="p">[</span> <span class="nc">Newarr</span> <span class="p">(</span><span class="n">typeOf</span> <span class="n">t</span><span class="p">)</span> <span class="p">]</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Array allocations (<code class="highlighter-rouge">new float[2]</code>) are handled by:</p>
+
+<ul>
+  <li>Pushing the result of the expression representing the size of the array, onto the stack</li>
+  <li>Calling <code class="highlighter-rouge">newarr</code>, which pops the required array length from the stack and pushes the newly-created array.</li>
+</ul>
+
+<h4 id="mapping-statements-from-ast-to-ir">Mapping statements from AST to IR</h4>
+
+<p>The next big function is <code class="highlighter-rouge">processStatement</code>, which maps statements from their AST representation to their intermediate representation. We’ll break it down into (hopefully) more readable chunks.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ExpressionStatement</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">match</span> <span class="n">x</span> <span class="k">with</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Expression</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span>
+      <span class="k">let</span> <span class="n">isNotVoid</span> <span class="p">=</span> <span class="n">semanticAnalysisResult</span><span class="p">.</span><span class="nn">ExpressionTypes</span><span class="p">.</span><span class="err">[</span><span class="n">x</span><span class="o">].</span><span class="nc">Type</span> <span class="o">&lt;&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Void</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">x</span>
+                    <span class="p">(</span><span class="k">if</span> <span class="n">isNotVoid</span> <span class="k">then</span> <span class="p">[</span> <span class="nc">Pop</span> <span class="p">]</span> <span class="k">else</span> <span class="bp">[]</span><span class="p">)</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Nop</span> <span class="p">-&gt;</span> <span class="bp">[]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Expression statements (which are, roughly, an expression with a semicolon on the end) have an interesting wrinkle. We have to be careful about the stack; we can’t leave extra values lying around if they’re not going to be used. An expression statement, by definition, doesn’t return a value to anything else, so it shouldn’t leave anything on the stack. We make sure of that by checking if the expression returns a value. If it does, then do an extra <code class="highlighter-rouge">Pop</code> to throw away the topmost item on the stack.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">CompoundStatement</span><span class="o">(_,</span> <span class="n">s</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">s</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">processStatement</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Compound statements are easy; we just collect all the instructions generated by recursively calling <code class="highlighter-rouge">processStatement</code> for each of the statements in the compound statement.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="nc">Some</span><span class="p">(</span><span class="n">s2</span><span class="o">))</span> <span class="p">-&gt;</span>
+    <span class="k">let</span> <span class="n">thenLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="p">[</span> <span class="nc">Brtrue</span> <span class="n">thenLabel</span> <span class="p">]</span>
+                  <span class="n">processStatement</span> <span class="n">s2</span>
+                  <span class="p">[</span> <span class="nc">Br</span> <span class="n">endLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">thenLabel</span> <span class="p">]</span>
+                  <span class="n">processStatement</span> <span class="n">s1</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="nc">None</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">let</span> <span class="n">thenLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">processExpression</span> <span class="n">e</span>
+                  <span class="p">[</span> <span class="nc">Brtrue</span> <span class="n">thenLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Br</span> <span class="n">endLabel</span> <span class="p">]</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">thenLabel</span> <span class="p">]</span>
+                  <span class="n">processStatement</span> <span class="n">s1</span>
+                  <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>The two types of <code class="highlighter-rouge">if</code> statement are handled separately.</p>
+
+<p>First, there’s the type that has an <code class="highlighter-rouge">else</code> block. Whenever we’re dealing with branching, we use labels as the target of branch instructions. We proceed as follows:</p>
+
+<ul>
+  <li>Push the value of the <code class="highlighter-rouge">if</code> condition onto the stack</li>
+  <li>If it’s true, branch to <code class="highlighter-rouge">thenLabel</code> (we could equivalently implement <code class="highlighter-rouge">if</code> statements by using <code class="highlighter-rouge">brfalse</code> and inverting the logic; I don’t know enough to know if there’s a good reason for implementing it either way)</li>
+  <li>If we’re still “here”, it means the condition evaluated to false, so process the <code class="highlighter-rouge">else</code> statement</li>
+  <li>After the <code class="highlighter-rouge">else</code> statement, branch to <code class="highlighter-rouge">endLabel</code></li>
+  <li>If the condition was true, we will have branched to <code class="highlighter-rouge">thenLabel</code>, so process the <code class="highlighter-rouge">then</code> statement</li>
+  <li>Either way, we end up at <code class="highlighter-rouge">endLabel</code></li>
+</ul>
+
+<p>There’s also the type of <code class="highlighter-rouge">if</code> statement without an <code class="highlighter-rouge">else</code> block. This is handled very similarly.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">WhileStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">let</span> <span class="n">startLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">conditionLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">endLabel</span> <span class="p">=</span> <span class="n">makeLabel</span><span class="bp">()</span>
+    <span class="n">currentWhileStatementEndLabel</span><span class="p">.</span><span class="nc">Push</span> <span class="n">endLabel</span>
+    <span class="k">let</span> <span class="n">result</span> <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="p">[</span> <span class="nc">Br</span> <span class="n">conditionLabel</span> <span class="p">]</span>
+                               <span class="p">[</span> <span class="nc">Label</span> <span class="n">startLabel</span> <span class="p">]</span>
+                               <span class="n">processStatement</span> <span class="n">s</span>
+                               <span class="p">[</span> <span class="nc">Label</span> <span class="n">conditionLabel</span> <span class="p">]</span>
+                               <span class="n">processExpression</span> <span class="n">e</span>
+                               <span class="p">[</span> <span class="nc">Brtrue</span> <span class="n">startLabel</span> <span class="p">]</span>
+                               <span class="p">[</span> <span class="nc">Label</span> <span class="n">endLabel</span> <span class="p">]</span> <span class="p">]</span>
+    <span class="n">currentWhileStatementEndLabel</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span> <span class="o">|&gt;</span> <span class="n">ignore</span>
+    <span class="n">result</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>While statements are interesting. While statements can be nested, and if there is a <code class="highlighter-rouge">break</code> statement in the body, it needs to branch to the end of the correct while loop. If Mini-C had other types of loop (which it doesn’t) the <code class="highlighter-rouge">break</code> statement would need to branch to the end of whichever type of loop it is immediately parented by.</p>
+
+<p>This tracking of the current while loop is done with the <code class="highlighter-rouge">currentWhileStatementEndLabel</code> stack.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BreakStatement</span> <span class="p">-&gt;</span>
+    <span class="p">[</span> <span class="nc">Br</span> <span class="p">(</span><span class="n">currentWhileStatementEndLabel</span><span class="p">.</span><span class="nc">Peek</span><span class="bp">()</span><span class="p">)</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>And here is where <code class="highlighter-rouge">currentWhileStatementEndLabel</code> is used - we branch to the <code class="highlighter-rouge">endLabel</code> of whichever while loop is “closest” to this break statement.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="n">processStatement</span> <span class="p">=</span>
+  <span class="k">function</span>
+  <span class="o">...</span>
+  <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span>
+    <span class="k">match</span> <span class="n">x</span> <span class="k">with</span>
+    <span class="p">|</span> <span class="nc">Some</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="p">(</span><span class="n">processExpression</span> <span class="n">x</span><span class="p">)</span> <span class="o">@</span> <span class="p">[</span> <span class="nc">Ret</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nc">None</span>    <span class="p">-&gt;</span> <span class="p">[</span> <span class="nc">Ret</span> <span class="p">]</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Return statements are straightforward: if there’s a value to return, then push it to the stack, and call <code class="highlighter-rouge">Ret</code>. Otherwise, call <code class="highlighter-rouge">Ret</code> directly. Note that MSIL methods must end with <code class="highlighter-rouge">Ret</code>, even if there’s no value to return, otherwise you get a CLR exception - I know that because it took me a while to figure out why my executables were crashing, and that turned out to be the reason.</p>
+
+<h4 id="collecting-local-declarations">Collecting local declarations</h4>
+
+<p>Now that we’ve got functions to build an abstract representation of MSIL for our method bodies, let’s turn our attention to local declarations. MSIL requires us to declare all required local variables at the start of each method. Mini-C, on the other hand, has two sources of local variables, one explicit and the other implicit:</p>
+
+<ul>
+  <li>Mini-C allows local declarations within compound statements, and compound statements can be nested.</li>
+  <li>Evaluation of array assignment expressions makes use of a temporary local variable, as discussed above. This local variable isn’t in the Mini-C source code, but we need it to make our MSIL work correctly.</li>
+</ul>
+
+<p>The following functions extract all the required local declarations from a function. They’re actually only pulling local declarations out from the two sources just mentioned; the rest of these functions handle traversing down through the AST. (There’s potential for separating out the tree traversal code from the actual operation being performed.)</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">processVariableDeclaration</span> <span class="p">(</span><span class="n">mutableIndex</span> <span class="p">:</span> <span class="n">byref</span><span class="o">&lt;_&gt;)</span> <span class="n">f</span> <span class="n">d</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">v</span> <span class="p">=</span> <span class="n">createILVariable</span> <span class="n">d</span>
+  <span class="n">variableMappings</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">f</span> <span class="n">mutableIndex</span><span class="p">)</span>
+  <span class="n">mutableIndex</span> <span class="p">&lt;-</span> <span class="n">mutableIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="n">s</span>
+  <span class="n">v</span>
+
+<span class="k">let</span> <span class="n">processLocalDeclaration</span> <span class="n">declaration</span> <span class="p">=</span>
+  <span class="n">processVariableDeclaration</span> <span class="p">&amp;</span><span class="n">localIndex</span> <span class="p">(</span><span class="k">fun</span> <span class="n">i</span> <span class="p">-&gt;</span> <span class="nc">LocalScope</span> <span class="n">i</span><span class="p">)</span> <span class="n">declaration</span>
+<span class="k">let</span> <span class="n">processParameter</span> <span class="n">declaration</span> <span class="p">=</span>
+  <span class="n">processVariableDeclaration</span> <span class="p">&amp;</span><span class="n">argumentIndex</span> <span class="p">(</span><span class="k">fun</span> <span class="n">i</span> <span class="p">-&gt;</span> <span class="nc">ArgumentScope</span> <span class="n">i</span><span class="p">)</span> <span class="n">declaration</span>
+
+<span class="k">let</span> <span class="k">rec</span> <span class="n">collectLocalDeclarations</span> <span class="n">statement</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="k">rec</span> <span class="n">fromStatement</span> <span class="p">=</span>
+    <span class="k">function</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ExpressionStatement</span><span class="p">(</span><span class="n">es</span><span class="p">)</span> <span class="p">-&gt;</span>
+      <span class="k">match</span> <span class="n">es</span> <span class="k">with</span>
+      <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Expression</span><span class="p">(</span><span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">fromExpression</span> <span class="n">e</span>
+      <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Nop</span> <span class="p">-&gt;</span> <span class="bp">[]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">CompoundStatement</span><span class="p">(</span><span class="n">localDeclarations</span><span class="p">,</span> <span class="n">statements</span><span class="p">)</span> <span class="p">-&gt;</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">localDeclarations</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="n">processLocalDeclaration</span><span class="p">;</span>
+                    <span class="n">statements</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">collectLocalDeclarations</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="nc">Some</span><span class="p">(</span><span class="n">s2</span><span class="o">))</span> <span class="p">-&gt;</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">fromExpression</span> <span class="n">e</span>
+                    <span class="n">collectLocalDeclarations</span> <span class="n">s1</span>
+                    <span class="n">collectLocalDeclarations</span> <span class="n">s2</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s1</span><span class="p">,</span> <span class="nc">None</span><span class="p">)</span> <span class="p">-&gt;</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">fromExpression</span> <span class="n">e</span>
+                    <span class="n">collectLocalDeclarations</span> <span class="n">s1</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">WhileStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span> <span class="p">-&gt;</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">fromExpression</span> <span class="n">e</span>
+                    <span class="n">collectLocalDeclarations</span> <span class="n">s</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="n">e</span><span class="o">))</span> <span class="p">-&gt;</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">fromExpression</span> <span class="n">e</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="bp">[]</span>
+
+  <span class="ow">and</span> <span class="n">fromExpression</span> <span class="p">=</span>
+    <span class="k">function</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">fromExpression</span> <span class="n">e</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e1</span><span class="p">,</span> <span class="n">e2</span><span class="p">)</span> <span class="k">as</span> <span class="n">ae</span> <span class="p">-&gt;</span>
+      <span class="k">let</span> <span class="n">v</span> <span class="p">=</span> <span class="p">{</span>
+        <span class="nn">ILVariable</span><span class="p">.</span><span class="nc">Type</span> <span class="p">=</span> <span class="n">typeOf</span> <span class="o">((</span><span class="n">semanticAnalysisResult</span><span class="p">.</span><span class="nn">SymbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span> <span class="n">i</span><span class="o">).</span><span class="nc">Type</span><span class="o">);</span> 
+        <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"ArrayAssignmentTemp"</span> <span class="o">+</span> <span class="kt">string</span> <span class="n">localIndex</span><span class="p">;</span>
+      <span class="p">}</span>
+      <span class="n">arrayAssignmentLocals</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">ae</span><span class="p">,</span> <span class="n">localIndex</span><span class="o">);</span>
+      <span class="n">localIndex</span> <span class="p">&lt;-</span> <span class="n">localIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="n">s</span>
+      <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="p">[</span> <span class="n">v</span> <span class="o">];</span> <span class="n">fromExpression</span> <span class="n">e2</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">l</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>      <span class="p">-&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">fromExpression</span> <span class="n">l</span><span class="p">;</span> <span class="n">fromExpression</span> <span class="n">r</span><span class="p">;</span> <span class="p">]</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">UnaryExpression</span><span class="p">(</span><span class="n">op</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>          <span class="p">-&gt;</span> <span class="n">fromExpression</span> <span class="n">e</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayIdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">fromExpression</span> <span class="n">e</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionCallExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">a</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="n">a</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">fromExpression</span>
+    <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayAllocationExpression</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">fromExpression</span> <span class="n">e</span>
+    <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="bp">[]</span>
+
+  <span class="n">fromStatement</span> <span class="n">statement</span>
+</code></pre>
+</div>
+
+<p>We’re almost there, at least for methods. Here is <code class="highlighter-rouge">ILMethodBuilder</code>’s only public method. It creates a record with a complete intermediate representation of the MSIL we’re going to output in the next part.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">BuildMethod</span><span class="p">(</span><span class="n">returnType</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">parameters</span><span class="p">,</span> <span class="p">(</span><span class="n">localDeclarations</span><span class="p">,</span> <span class="n">statements</span><span class="o">))</span> <span class="p">=</span>
+  <span class="p">{</span>
+    <span class="nc">Name</span>       <span class="p">=</span> <span class="n">name</span><span class="p">;</span>
+    <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeOf</span> <span class="n">returnType</span><span class="p">;</span>
+    <span class="nc">Parameters</span> <span class="p">=</span> <span class="n">parameters</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="n">processParameter</span><span class="p">;</span>
+    <span class="nc">Locals</span>     <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">localDeclarations</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="n">processLocalDeclaration</span><span class="p">;</span>
+                               <span class="n">statements</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">collectLocalDeclarations</span> <span class="p">]</span>
+    <span class="nc">Body</span>       <span class="p">=</span> <span class="n">statements</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">collect</span> <span class="n">processStatement</span><span class="p">;</span>
+  <span class="p">}</span>
+</code></pre>
+</div>
+
+<h4 id="building-ilclass">Building <code class="highlighter-rouge">ILClass</code></h4>
+
+<p>So far, we’ve seen the <code class="highlighter-rouge">ILMethodBuilder</code> type, which can turn a function declaration from the AST into an <code class="highlighter-rouge">ILMethod</code>. Now, let’s look at <code class="highlighter-rouge">ILBuilder</code>, which converts a whole program into its IR:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">ILBuilder</span><span class="p">(</span><span class="n">semanticAnalysisResult</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">variableMappings</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">VariableMappingDictionary</span><span class="p">(</span><span class="nn">HashIdentity</span><span class="p">.</span><span class="nc">Reference</span><span class="p">)</span>
+
+  <span class="k">let</span> <span class="n">processStaticVariableDeclaration</span> <span class="n">d</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">v</span> <span class="p">=</span> <span class="n">createILVariable</span> <span class="n">d</span>
+    <span class="n">variableMappings</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="nc">FieldScope</span><span class="p">(</span><span class="n">v</span><span class="o">))</span>
+    <span class="n">v</span>
+
+  <span class="k">let</span> <span class="n">processFunctionDeclaration</span> <span class="n">functionDeclaration</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">ilMethodBuilder</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">ILMethodBuilder</span><span class="p">(</span><span class="n">semanticAnalysisResult</span><span class="p">,</span> <span class="n">variableMappings</span><span class="p">)</span>
+    <span class="n">ilMethodBuilder</span><span class="p">.</span><span class="nc">BuildMethod</span> <span class="n">functionDeclaration</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">variableMappings</code>, as the name suggests, stores the mapping from <code class="highlighter-rouge">Ast.VariableDeclaration</code> to <code class="highlighter-rouge">ILVariableScope</code>. <code class="highlighter-rouge">processStaticVariableDeclaration</code> adds static variable declarations to this dictionary. <code class="highlighter-rouge">processFunctionDeclaration</code> is the entry point into <code class="highlighter-rouge">ILMethodBuilder.BuildMethod</code>.</p>
+
+<p><code class="highlighter-rouge">ILBuilder</code>’s only public method is <code class="highlighter-rouge">BuildClass</code>, which starts by creating hard-coded <code class="highlighter-rouge">ILMethod</code> objects for Mini-C’s built-in methods. In a real language, you wouldn’t want to do this. Instead, you’d provide a way to import classes and / or methods from arbitrary .NET namespaces. But Mini-C doesn’t have any of that; the only functions you can call are either the ones you write yourself, or these four:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">BuildClass</span> <span class="p">(</span><span class="n">program</span> <span class="p">:</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Program</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">builtInMethods</span> <span class="p">=</span> <span class="p">[</span>
+    <span class="p">{</span>
+      <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"iread"</span><span class="p">;</span>
+      <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span>
+      <span class="nc">Parameters</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Locals</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Body</span> <span class="p">=</span> <span class="p">[</span> <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Console</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"ReadLine"</span><span class="o">))</span>
+               <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Convert</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"ToInt32"</span><span class="p">,</span> <span class="p">[|</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">string</span><span class="p">&gt;</span> <span class="o">|]))</span>
+               <span class="nc">Ret</span> <span class="o">];</span>
+    <span class="o">};</span>
+    <span class="p">{</span>
+      <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"fread"</span><span class="p">;</span>
+      <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">float</span><span class="o">&gt;;</span>
+      <span class="nc">Parameters</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Locals</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Body</span> <span class="p">=</span> <span class="p">[</span> <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Console</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"ReadLine"</span><span class="o">))</span>
+               <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Convert</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"ToDouble"</span><span class="p">,</span> <span class="p">[|</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">string</span><span class="p">&gt;</span> <span class="o">|]))</span>
+               <span class="nc">Ret</span> <span class="o">];</span>
+    <span class="o">};</span>
+    <span class="p">{</span>
+      <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"iprint"</span><span class="p">;</span>
+      <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Void</span><span class="o">&gt;;</span>
+      <span class="nc">Parameters</span> <span class="p">=</span> <span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"value"</span><span class="p">;</span> <span class="o">}];</span>
+      <span class="nc">Locals</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Body</span> <span class="p">=</span> <span class="p">[</span> <span class="nc">Ldarg</span><span class="p">(</span><span class="mi">0</span><span class="n">s</span><span class="p">)</span>
+               <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Console</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"WriteLine"</span><span class="p">,</span> <span class="p">[|</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="p">&gt;</span> <span class="o">|]))</span>
+               <span class="nc">Ret</span> <span class="o">];</span>
+    <span class="o">};</span>
+    <span class="p">{</span>
+      <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"fprint"</span><span class="p">;</span>
+      <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Void</span><span class="o">&gt;;</span>
+      <span class="nc">Parameters</span> <span class="p">=</span> <span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">float</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"value"</span><span class="p">;</span> <span class="o">}];</span>
+      <span class="nc">Locals</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Body</span> <span class="p">=</span> <span class="p">[</span> <span class="nc">Ldarg</span><span class="p">(</span><span class="mi">0</span><span class="n">s</span><span class="p">)</span>
+               <span class="nc">CallClr</span><span class="p">(</span><span class="n">typeof</span><span class="p">&lt;</span><span class="nn">System</span><span class="p">.</span><span class="nc">Console</span><span class="o">&gt;.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"WriteLine"</span><span class="p">,</span> <span class="p">[|</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">float</span><span class="p">&gt;</span> <span class="o">|]))</span>
+               <span class="nc">Ret</span> <span class="o">];</span>
+    <span class="p">}</span>
+  <span class="p">]</span>
+
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">ILClass</code> stores fields and methods separately, because that’s what we’re going to need when we turn our IR into real executable files. So let’s separate those out:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">BuildClass</span> <span class="p">(</span><span class="n">program</span> <span class="p">:</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Program</span><span class="p">)</span> <span class="p">=</span>
+  <span class="o">...</span>
+
+  <span class="k">let</span> <span class="n">variableDeclarations</span> <span class="p">=</span>
+    <span class="n">program</span>
+    <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">choose</span> <span class="p">(</span><span class="k">fun</span> <span class="n">x</span> <span class="p">-&gt;</span>
+      <span class="k">match</span> <span class="n">x</span> <span class="k">with</span>
+      <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="nc">Some</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+      <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="nc">None</span><span class="p">)</span>
+    
+  <span class="k">let</span> <span class="n">functionDeclarations</span> <span class="p">=</span>
+    <span class="n">program</span>
+    <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">choose</span> <span class="p">(</span><span class="k">fun</span> <span class="n">x</span> <span class="p">-&gt;</span>
+      <span class="k">match</span> <span class="n">x</span> <span class="k">with</span>
+      <span class="p">|</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionDeclaration</span><span class="o">(_,</span> <span class="o">_,</span> <span class="o">_,</span> <span class="p">_</span> <span class="k">as</span> <span class="n">a</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="nc">Some</span> <span class="n">a</span>
+      <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="nc">None</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>And, <em>finally</em>, we can create an <code class="highlighter-rouge">ILClass</code> record, which wraps up our entire IR for a single Mini-C program:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="err">```</span> <span class="n">ocaml</span>
+<span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">BuildClass</span> <span class="p">(</span><span class="n">program</span> <span class="p">:</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Program</span><span class="p">)</span> <span class="p">=</span>
+  <span class="o">...</span>
+  
+  <span class="p">{</span>
+    <span class="nc">Fields</span>  <span class="p">=</span> <span class="n">variableDeclarations</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="n">processStaticVariableDeclaration</span><span class="p">;</span>
+    <span class="nc">Methods</span> <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">concat</span> <span class="p">[</span> <span class="n">builtInMethods</span>
+                            <span class="n">functionDeclarations</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="n">processFunctionDeclaration</span> <span class="o">];</span>
+  <span class="p">}</span>
+</code></pre>
+</div>
+
+<h3 id="summary">Summary</h3>
+
+<p>Here’s that example from the beginning, again; hopefully it makes more sense now. Putting together everything we’ve covered so far, we’re able to take this Mini-C source code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">float</span> <span class="n">c</span><span class="p">[];</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>… and turn it into this intermediate representation (IR):</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">{</span> <span class="o">//</span> <span class="nc">ILClass</span>
+  <span class="nc">Fields</span>  <span class="p">=</span> <span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"a"</span> <span class="p">}</span> <span class="o">];</span>
+  <span class="nc">Methods</span> <span class="p">=</span> <span class="p">[</span>
+    <span class="p">{</span> <span class="o">//</span> <span class="nc">ILMethod</span>
+<span class="err">    </span>  <span class="nc">Name</span><span class="err">       </span><span class="p">=</span><span class="err"> </span><span class="s2">"main"</span><span class="p">;</span>
+<span class="err">      </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span>
+<span class="err">      </span><span class="nc">Parameters</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">bool</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"b"</span> <span class="p">}</span> <span class="o">];</span>
+<span class="err">      </span><span class="nc">Locals</span><span class="err">     </span><span class="p">=</span><span class="err"> </span><span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="n">single</span><span class="bp">[]</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"c"</span> <span class="p">}</span> <span class="o">];</span>
+<span class="err">      </span><span class="nc">Body</span><span class="err">       </span><span class="p">=</span><span class="err"> </span><span class="p">[</span><span class="err"> </span><span class="nn">IL</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">1</span><span class="o">);</span><span class="err"> </span><span class="nn">IL</span><span class="p">.</span><span class="nc">Ret</span><span class="err"> </span><span class="o">];</span>
+<span class="err">    </span><span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>The hard work is now behind us. Because the IR we chose is very close to MSIL, turning it into a real .NET executable is fairly straightforward. That will be the topic of the <a href="/blog/archive/2014/09/13/writing-a-minic-to-msil-compiler-in-fsharp-part-5-code-generation">next part</a>, which I hope will take less time for me to write than this one has! See you next time.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/09/13/writing-a-minic-to-msil-compiler-in-fsharp-part-5-code-generation">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

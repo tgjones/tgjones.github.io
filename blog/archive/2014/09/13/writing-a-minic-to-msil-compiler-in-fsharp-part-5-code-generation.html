@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 5 - Code generation - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 5 - Code generation</h1>
+
+    <div class="post-date">
+        <time datetime="2014-09-13T15:30:00+00:00">13 September 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>Let’s do a quick recap. By the end of the last part on <a href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">building an intermediate representation</a>, we were able to take source code like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="mi">123</span> <span class="o">+</span> <span class="mi">456</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>and turn it into an intermediate representation (IR) like this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">{</span> <span class="o">//</span> <span class="nc">ILClass</span>
+  <span class="nc">Fields</span>  <span class="p">=</span> <span class="p">[</span> <span class="p">{</span> <span class="nc">Type</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span> <span class="nc">Name</span> <span class="p">=</span> <span class="s2">"a"</span> <span class="p">}</span> <span class="o">];</span>
+  <span class="nc">Methods</span> <span class="p">=</span> <span class="p">[</span>
+    <span class="p">{</span> <span class="o">//</span> <span class="nc">ILMethod</span>
+<span class="err">    </span>  <span class="nc">Name</span>       <span class="p">=</span> <span class="s2">"main"</span><span class="p">;</span>
+      <span class="nc">ReturnType</span> <span class="p">=</span> <span class="n">typeof</span><span class="p">&lt;</span><span class="kt">int</span><span class="o">&gt;;</span>
+      <span class="nc">Parameters</span> <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Locals</span>     <span class="p">=</span> <span class="bp">[]</span><span class="p">;</span>
+      <span class="nc">Body</span>       <span class="p">=</span> <span class="p">[</span> <span class="nn">IL</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">123</span><span class="o">);</span> <span class="nn">IL</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">(</span><span class="mi">456</span><span class="o">);</span> <span class="nn">IL</span><span class="p">.</span><span class="nc">Add</span><span class="p">;</span> <span class="nn">IL</span><span class="p">.</span><span class="nc">Ret</span> <span class="o">];</span>
+<span class="err">    </span><span class="p">}</span>
+  <span class="p">]</span>
+<span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>In this part, we’ll focus on <a href="http://en.wikipedia.org/wiki/Code_generation_(compiler)">code generation</a>:</p>
+
+<blockquote>
+  <p>In computing, code generation is the process by which a compiler’s code generator converts some intermediate representation of source code into a form (e.g., machine code) that can be readily executed by a machine.</p>
+</blockquote>
+
+<p>We’ll be converting our intermediate representation into MSIL. Fortunately, our IR is already very similar to MSIL - a choice designed to make code generation easier.</p>
+
+<p>Let’s get started. The code for this part is in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/CodeGenerator.fs">CodeGenerator.fs</a> in the GitHub repository.</p>
+
+<h2 id="emitting-msil">Emitting MSIL</h2>
+
+<p>MSIL is a bytecode format - if you opened a .NET DLL or executable file in a binary viewer, all you’d see would be a long sequence of bytes. Nobody (presumably) wants to build their .NET applications by writing bytes.</p>
+
+<p>The next level up is writing IL yourself. Microsoft provides a tool, <code class="highlighter-rouge">ilasm.exe</code>, which assembles IL into .NET bytecode (or a Portable Executable (PE), as it’s called). If you were to write IL by hand for the trivial example program above, it would look like this (I have removed some items for brevity):</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="p">.</span><span class="n">assembly</span> <span class="k">extern</span> <span class="n">mscorlib</span>
+<span class="p">{</span>
+  <span class="p">.</span><span class="n">publickeytoken</span> <span class="o">=</span> <span class="p">(</span><span class="n">B7</span> <span class="mi">7</span><span class="n">A</span> <span class="mi">5</span><span class="n">C</span> <span class="mi">56</span> <span class="mi">19</span> <span class="mi">34</span> <span class="n">E0</span> <span class="mi">89</span> <span class="p">)</span>
+  <span class="p">.</span><span class="n">ver</span> <span class="mi">4</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">0</span>
+<span class="p">}</span>
+<span class="p">.</span><span class="n">assembly</span> <span class="n">TrivialExample</span>
+<span class="p">{</span>
+  <span class="p">.</span><span class="n">hash</span> <span class="n">algorithm</span> <span class="mh">0x00008004</span>
+  <span class="p">.</span><span class="n">ver</span> <span class="mi">1</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">0</span><span class="o">:</span><span class="mi">0</span>
+<span class="p">}</span>
+<span class="p">.</span><span class="n">module</span> <span class="n">TrivialExample</span><span class="p">.</span><span class="n">exe</span>
+
+<span class="p">.</span><span class="n">class</span> <span class="n">private</span> <span class="k">auto</span> <span class="n">ansi</span> <span class="n">beforefieldinit</span> <span class="n">TrivialExample</span><span class="p">.</span><span class="n">Program</span>
+       <span class="n">extends</span> <span class="p">[</span><span class="n">mscorlib</span><span class="p">]</span><span class="n">System</span><span class="p">.</span><span class="n">Object</span>
+<span class="p">{</span>
+  <span class="p">.</span><span class="n">method</span> <span class="n">private</span> <span class="n">hidebysig</span> <span class="k">static</span> <span class="n">int32</span> 
+          <span class="n">Main</span><span class="p">()</span> <span class="n">cil</span> <span class="n">managed</span>
+  <span class="p">{</span>
+    <span class="p">.</span><span class="n">entrypoint</span>
+    <span class="p">.</span><span class="n">maxstack</span>  <span class="mi">2</span>
+    <span class="n">IL_0000</span><span class="o">:</span>  <span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">123</span>
+    <span class="n">IL_0001</span><span class="o">:</span>  <span class="n">ldc</span><span class="p">.</span><span class="n">i4</span> <span class="mi">456</span>
+    <span class="n">IL_0002</span><span class="o">:</span>  <span class="n">add</span>
+    <span class="n">IL_0003</span><span class="o">:</span>  <span class="n">ret</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Whenever a .NET language like C#, or Mini-C, is compiled, the compiler is essentially creating one of these IL files, and then assembling it into .NET bytecode. But to save you the trouble of building IL text files yourself, the .NET framework includes a nice API for generating IL, in the <code class="highlighter-rouge">System.Reflection.Emit</code> namespace. Instead of, for example, writing this line in an IL file:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>ldc.i4 123
+</code></pre>
+</div>
+
+<p>we can just call this method:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">,</span> <span class="mi">123</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>This is quite <a href="http://thats-so-meta.tumblr.com/">meta</a>: we’re using a .NET API to generate (another) .NET application.</p>
+
+<p>The main <code class="highlighter-rouge">System.Reflection.Emit</code> types that we’ll need are:</p>
+
+<ul>
+  <li><a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.modulebuilder.aspx">ModuleBuilder</a></li>
+  <li><a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.typebuilder.aspx">TypeBuilder</a></li>
+  <li><a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.methodbuilder.aspx">MethodBuilder</a></li>
+</ul>
+
+<h2 id="generating-msil-methods">Generating MSIL methods</h2>
+
+<p>In the Mini-C compiler, at least, most of the hard work in code generation is expended in generating methods. So that’s where we’ll start. First, a couple of helpful type aliases:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MethodMappingDictionary</span> <span class="p">=</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="kt">string</span><span class="p">,</span> <span class="nc">MethodInfo</span><span class="p">&gt;</span>
+<span class="k">type</span> <span class="nc">FieldMappingDictionary</span> <span class="p">=</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nc">ILVariable</span><span class="p">,</span> <span class="nc">FieldInfo</span><span class="p">&gt;</span>
+</code></pre>
+</div>
+
+<p>These will help us keep track of the generated versions of methods and fields.</p>
+
+<p>We’ll wrap all the code to generate methods into a <code class="highlighter-rouge">MethodGenerator</code> type (I’ll discuss in the next part my feelings on my use of classes / types in this compiler. I think I’d put the pieces together differently 
+if I was doing it now. I have been a C# developer for a long time, and I think it shows. There are often better ways of doing things in F#.)</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MethodGenerator</span><span class="p">(</span><span class="n">typeBuilder</span> <span class="p">:</span> <span class="nc">TypeBuilder</span><span class="p">,</span> <span class="n">ilMethod</span> <span class="p">:</span> <span class="nc">ILMethod</span><span class="p">,</span>
+                     <span class="n">methodMappings</span> <span class="p">:</span> <span class="nc">MethodMappingDictionary</span><span class="p">,</span>
+                     <span class="n">fieldMappings</span> <span class="p">:</span> <span class="nc">FieldMappingDictionary</span><span class="p">)</span> <span class="p">=</span>
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">ILMethod</code> object is the intermediate representation that we built in the last part.</p>
+
+<p>First, we’ll create a new <code class="highlighter-rouge">MethodBuilder</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">methodAttributes</span> <span class="p">=</span> <span class="nn">MethodAttributes</span><span class="p">.</span><span class="nc">Public</span> <span class="o">|||</span> <span class="nn">MethodAttributes</span><span class="p">.</span><span class="nc">Static</span>
+<span class="k">let</span> <span class="n">methodBuilder</span> <span class="p">=</span> <span class="n">typeBuilder</span><span class="p">.</span><span class="nc">DefineMethod</span><span class="p">(</span><span class="n">ilMethod</span><span class="p">.</span><span class="nc">Name</span><span class="p">,</span> <span class="n">methodAttributes</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Later on, when we’re generating the IL for a method call, we need to pass as the argument a <code class="highlighter-rouge">MethodInfo</code> object. To support that, we need to keep track of all the <code class="highlighter-rouge">MethodInfo</code> objects we’ve created for the functions in our program. That’s what the <code class="highlighter-rouge">methodMappings</code> dictionary is for.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">do</span> <span class="n">methodMappings</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">ilMethod</span><span class="p">.</span><span class="nc">Name</span><span class="p">,</span> <span class="n">methodBuilder</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>(Rather confusingly, the <code class="highlighter-rouge">*Builder</code> types inherit from the <code class="highlighter-rouge">*Info</code> types; i.e. <code class="highlighter-rouge">MethodBuilder</code> inherits from <code class="highlighter-rouge">MethodInfo</code>.)</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">ilGenerator</span> <span class="p">=</span> <span class="n">methodBuilder</span><span class="p">.</span><span class="nc">GetILGenerator</span><span class="bp">()</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">ilGenerator</code> is the key object here; we’ll use it to generate all the IL instructions for methods.</p>
+
+<p>Next, we need some code to handle labels. In the IL examples above, the labels appear at the start of IL instructions (for example, <code class="highlighter-rouge">IL_0001:</code>). If you’re writing IL by hand, you can give meaningful names to labels. We don’t need to do that, but we do need to use labels as branch targets. For example, at the end of a <code class="highlighter-rouge">while</code> loop, we need to branch back to the beginning of the loop to test the condition again. The thing we’re branching back to is a label.</p>
+
+<p>We’ll keep track of labels using another dictionary:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">labelMappings</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nn">IL</span><span class="p">.</span><span class="nc">ILLabel</span><span class="p">,</span> <span class="nn">System</span><span class="p">.</span><span class="nn">Reflection</span><span class="p">.</span><span class="nn">Emit</span><span class="p">.</span><span class="nc">Label</span><span class="o">&gt;()</span>
+</code></pre>
+</div>
+
+<p>And then for a given <code class="highlighter-rouge">IL.ILLabel</code>, we’ll create a corresponding <code class="highlighter-rouge">System.Reflection.Emit.Label</code> if we haven’t already, and return it:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">getLabel</span> <span class="n">ilLabel</span> <span class="p">=</span>
+  <span class="k">if</span> <span class="n">labelMappings</span><span class="p">.</span><span class="nc">ContainsKey</span> <span class="n">ilLabel</span> <span class="k">then</span>
+    <span class="n">labelMappings</span><span class="o">.[</span><span class="n">ilLabel</span><span class="p">]</span>
+  <span class="k">else</span>
+    <span class="k">let</span> <span class="n">label</span> <span class="p">=</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">DefineLabel</span><span class="bp">()</span>
+    <span class="n">labelMappings</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">ilLabel</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+    <span class="n">label</span>
+</code></pre>
+</div>
+
+<p>Now we get to one of the core functions in this whole compiler - the function that actually generates IL instructions from the intermediate representation. In a real-world compiler, this function would be <em>much</em> larger. But in Mini-C, we can get away with using a small subset of the <a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.opcodes.aspx">available MSIL instructions</a>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">emitOpCode</span> <span class="p">(</span><span class="n">ilGenerator</span> <span class="p">:</span> <span class="nc">ILGenerator</span><span class="p">)</span> <span class="p">=</span> <span class="k">function</span>
+  <span class="p">|</span> <span class="nc">Add</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Add</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Br</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>      <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Br</span><span class="p">,</span> <span class="n">getLabel</span> <span class="n">l</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Brfalse</span><span class="p">(</span><span class="n">l</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Brfalse</span><span class="p">,</span> <span class="n">getLabel</span> <span class="n">l</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Brtrue</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Brtrue</span><span class="p">,</span> <span class="n">getLabel</span> <span class="n">l</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Call</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>    <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Call</span><span class="p">,</span> <span class="n">methodMappings</span><span class="o">.[</span><span class="n">n</span><span class="o">])</span>
+  <span class="p">|</span> <span class="nc">CallClr</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Call</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ceq</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ceq</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Cge</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Clt</span><span class="p">)</span>
+                  <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldc_I4_0</span><span class="p">)</span>
+                  <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ceq</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Cgt</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Cgt</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Cle</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Cgt</span><span class="p">)</span>
+                  <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldc_I4_0</span><span class="p">)</span>
+                  <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ceq</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Clt</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Clt</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Dup</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Dup</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Div</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Div</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Label</span><span class="p">(</span><span class="n">l</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">MarkLabel</span><span class="p">(</span><span class="n">getLabel</span> <span class="n">l</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldarg</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldarg</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldc_I4</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldc_I4</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldc_R8</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldc_R8</span><span class="p">,</span> <span class="n">r</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldelem</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldelem</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldlen</span>      <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldlen</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldloc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldloc</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ldsfld</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ldsfld</span><span class="p">,</span> <span class="n">fieldMappings</span><span class="o">.[</span><span class="n">v</span><span class="o">])</span>
+  <span class="p">|</span> <span class="nc">Mul</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Mul</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Neg</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Neg</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Newarr</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Newarr</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Pop</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Pop</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Rem</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Rem</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Ret</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ret</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Starg</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Starg</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Stelem</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Stelem</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Stloc</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>   <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Stloc</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+  <span class="p">|</span> <span class="nc">Stsfld</span><span class="p">(</span><span class="n">v</span><span class="p">)</span>  <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Stsfld</span><span class="p">,</span> <span class="n">fieldMappings</span><span class="o">.[</span><span class="n">v</span><span class="o">])</span>
+  <span class="p">|</span> <span class="nc">Sub</span>        <span class="p">-&gt;</span> <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Sub</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>The only two that aren’t direct mappings are <code class="highlighter-rouge">IL.Cge</code> (<code class="highlighter-rouge">&gt;=</code>) and <code class="highlighter-rouge">IL.Cle</code> (<code class="highlighter-rouge">&lt;=</code>). That’s because these instructions don’t exist in IL. So for <code class="highlighter-rouge">Cge</code>, for example, we instead:</p>
+
+<ul>
+  <li>Compare using the less-than operator. If the first value is greater than or equal to the second value, this will push 0 onto the stack.</li>
+  <li>Load the constant <code class="highlighter-rouge">0</code> onto the stack.</li>
+  <li>If these two values are equal, then the first value must be greater than or equal to the second value.</li>
+</ul>
+
+<p>(As an aside: I don’t know why MSIL doesn’t have a <code class="highlighter-rouge">Cge</code> instruction. Do any readers know?)</p>
+
+<p>And finally, let’s bring it all together:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">Generate</span><span class="bp">()</span> <span class="p">=</span>
+  <span class="n">methodBuilder</span><span class="p">.</span><span class="nc">SetReturnType</span> <span class="n">ilMethod</span><span class="p">.</span><span class="nc">ReturnType</span>
+  <span class="n">methodBuilder</span><span class="p">.</span><span class="nc">SetParameters</span> <span class="p">(</span><span class="nn">List</span><span class="p">.</span><span class="n">toArray</span> <span class="p">(</span><span class="n">ilMethod</span><span class="p">.</span><span class="nc">Parameters</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">map</span> <span class="p">(</span><span class="k">fun</span> <span class="n">p</span> <span class="p">-&gt;</span> <span class="n">p</span><span class="p">.</span><span class="nc">Type</span><span class="o">)))</span>
+        
+  <span class="k">let</span> <span class="n">defineParameter</span> <span class="n">index</span> <span class="n">name</span> <span class="p">=</span> 
+    <span class="n">methodBuilder</span><span class="p">.</span><span class="nc">DefineParameter</span><span class="p">(</span><span class="n">index</span><span class="p">,</span> <span class="nn">ParameterAttributes</span><span class="p">.</span><span class="nc">In</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span> <span class="o">|&gt;</span> <span class="n">ignore</span>
+  <span class="n">ilMethod</span><span class="p">.</span><span class="nc">Parameters</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">iteri</span> <span class="p">(</span><span class="k">fun</span> <span class="n">i</span> <span class="n">p</span> <span class="p">-&gt;</span> <span class="n">defineParameter</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="n">p</span><span class="p">.</span><span class="nc">Name</span><span class="p">)</span>
+
+  <span class="k">let</span> <span class="n">emitLocal</span> <span class="p">(</span><span class="n">ilGenerator</span> <span class="p">:</span> <span class="nc">ILGenerator</span><span class="p">)</span> <span class="n">variable</span> <span class="p">=</span>
+    <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">DeclareLocal</span><span class="p">(</span><span class="n">variable</span><span class="p">.</span><span class="nc">Type</span><span class="o">).</span><span class="nc">SetLocalSymInfo</span><span class="p">(</span><span class="n">variable</span><span class="p">.</span><span class="nc">Name</span><span class="p">)</span>
+  <span class="n">ilMethod</span><span class="p">.</span><span class="nc">Locals</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">iter</span> <span class="p">(</span><span class="n">emitLocal</span> <span class="n">ilGenerator</span><span class="p">)</span>
+
+  <span class="n">ilMethod</span><span class="p">.</span><span class="nc">Body</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">iter</span> <span class="p">(</span><span class="n">emitOpCode</span> <span class="n">ilGenerator</span><span class="p">)</span>
+
+  <span class="k">let</span> <span class="k">rec</span> <span class="n">last</span> <span class="p">=</span>
+    <span class="k">function</span>
+    <span class="p">|</span> <span class="n">head</span> <span class="p">::</span> <span class="bp">[]</span> <span class="p">-&gt;</span> <span class="n">head</span>
+    <span class="p">|</span> <span class="n">head</span> <span class="p">::</span> <span class="n">tail</span> <span class="p">-&gt;</span> <span class="n">last</span> <span class="n">tail</span>
+    <span class="p">|</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="n">failwith</span> <span class="s2">"Empty list."</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">last</span> <span class="n">ilMethod</span><span class="p">.</span><span class="nc">Body</span><span class="p">)</span> <span class="o">&lt;&gt;</span> <span class="nc">Ret</span> <span class="k">then</span>
+    <span class="n">ilGenerator</span><span class="p">.</span><span class="nc">Emit</span><span class="p">(</span><span class="nn">OpCodes</span><span class="p">.</span><span class="nc">Ret</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>(Apparently there’s some unwritten rule that you can’t have a proper functional program without having a function somewhere in it that uses recursion to get the last item in a list. So I’ve obliged.)</p>
+
+<p>The only wrinkle here is that if there isn’t an explicit <code class="highlighter-rouge">return</code> at the end of the function in the original source code, we need to make sure we still add one to the generated code, otherwise our executable will fail runtime verification.</p>
+
+<p>That’s quite a whirlwind tour through IL generation. Obviously, we’ve only scratched the surface of what’s possible, but hopefully this gives you a rough idea of what’s involved.</p>
+
+<h2 id="generating-msil-types">Generating MSIL types</h2>
+
+<p>We can now generate IL for each of the functions in our Mini-C programs. Next, we need to generate IL for fields, and bring it all together into a .NET type. Mini-C doesn’t have types, but MSIL methods can only exist inside a type. We’ll generate one type as a container for all the fields and functions in any given Mini-C program.</p>
+
+<p>First, some code to generate fields, and store the mapping from <code class="highlighter-rouge">IL.Field</code> to <code class="highlighter-rouge">System.Reflection.FieldInfo</code> (when we refer to fields inside method IL instructions, we need to use the <code class="highlighter-rouge">FieldInfo</code> object):</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">CodeGenerator</span><span class="p">(</span><span class="n">moduleBuilder</span> <span class="p">:</span> <span class="nc">ModuleBuilder</span><span class="p">,</span> <span class="n">ilClass</span> <span class="p">:</span> <span class="nc">ILClass</span><span class="p">,</span> <span class="n">moduleName</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">fieldMappings</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">FieldMappingDictionary</span><span class="bp">()</span>
+
+  <span class="k">let</span> <span class="n">generateField</span> <span class="p">(</span><span class="n">typeBuilder</span> <span class="p">:</span> <span class="nc">TypeBuilder</span><span class="p">)</span> <span class="p">(</span><span class="n">ilField</span> <span class="p">:</span> <span class="nc">ILVariable</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">fieldAttributes</span> <span class="p">=</span> <span class="nn">FieldAttributes</span><span class="p">.</span><span class="nc">Public</span> <span class="o">|||</span> <span class="nn">FieldAttributes</span><span class="p">.</span><span class="nc">Static</span>
+    <span class="k">let</span> <span class="n">fieldBuilder</span> <span class="p">=</span> <span class="n">typeBuilder</span><span class="p">.</span><span class="nc">DefineField</span><span class="p">(</span><span class="n">ilField</span><span class="p">.</span><span class="nc">Name</span><span class="p">,</span> <span class="n">ilField</span><span class="p">.</span><span class="nc">Type</span><span class="p">,</span> <span class="n">fieldAttributes</span><span class="p">)</span>
+    <span class="n">fieldMappings</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">ilField</span><span class="p">,</span> <span class="n">fieldBuilder</span><span class="p">)</span>
+
+  <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Next, the all-important method that creates a new type, generates the fields and methods for that type, and finally returns both the type and the <code class="highlighter-rouge">main</code> method that will act as the program entry point:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">CodeGenerator</span><span class="p">(</span><span class="n">moduleBuilder</span> <span class="p">:</span> <span class="nc">ModuleBuilder</span><span class="p">,</span> <span class="n">ilClass</span> <span class="p">:</span> <span class="nc">ILClass</span><span class="p">,</span> <span class="n">moduleName</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">=</span>
+  <span class="o">...</span>
+  
+  <span class="n">member</span> <span class="n">x</span><span class="p">.</span><span class="nc">GenerateType</span><span class="bp">()</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">typeAttributes</span> <span class="p">=</span> <span class="nn">TypeAttributes</span><span class="p">.</span><span class="nc">Abstract</span> <span class="o">|||</span> <span class="nn">TypeAttributes</span><span class="p">.</span><span class="nc">Sealed</span> <span class="o">|||</span> <span class="nn">TypeAttributes</span><span class="p">.</span><span class="nc">Public</span>
+    <span class="k">let</span> <span class="n">typeBuilder</span> <span class="p">=</span> <span class="n">moduleBuilder</span><span class="p">.</span><span class="nc">DefineType</span><span class="p">(</span><span class="n">moduleName</span> <span class="o">+</span> <span class="s2">".Program"</span><span class="p">,</span> <span class="n">typeAttributes</span><span class="p">)</span>
+
+    <span class="n">ilClass</span><span class="p">.</span><span class="nc">Fields</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">iter</span> <span class="p">(</span><span class="n">generateField</span>  <span class="n">typeBuilder</span><span class="p">)</span>
+
+    <span class="k">let</span> <span class="n">methodMappings</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">MethodMappingDictionary</span><span class="bp">()</span>
+    <span class="k">let</span> <span class="n">generateMethod</span> <span class="n">ilMethod</span> <span class="p">=</span>
+      <span class="k">let</span> <span class="n">methodGenerator</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">MethodGenerator</span><span class="p">(</span><span class="n">typeBuilder</span><span class="p">,</span> <span class="n">ilMethod</span><span class="p">,</span> <span class="n">methodMappings</span><span class="p">,</span> <span class="n">fieldMappings</span><span class="p">)</span>
+      <span class="n">methodGenerator</span><span class="p">.</span><span class="nc">Generate</span><span class="bp">()</span>
+    <span class="n">ilClass</span><span class="p">.</span><span class="nc">Methods</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">iter</span> <span class="n">generateMethod</span>
+
+    <span class="p">(</span><span class="n">typeBuilder</span><span class="p">.</span><span class="nc">CreateType</span><span class="bp">()</span><span class="p">,</span> <span class="n">typeBuilder</span><span class="p">.</span><span class="nc">GetMethod</span><span class="p">(</span><span class="s2">"main"</span><span class="o">))</span>
+</code></pre>
+</div>
+
+<p>And that’s pretty much it! It took me quite a lot of trial and error to get this working. Some bugs were hard to fix, because if you get IL generation wrong, your executable files can crash in odd and unhelpful ways. If you pop from the stack more times than you push, or if you don’t have a <code class="highlighter-rouge">Ret</code> at the end of your methods, or… several other categories of error, you’ll get an exception at runtime. I think I could have used <a href="http://msdn.microsoft.com/en-us/library/62bwd2yd.aspx">PEVerify</a> to catch some of these errors without running the program, but I didn’t know about that at the time.</p>
+
+<p>We’ve almost reached the end of this little journey through a .NET compiler. In the <a href="/blog/archive/2014/09/14/writing-a-minic-to-msil-compiler-in-fsharp-part-6-conclusion">next and final part</a>, I’ll show the compiler entry point (the function that actually takes Mini-C source code as a string, and compiles it into a .NET assembly). I’ll also discuss how I would have done things differently with the benefit of hindsight. See you then!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/09/14/writing-a-minic-to-msil-compiler-in-fsharp-part-6-conclusion">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

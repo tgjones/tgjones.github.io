@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Introducing HlslUnit: unit tests for your HLSL shader code - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Introducing HlslUnit: unit tests for your HLSL shader code</h1>
+
+    <div class="post-date">
+        <time datetime="2014-01-07T15:54:00+00:00">07 January 2014</time>
+    </div>
+
+    
+
+    <p>The <em>skip-to-the-end</em> version:</p>
+
+<ul>
+  <li>HlslUnit is a .NET library that allows you to test your HLSL shaders without running your game or application.</li>
+  <li>HlslUnit is an open source library. The <a href="https://github.com/tgjones/slimshader">repository is hosted on GitHub</a>.</li>
+  <li>To get started, install the <a href="http://www.nuget.org/packages/HlslUnit">HlslUnit NuGet package</a> into your test project.</li>
+</ul>
+
+<h3 id="what-does-it-do">What does it do?</h3>
+
+<p>Whilst I’m not as good at Test-Driven Development (<a href="http://en.wikipedia.org/wiki/Test-driven_development">TDD</a>) as I would like to be, I do try my best to provide some minimum level of test coverage for my C# code. But shaders (and I’m focusing here on HLSL shaders) are much more difficult to test in isolation. Normally, to “test” your shaders, you need to make a change to the HLSL code, start your game, and look around the 3D world until you’re satisfied that you haven’t broken anything. You could automate testing by having a known-good screenshot, and compare that against an automatically-taken screenshot - and this is a good idea, but it’s not at all granular. That’s more like an integration test - it tests your whole application. Ideally, you’d be able to test your HLSL code in isolation. That’s where HlslUnit comes in - it allows you to test your HLSL code, and <em>only</em> your HLSL code.</p>
+
+<p>HlslUnit works by providing a virtual machine that can execute your HLSL shaders on the CPU, without involving the GPU at all. It currently supports Shader Model 4.0 and Shader Model 5.0 shaders. HlslUnit provides a high-level <code class="highlighter-rouge">Shader</code> class that hides the underlying complexity behind a friendly API.</p>
+
+<h3 id="show-me-the-code">Show me the code</h3>
+
+<p>Let’s use a simple vertex shader as an example. Here’s the HLSL code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">float4x4</span> <span class="n">World</span><span class="p">;</span>
+<span class="n">float4x4</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+
+<span class="k">struct</span> <span class="n">VS_INPUT</span>
+<span class="p">{</span>
+  <span class="n">float4</span> <span class="n">Position</span>  <span class="o">:</span> <span class="n">POSITION</span><span class="p">;</span>
+  <span class="n">float3</span> <span class="n">Normal</span>    <span class="o">:</span> <span class="n">NORMAL</span><span class="p">;</span>
+  <span class="n">float2</span> <span class="n">TexCoords</span> <span class="o">:</span> <span class="n">TEXCOORD0</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="k">struct</span> <span class="n">VS_OUTPUT</span>
+<span class="p">{</span>
+  <span class="n">float4</span> <span class="n">Position</span>  <span class="o">:</span> <span class="n">SV_POSITION</span><span class="p">;</span>
+  <span class="n">float3</span> <span class="n">Normal</span>    <span class="o">:</span> <span class="n">TEXCOORD0</span><span class="p">;</span>
+  <span class="n">float2</span> <span class="n">TexCoords</span> <span class="o">:</span> <span class="n">TEXCOORD1</span><span class="p">;</span>
+<span class="p">};</span>
+
+<span class="n">VS_OUTPUT</span> <span class="nf">RenderSceneVS</span><span class="p">(</span><span class="n">VS_INPUT</span> <span class="n">input</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="n">VS_OUTPUT</span> <span class="n">output</span><span class="p">;</span>   
+  <span class="n">output</span><span class="p">.</span><span class="n">Position</span> <span class="o">=</span> <span class="n">mul</span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">Position</span><span class="p">,</span> <span class="n">WorldViewProjection</span><span class="p">);</span>
+  <span class="n">output</span><span class="p">.</span><span class="n">Normal</span> <span class="o">=</span> <span class="n">normalize</span><span class="p">(</span><span class="n">mul</span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">Normal</span><span class="p">,</span> <span class="p">(</span><span class="n">float3x3</span><span class="p">)</span> <span class="n">World</span><span class="p">));</span>
+  <span class="n">output</span><span class="p">.</span><span class="n">TexCoords</span> <span class="o">=</span> <span class="n">input</span><span class="p">.</span><span class="n">TexCoords</span><span class="p">;</span> 
+  <span class="k">return</span> <span class="n">output</span><span class="p">;</span>    
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>When you compile this code, perhaps with <code class="highlighter-rouge">fxc.exe</code>, you’ll get the following assembly code output. The assembly code is a human-readable version of the bytecode - HlslUnit works with the bytecode directly. Don’t worry if this part doesn’t make sense - it’s only here for explanatory purposes, and can be safely ignored.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>vs_2_0
+dcl_position v0
+dcl_normal v1
+dcl_texcoord v2
+dp4 oPos.x, v0, c0
+dp4 oPos.y, v0, c1
+dp4 oPos.z, v0, c2
+dp4 oPos.w, v0, c3
+dp3 r0.x, v1, c4
+dp3 r0.y, v1, c5
+dp3 r0.z, v1, c6
+dp3 r0.w, r0, r0
+rsq r0.w, r0.w
+mul oT0.xyz, r0.w, r0
+mov oT1.xy, v2
+</code></pre>
+</div>
+
+<p>Next, we need to write some C# structs that match the HLSL structures. You might already have the vertex input structure - it’s what you’d use to set the vertex data into a Direct3D vertex buffer. The <code class="highlighter-rouge">Matrix</code> and <code class="highlighter-rouge">Vector</code> types are from <a href="http://sharpdx.org/">SharpDX</a>, which I use and recommend - but HlslUnit itself is framework-agnostic.</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[StructLayout(LayoutKind.Sequential)]</span>
+<span class="k">public</span> <span class="k">struct</span> <span class="nc">ConstantBufferGlobals</span>
+<span class="p">{</span>
+  <span class="k">public</span> <span class="n">Matrix</span> <span class="n">World</span><span class="p">;</span>
+  <span class="k">public</span> <span class="n">Matrix</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="na">[StructLayout(LayoutKind.Sequential)]</span>
+<span class="k">public</span> <span class="k">struct</span> <span class="nc">VertexShaderInput</span>
+<span class="p">{</span>
+  <span class="k">public</span> <span class="n">Vector4</span> <span class="n">Position</span><span class="p">;</span>
+  <span class="k">public</span> <span class="n">Vector3</span> <span class="n">Normal</span><span class="p">;</span>
+  <span class="k">public</span> <span class="n">Vector2</span> <span class="n">TexCoords</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="na">[StructLayout(LayoutKind.Sequential)]</span>
+<span class="k">public</span> <span class="k">struct</span> <span class="nc">VertexShaderOutput</span>
+<span class="p">{</span>
+  <span class="k">public</span> <span class="n">Vector4</span> <span class="n">Position</span><span class="p">;</span>
+  <span class="k">public</span> <span class="n">Vector3</span> <span class="n">Normal</span><span class="p">;</span>
+  <span class="k">public</span> <span class="n">Vector2</span> <span class="n">TexCoords</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Now, let’s finally write the code to test this shader. I’m using <a href="http://www.nunit.org/">NUnit</a> as the test framework here, but you can use your preferred test framework instead. (<code class="highlighter-rouge">ShaderTestUtility.CompileShader</code> is a simple method that wraps SharpDX’s <code class="highlighter-rouge">ShaderBytecode.CompileFromFile</code> method. <code class="highlighter-rouge">$Globals</code> is the name assigned to the default constant buffer, which is used when you don’t explicitly put your global variables into a constant buffer.)</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[Test]</span>
+<span class="k">public</span> <span class="k">void</span> <span class="nf">CanExecuteVertexShader</span><span class="p">()</span>
+<span class="p">{</span>
+  <span class="c1">// Arrange.
+</span>  <span class="kt">var</span> <span class="n">shader</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Shader</span><span class="p">(</span><span class="n">ShaderTestUtility</span><span class="p">.</span><span class="nf">CompileShader</span><span class="p">(</span>
+    <span class="s">"Shaders/VS/BasicHLSL.fx"</span><span class="p">,</span> <span class="s">"RenderSceneVS"</span><span class="p">,</span> <span class="s">"vs_4_0"</span><span class="p">));</span>
+  <span class="n">shader</span><span class="p">.</span><span class="nf">SetConstantBuffer</span><span class="p">(</span><span class="s">"$Globals"</span><span class="p">,</span> <span class="k">new</span> <span class="n">VertexConstantBufferGlobals</span>
+  <span class="p">{</span>
+    <span class="n">World</span> <span class="p">=</span> <span class="n">Matrix</span><span class="p">.</span><span class="n">Identity</span><span class="p">,</span>
+    <span class="n">WorldViewProjection</span> <span class="p">=</span>
+      <span class="n">Matrix</span><span class="p">.</span><span class="nf">LookAtRH</span><span class="p">(</span><span class="n">Vector3</span><span class="p">.</span><span class="n">UnitZ</span><span class="p">,</span> <span class="n">Vector3</span><span class="p">.</span><span class="n">Zero</span><span class="p">,</span> <span class="n">Vector3</span><span class="p">.</span><span class="n">UnitY</span><span class="p">)</span> <span class="p">*</span>
+      <span class="n">Matrix</span><span class="p">.</span><span class="nf">PerspectiveFovRH</span><span class="p">(</span><span class="n">MathUtil</span><span class="p">.</span><span class="n">PiOverFour</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">10</span><span class="p">)</span>
+  <span class="p">});</span>
+  <span class="kt">var</span> <span class="n">vertexInput</span> <span class="p">=</span> <span class="k">new</span> <span class="n">VertexShaderInput</span>
+  <span class="p">{</span>
+    <span class="n">Position</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector4</span><span class="p">(</span><span class="m">3</span><span class="p">,</span> <span class="m">0</span><span class="p">,</span> <span class="m">2</span><span class="p">,</span> <span class="m">1</span><span class="p">),</span>
+    <span class="n">Normal</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector3</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">0</span><span class="p">),</span>
+    <span class="n">TexCoords</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector2</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">)</span>
+  <span class="p">};</span>
+
+  <span class="c1">// Act.
+</span>  <span class="kt">var</span> <span class="n">output</span> <span class="p">=</span> <span class="n">shader</span><span class="p">.</span><span class="n">Execute</span><span class="p">&lt;</span><span class="n">VertexShaderInput</span><span class="p">,</span> <span class="n">VertexShaderOutput</span><span class="p">&gt;(</span><span class="n">vertexInput</span><span class="p">);</span>
+
+  <span class="c1">// Assert.
+</span>  <span class="n">Assert</span><span class="p">.</span><span class="nf">That</span><span class="p">(</span><span class="n">output</span><span class="p">,</span> <span class="n">Is</span><span class="p">.</span><span class="nf">EqualTo</span><span class="p">(</span><span class="k">new</span> <span class="n">VertexShaderOutput</span>
+  <span class="p">{</span>
+    <span class="n">Position</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector4</span><span class="p">(</span><span class="m">7.24264f</span><span class="p">,</span> <span class="m">0</span><span class="p">,</span> <span class="p">-</span><span class="m">3.222222f</span><span class="p">,</span> <span class="m">1</span><span class="p">),</span>
+    <span class="n">Normal</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector3</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">,</span> <span class="m">0</span><span class="p">),</span>
+    <span class="n">TexCoords</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Vector2</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">1</span><span class="p">)</span>
+  <span class="p">}));</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>HlslUnit’s <a href="https://github.com/tgjones/slimshader/blob/master/src/HlslUnit.Tests/ShaderTests.cs">unit tests</a> include a couple of further examples.</p>
+
+<h3 id="how-does-it-work">How does it work?</h3>
+
+<p>HlslUnit is built on top of two other projects of mine, <a href="https://github.com/tgjones/slimshader">SlimShader</a> and SlimShader.VirtualMachine. SlimShader is used to parse the Direct3D bytecode, and SlimShader.VirtualMachine is, as the name suggests, a virtual machine with an interpreter capable of executing the parsed bytecode. (There is a <a href="https://github.com/tgjones/slimshader/blob/master/src/SlimShader.VirtualMachine.Jitter/JitShaderExecutor.cs">JITter</a> for SlimShader.VirtualMachine, which can execute HLSL shaders much more quickly than the interpreter, but it’s overkill for unit tests, so I’m not using it for HlslUnit.)</p>
+
+<p>I plan to write in more detail about how SlimShader and SlimShader.VirtualMachine work, but here’s a brief explanation. When you compile your HLSL code, the Direct3D compiler generates bytecode - i.e. a sequence of raw bytes. It’s unintelligible to humans, but meaningful once you know how the bytes are structured. SlimShader parses this sequence of bytes into a nice object-oriented structure, which includes (among other things) an array of <code class="highlighter-rouge">InstructionToken</code> objects. SlimShader.VirtualMachine has an interpreter that iterates through these instructions, and executes each one in turn, saving the output into a set of registers. HlslUnit pulls the output from these registers, casts it into the appropriate output structure, and returns it.</p>
+
+<p>Everything happens on the CPU, in managed .NET code - in fact, HlslUnit is a <a href="http://blogs.msdn.com/b/dotnet/archive/2013/10/14/portable-class-library-pcl-now-available-on-all-platforms.aspx">Portable Class Library</a>, as are SlimShader and SlimShader.VirtualMachine, so they can be used on a number of different platforms.</p>
+
+<p><a href="https://github.com/tgjones/slimshader">Take a look at the code</a> if you’re interested in learning more.</p>
+
+<h3 id="getting-started">Getting started</h3>
+
+<p>By far the easiest way to get started is to install the <a href="http://www.nuget.org/packages/HlslUnit">NuGet package</a>. HlslUnit depends on the <a href="http://www.nuget.org/packages/SlimShader">SlimShader</a> and <a href="http://www.nuget.org/packages/SlimShader.VirtualMachine">SlimShader.VirtualMachine</a> packages, but that is all taken care of by the NuGet package system.</p>
+
+<p>In a test method, create an instance of the <code class="highlighter-rouge">Shader</code> class. You’ll need to pass it a <code class="highlighter-rouge">byte[]</code> array containing the compiled bytecode of your shader. (You can use SharpDX’s <code class="highlighter-rouge">ShaderBytecode</code> class to compile your shader.)</p>
+
+<p>Constant buffers are set with the <code class="highlighter-rouge">SetConstantBuffer&lt;T&gt;(string name, T value)</code> method. Make sure that your C# structure matches the one defined in HLSL.</p>
+
+<p>Textures are slightly different - instead of passing a texture object, you pass a callback. Whenever your shader does a texture lookup, your callback will called with the texture coordinates requested by the shader. You can return whatever value you like - either a constant value, or vary it based on the coordinates. This makes it easier to write isolated tests - you don’t need to use an actual texture.</p>
+
+<p>After setting constant buffers and textures onto the <code class="highlighter-rouge">Shader</code> object, call the <code class="highlighter-rouge">Execute</code>, passing in your input structure. The return value is the shader output - you probably want to write some asserts at this point…</p>
+
+<p>That’s it!</p>
+
+<h3 id="over-to-you">Over to you…</h3>
+
+<p>HlslUnit is already able to execute many HLSL shaders. It currently supports vertex and pixel shaders, for SM4.0 and SM5.0. It doesn’t yet support every shader instruction - and that’s where you come in. If HlslUnit interests you, and you try it out, please let me know if it breaks! The most likely explanation is that the interpreter doesn’t support one of the instructions you’ve used in your shader. Please <a href="https://github.com/tgjones/slimshader/issues">log an issue</a> on GitHub, and I’ll take a look.</p>
+
+<p>Unfortunately, XNA 4.0 only supports Shader Model 3.0, which uses an entirely different bytecode format. So at the moment, HlslUnit isn’t compatible with XNA. <a href="http://visualstudio.uservoice.com/forums/121579-visual-studio/suggestions/3725445-xna-5">Fingers crossed for an XNA 5.0!</a></p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2013/06/21/gemini-aka-make-your-own-visual-studio">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/01/10/new-sharpdx-module-for-gemini-direct3d-in-your-avalondock">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Make Santa Jump - Making an endless runner game in F# using MonoGame - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Make Santa Jump - Making an endless runner game in F# using MonoGame</h1>
+
+    <div class="post-date">
+        <time datetime="2014-12-28T07:48:00+00:00">28 December 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li><a href="https://github.com/tgjones/make-santa-jump">GitHub repository</a></li>
+</ul>
+
+<p>It’s the holiday season, so let’s make a game. Here’s what it will look like:</p>
+
+<p><img src="/assets/posts/make-santa-jump.png" alt="" /></p>
+
+<p>It looks <em>even better</em> in action, if that’s possible. And for a game that’s taken about 5 hours to put together, it’s pretty fun to play, if I do say so myself. Here’s a short, poor-quality video that I took with my phone (it’s harder than you might think to take a video with one hand while playing a game with the other hand):</p>
+
+<iframe class="vine-embed" src="https://vine.co/v/OHgE92bzFmd/embed/simple" width="320" height="320" frameborder="0"></iframe>
+<script async="" src="//platform.vine.co/static/scripts/embed.js" charset="utf-8"></script>
+
+<p>For the last couple of months, I’ve been addicted to <a href="https://itunes.apple.com/us/app/make-them-jump/id900211132?mt=8">Make Them Jump</a>, an awesome game for iOS (and Android). When <a href="http://sergeytihon.wordpress.com/">Sergey Tihon</a> asked for volunteers for the <a href="http://sergeytihon.wordpress.com/2014/11/24/f-advent-calendar-in-english-2014/">F# Advent Calendar</a>, I knew I wanted to do something related to games, and I decided it would be fun to make a Santa-themed clone of Make Them Jump. Unlike some of the other <a href="https://twitter.com/search?q=fsadvent">#fsadvent</a> entries, the code for this game is not particularly clever or advanced; but the end result is, hopefully, enjoyable.</p>
+
+<p>Before we go any further, I recommend that you <a href="https://github.com/tgjones/make-santa-jump/releases">download the finished game from GitHub</a> (download “MakeSantaJump.Windows.zip” to get the pre-built binaries) and try it out yourself. There are 5 difficulty levels; on the menu screen, press the number key corresponding to the difficulty. Then press the key in the top-left corner of each panel (Space, F, etc.), to make the corresponding Santa jump. Try to get as high a score as possible! <strong>And then leave your score and difficulty level in the comments below :)</strong></p>
+
+<p>If you manage to score more than 0 on the highest difficulty level, you’re doing great ;-) In keeping with the original, I’ve pitched the difficulty somewhere between “fiendish” and “nightmarish”.</p>
+
+<p>Okay - now that you’ve (hopefully) played the game, you’ve got a good idea of what we’re going to build. We’re going to write the game from scratch, step by step, using <a href="http://www.monogame.net/">MonoGame</a>. Or put another way, we’re going to write the game from scratch, using only A HIGH LEVEL LIBRARY THAT DOES BASICALLY EVERYTHING FOR US.</p>
+
+<p>If you haven’t worked with F# much or at all before - no problem. I’ll include all of the necessary code here, and we’ll work our way right from the beginning to the end.</p>
+
+<p>Our whole game will be only 300-ish lines of F# source code. Let’s get started!</p>
+
+<h2 id="file--new--project">File &gt; New &gt; Project</h2>
+
+<p>I’ve made the assumption, for the purposes of this tutorial, that you’re using Windows. As I mention at the end of this post, the game should work without too many modifications on Mac and Linux, but for now, it will be easiest to follow along if you’re on Windows.</p>
+
+<p>I’m also assuming, if you’re reading this, that you already have Visual Studio installed. If not, grab the free <a href="http://www.visualstudio.com/products/visual-studio-community-vs">Visual Studio Community 2013</a> and install it.</p>
+
+<p>Go to File &gt; New &gt; Project. On the left, under Templates, choose “Other Languages”, then “Visual F#”. Choose “Console Application”, give it a name, and click OK.</p>
+
+<p><img src="/assets/posts/make-santa-jump-file-new-project.png" alt="" /></p>
+
+<p>We’re going to use MonoGame. In Solution Explorer, right-click on “References”, and click “Manage NuGet Packages…”. Search for “MonoGame”. The package you want is <a href="http://www.nuget.org/packages/MonoGame.Binaries">MonoGame.Binaries</a>. At the time of writing, the current version is 3.2.0. Click “Install”, wait for it to install, and then click “Close”.</p>
+
+<p><img src="/assets/posts/make-santa-jump-nuget.png" alt="" /></p>
+
+<p>Next, right-click on the project in Solution Explorer, and click “Properties”. In the Application tab, change the “Output type” to “Windows Application”. (I don’t know why there isn’t a Windows application project template, which would save us this step. If we leave it as Console Application, it will still work, but it will show a console window behind our game window.)</p>
+
+<p><img src="/assets/posts/make-santa-jump-output-type.png" alt="" /></p>
+
+<p>We’ll write all our game code in a new file, and keep <code class="highlighter-rouge">Program.fs</code> mostly empty. Right-click <code class="highlighter-rouge">Program.fs</code>, then “Add Above” &gt; “New Item…”. Call the new file <code class="highlighter-rouge">Game.fs</code>. Replace the contents with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">module</span> <span class="nc">MakeSantaJump</span>
+
+<span class="k">open</span> <span class="nn">System</span><span class="p">.</span><span class="nn">Collections</span><span class="p">.</span><span class="nc">Generic</span> 
+<span class="k">open</span> <span class="nn">Microsoft</span><span class="p">.</span><span class="nn">Xna</span><span class="p">.</span><span class="nc">Framework</span>
+<span class="k">open</span> <span class="nn">Microsoft</span><span class="p">.</span><span class="nn">Xna</span><span class="p">.</span><span class="nn">Framework</span><span class="p">.</span><span class="nc">Graphics</span>
+<span class="k">open</span> <span class="nn">Microsoft</span><span class="p">.</span><span class="nn">Xna</span><span class="p">.</span><span class="nn">Framework</span><span class="p">.</span><span class="nc">Input</span>
+
+<span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="k">inherit</span> <span class="nc">Game</span><span class="bp">()</span>
+
+    <span class="k">do</span> <span class="n">this</span><span class="p">.</span><span class="nn">Window</span><span class="p">.</span><span class="nc">Title</span> <span class="p">&lt;-</span> <span class="s2">"Make Santa Jump"</span>
+
+    <span class="k">let</span> <span class="n">graphics</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">GraphicsDeviceManager</span><span class="p">(</span><span class="n">this</span><span class="p">)</span>
+    <span class="k">do</span> <span class="n">graphics</span><span class="p">.</span><span class="nc">PreferredBackBufferWidth</span> <span class="p">&lt;-</span> <span class="mi">800</span>
+    <span class="k">do</span> <span class="n">graphics</span><span class="p">.</span><span class="nc">PreferredBackBufferHeight</span> <span class="p">&lt;-</span> <span class="mi">600</span>
+
+    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">LoadContent</span><span class="bp">()</span> <span class="p">=</span>
+        <span class="bp">()</span>
+
+    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="bp">()</span>
+
+    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nc">Clear</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Black</span>
+</code></pre>
+</div>
+
+<p>Now open <code class="highlighter-rouge">Program.fs</code>, and replace the contents with the following code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">open</span> <span class="nc">MakeSantaJump</span>
+
+<span class="p">[&lt;</span><span class="nc">EntryPoint</span><span class="p">&gt;]</span>
+<span class="k">let</span> <span class="n">main</span> <span class="n">argv</span> <span class="p">=</span> 
+    <span class="n">use</span> <span class="n">g</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span>
+    <span class="n">g</span><span class="p">.</span><span class="nc">Run</span><span class="bp">()</span>
+    <span class="mi">0</span>
+</code></pre>
+</div>
+
+<p>Hit “Start” in the toolbar, or press F5, to run it. You should see an 800x600 window, cleared to black. That was easy, right? MonoGame, like XNA before it, makes it exceptionally straightforward to get <em>something</em> on the screen. Especially if that “something” is… an empty window.</p>
+
+<p><img src="/assets/posts/make-santa-jump-blank-screen.png" alt="" /></p>
+
+<h2 id="obstacles">Obstacles</h2>
+
+<p>Now that we’ve got an empty window on the screen, let’s take a step back and talk about the game. As Santa runs, obstacles (well, green boxes) appear in his path, which he needs to jump over. It might <em>look</em> like Santa is running to the right, with the obstacles in fixed positions on the track. But I’ve chosen a simpler method: Santa runs in place, and the obstacles move left towards him. When the obstacles reach him, he needs to jump. Then the obstacles disappear off the left edge of the screen.</p>
+
+<p>To generate new obstacles, I’ve gone with an equally simple strategy: when the obstacle we added most recently appears at the right edge of the screen, we generate a new one, beyond the right edge of the screen.</p>
+
+<p>Each frame, all the obstacles are moved to the left by a small amount.</p>
+
+<p>Let’s write some code. You’ll notice that I’ve gone with a hybrid object-oriented / functional approach, which might be controversial. (If any F# gurus are reading this and can suggest ways to improve the code, please let me know! I originally tried to make it purely functional, but games are basically all about mutating state, and the code ended up looking quite messy, with “global” variables being passed in to every function.)</p>
+
+<p>First, add these lines of code to the top of <code class="highlighter-rouge">Game.fs</code>, just below the <code class="highlighter-rouge">open</code> statements. We don’t need all of them yet, but for simplicity we’ll add them all now.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="o">//</span> <span class="nc">Change</span> <span class="n">these</span> <span class="n">values</span> <span class="k">to</span> <span class="n">alter</span> <span class="n">game</span> <span class="n">balance</span><span class="p">.</span>
+<span class="k">let</span> <span class="n">gravity</span> <span class="p">=</span> <span class="mi">0</span><span class="p">.</span><span class="mi">03</span><span class="n">f</span>
+<span class="k">let</span> <span class="n">speed</span> <span class="p">=</span> <span class="p">-</span><span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="n">f</span>
+<span class="k">let</span> <span class="n">minObstacleWidth</span> <span class="p">=</span> <span class="mi">20</span>
+<span class="k">let</span> <span class="n">maxObstacleWidth</span> <span class="p">=</span> <span class="mi">35</span>
+<span class="k">let</span> <span class="n">minObstacleHeight</span> <span class="p">=</span> <span class="mi">15</span>
+<span class="k">let</span> <span class="n">maxObstacleHeight</span> <span class="p">=</span> <span class="mi">40</span>
+</code></pre>
+</div>
+
+<p>Here’s the code for our <code class="highlighter-rouge">Obstacle</code> type. Add it below the <code class="highlighter-rouge">let</code> statements you just added:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Obstacle</span><span class="p">(</span><span class="n">startX</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">x</span> <span class="p">=</span> <span class="n">startX</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Visible</span>
+        <span class="k">with</span> <span class="n">get</span><span class="bp">()</span> <span class="p">=</span> <span class="kt">int</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">+</span> <span class="n">width</span> <span class="p">&gt;</span> <span class="mi">0</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">GetBounds</span><span class="p">(</span><span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+        <span class="nc">Rectangle</span><span class="p">(</span><span class="kt">int</span><span class="p">(</span><span class="n">x</span><span class="o">),</span> <span class="n">trackBounds</span><span class="p">.</span><span class="nc">Bottom</span> <span class="p">-</span> <span class="n">height</span><span class="p">,</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">x</span> <span class="p">&lt;-</span> <span class="n">x</span> <span class="o">+</span> <span class="n">speed</span> <span class="p">*</span> <span class="n">deltaTime</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">texture</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nc">GetBounds</span><span class="p">(</span><span class="n">trackBounds</span><span class="o">),</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Green</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Let’s break that down. Each obstacle has an <code class="highlighter-rouge">x</code> position, and a <code class="highlighter-rouge">width</code> and <code class="highlighter-rouge">height</code>. It is <code class="highlighter-rouge">Visible</code> if its right-hand side is not off the left-edge of the screen. <code class="highlighter-rouge">GetBounds</code> is a public method because, in addition to using it to draw the obstacle, we’ll also need it later for collision detection.</p>
+
+<p><code class="highlighter-rouge">Update</code> is where the magic happens: we move the obstacle to the left (because <code class="highlighter-rouge">speed</code> is negative; otherwise it would move to the right) by an amount proportional to <code class="highlighter-rouge">deltaTime</code>, which is the time that has elapsed since the last frame.</p>
+
+<p><code class="highlighter-rouge">Draw</code> uses MonoGame’s <code class="highlighter-rouge">SpriteBatch</code> to draw the “texture”. The texture is actually just a 1x1 white pixel, which we can colour anything we like by passing a <code class="highlighter-rouge">Color</code> as the final parameter to <code class="highlighter-rouge">SpriteBatch.Draw</code>.</p>
+
+<p>Now we need a way to generate new obstacles. We’ll apply some randomness to the width, height, and position of new obstacles, to keep the player on their toes. Here’s the code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[&lt;</span><span class="nc">CompilationRepresentation</span><span class="p">(</span><span class="nn">CompilationRepresentationFlags</span><span class="p">.</span><span class="nc">ModuleSuffix</span><span class="o">)&gt;]</span>
+<span class="k">module</span> <span class="nc">Obstacle</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">rng</span> <span class="p">=</span> <span class="nn">System</span><span class="p">.</span><span class="nc">Random</span><span class="bp">()</span>
+
+    <span class="k">let</span> <span class="n">addNewObstacles</span> <span class="p">(</span><span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">(</span><span class="n">obstacles</span> <span class="p">:</span> <span class="nc">Obstacle</span> <span class="kt">list</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">isMostRecentlyAddedObstacleFullyVisible</span> <span class="p">=</span>
+            <span class="k">match</span> <span class="n">obstacles</span> <span class="k">with</span>
+            <span class="p">|</span> <span class="n">head</span> <span class="p">::</span> <span class="n">tail</span> <span class="p">-&gt;</span> <span class="n">head</span><span class="p">.</span><span class="nc">GetBounds</span><span class="p">(</span><span class="n">trackBounds</span><span class="o">).</span><span class="nc">Right</span> <span class="p">&lt;</span> <span class="n">trackBounds</span><span class="p">.</span><span class="nc">Right</span>
+            <span class="p">|</span> <span class="bp">[]</span> <span class="p">-&gt;</span> <span class="bp">true</span>
+
+        <span class="k">if</span> <span class="n">isMostRecentlyAddedObstacleFullyVisible</span> <span class="k">then</span>
+            <span class="k">let</span> <span class="n">x</span> <span class="p">=</span> <span class="n">trackBounds</span><span class="p">.</span><span class="nc">Right</span> <span class="o">+</span> <span class="mi">200</span> <span class="o">+</span> <span class="n">rng</span><span class="p">.</span><span class="nc">Next</span><span class="p">(</span><span class="mi">200</span><span class="p">)</span>
+            <span class="k">let</span> <span class="n">width</span> <span class="p">=</span> <span class="n">rng</span><span class="p">.</span><span class="nc">Next</span><span class="p">(</span><span class="n">minObstacleWidth</span><span class="p">,</span> <span class="n">maxObstacleWidth</span><span class="p">)</span>
+            <span class="k">let</span> <span class="n">height</span> <span class="p">=</span> <span class="n">rng</span><span class="p">.</span><span class="nc">Next</span><span class="p">(</span><span class="n">minObstacleHeight</span><span class="p">,</span> <span class="n">maxObstacleHeight</span><span class="p">)</span>
+            <span class="k">let</span> <span class="n">newObstacle</span> <span class="p">=</span> <span class="nc">Obstacle</span><span class="p">(</span><span class="n">single</span><span class="p">(</span><span class="n">x</span><span class="o">),</span> <span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">)</span>
+            <span class="n">newObstacle</span> <span class="p">::</span> <span class="n">obstacles</span>
+        <span class="k">else</span>
+            <span class="n">obstacles</span>
+
+    <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>I’m using the <code class="highlighter-rouge">CompilationRepresentation</code> attribute to have a module with the same name as a type, which would usually be a compile error. It’s a trick I found in the F# runtime library source code, to “attach” functional-style functions to a type.</p>
+
+<p>In <code class="highlighter-rouge">addNewObstacles</code>, we check whether the obstacle that we added most recently is now fully visible on the screen. It it isn’t, it means it’s still either fully off the screen to the right, or it’s only partially visible. If it is fully visible, it’s time to add a new obstacle.</p>
+
+<p>We add a new obstacle as follows:</p>
+
+<ul>
+  <li>Calculate its <code class="highlighter-rouge">x</code> position as being 200 pixels off the right of the screen, plus a random value between 0 and 200. This random value is what creates the random spacing between obstacles.</li>
+  <li>Calculate the <code class="highlighter-rouge">width</code> as another random value - in my version, I’ve set the min/max as 20/35 respectively.</li>
+  <li>Same with the height - I’ve used min/max heights of 15/40, but I haven’t spent a lot of time playtesting it. You can decrease the maximum height to make it easier. Remember that if you set the maximum width or height too high, it will be impossible to play!</li>
+</ul>
+
+<p>The return value of <code class="highlighter-rouge">addNewObstacles</code> is the new obstacle, added to the front of the list of existing obstacles. (Or the original list, if we didn’t need to add a new obstacle.)</p>
+
+<p>After Santa has jumped over each obstacle, the obstacles will disappear off the left edge of the screen. We could just leave them lying around, since they won’t be rendered. And it’s unlikely that anybody will be able to play the game for long enough for memory usage to become a problem! But still, we’ll be good citizens by cleaning up after ourselves. Add the following at the end of the <code class="highlighter-rouge">Obstacle</code> module, after <code class="highlighter-rouge">addNewObstacles</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">module</span> <span class="nc">Obstacle</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+
+    <span class="k">let</span> <span class="n">removeOldObstacles</span> <span class="p">(</span><span class="n">obstacles</span> <span class="p">:</span> <span class="nc">Obstacle</span> <span class="kt">list</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">obstacles</span> <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">filter</span> <span class="p">(</span><span class="k">fun</span> <span class="n">o</span> <span class="p">-&gt;</span> <span class="n">o</span><span class="p">.</span><span class="nc">Visible</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>We’ve written a lot of code, without being able to run it and see something on the screen. We’ll fix that soon; but we’ve got some more work to do first. For now, we’ll just draw one “track” on the screen, but later, we’ll want to make the game more interesting (a.k.a. harder) by drawing multiple tracks. So we’ll do some of that work upfront by making a <code class="highlighter-rouge">Track</code> to manage our obstacles. Add the following code below the <code class="highlighter-rouge">Obstacle</code> module:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">obstacles</span> <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">empty</span><span class="p">&lt;</span><span class="nc">Obstacle</span><span class="p">&gt;</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">for</span> <span class="n">obstacle</span> <span class="k">in</span> <span class="n">obstacles</span> <span class="k">do</span>
+            <span class="n">obstacle</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">)</span>
+
+        <span class="n">obstacles</span> <span class="p">&lt;-</span> <span class="n">obstacles</span>
+            <span class="o">|&gt;</span> <span class="nn">Obstacle</span><span class="p">.</span><span class="n">removeOldObstacles</span>
+            <span class="o">|&gt;</span> <span class="nn">Obstacle</span><span class="p">.</span><span class="n">addNewObstacles</span> <span class="n">bounds</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">texture</span><span class="p">,</span> <span class="n">bounds</span><span class="p">,</span> <span class="n">color</span><span class="p">)</span> <span class="o">//</span> <span class="nc">Track</span> <span class="n">background</span>
+        <span class="k">for</span> <span class="n">obstacle</span> <span class="k">in</span> <span class="n">obstacles</span> <span class="k">do</span>
+            <span class="n">obstacle</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>We pass a <code class="highlighter-rouge">color</code> in to the constructor, because later we’ll want each track to have its own background colour. (At this point, I’d like to take the opportunity apologise for switching between <a href="https://www.flickr.com/photos/jpasden/10801898425/">English (traditional) and English (simplified)</a> spellings; I tend to use the American spelling for code, and the English spelling in prose.) We also pass in the <code class="highlighter-rouge">bounds</code> - for now, this will be the whole window, but later each track will only take up part of the window.</p>
+
+<p>In <code class="highlighter-rouge">Update</code>, we first update each obstacle. Then old obstacles are removed, and new obstacles added, using the functions we wrote earlier.</p>
+
+<p><code class="highlighter-rouge">Draw</code> first draws the track background, again making use of our 1x1 pixel texture, and then draws each obstacle.</p>
+
+<p>Let’s hook all this up, by making some changes to our <code class="highlighter-rouge">MakeSantaJumpGame</code> type. Add the following code after the <code class="highlighter-rouge">do graphics.*</code> calls and before <code class="highlighter-rouge">LoadContent</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="k">let</span> <span class="k">mutable</span> <span class="n">spriteBatch</span> <span class="p">=</span> <span class="nn">Unchecked</span><span class="p">.</span><span class="n">defaultof</span><span class="p">&lt;</span><span class="nc">SpriteBatch</span><span class="p">&gt;</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">texture</span> <span class="p">=</span> <span class="nn">Unchecked</span><span class="p">.</span><span class="n">defaultof</span><span class="p">&lt;</span><span class="nc">Texture2D</span><span class="p">&gt;</span>
+
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">tracks</span> <span class="p">=</span> <span class="bp">[]</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">Unchecked.defaultof</code> is generally considered bad practice in F# code, but I think it’s okay/necessary in this instance; we need to make these values available to multiple methods in our game type.</p>
+
+<p>Change <code class="highlighter-rouge">LoadContent</code> to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">LoadContent</span><span class="bp">()</span> <span class="p">=</span>
+        <span class="n">spriteBatch</span> <span class="p">&lt;-</span> <span class="k">new</span> <span class="nc">SpriteBatch</span><span class="p">(</span><span class="n">this</span><span class="p">.</span><span class="nc">GraphicsDevice</span><span class="p">)</span>
+
+        <span class="n">texture</span> <span class="p">&lt;-</span> <span class="k">new</span> <span class="nc">Texture2D</span><span class="p">(</span><span class="n">this</span><span class="p">.</span><span class="nc">GraphicsDevice</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">texture</span><span class="p">.</span><span class="nc">SetData</span><span class="o">([|</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">White</span> <span class="o">|])</span>
+
+        <span class="n">tracks</span> <span class="p">&lt;-</span> <span class="p">[</span> <span class="nc">Track</span><span class="p">(</span><span class="nn">Color</span><span class="p">.</span><span class="nc">Red</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nc">Bounds</span><span class="p">)</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Change <code class="highlighter-rouge">Update</code> to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">deltaTime</span> <span class="p">=</span> <span class="n">single</span><span class="p">(</span><span class="n">gameTime</span><span class="p">.</span><span class="nn">ElapsedGameTime</span><span class="p">.</span><span class="nc">TotalMilliseconds</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+            <span class="n">track</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Finally, change <code class="highlighter-rouge">Draw</code> to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nc">Clear</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Black</span>
+
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Begin</span><span class="p">(</span><span class="nn">SpriteSortMode</span><span class="p">.</span><span class="nc">Deferred</span><span class="p">,</span> <span class="nn">BlendState</span><span class="p">.</span><span class="nc">NonPremultiplied</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+            <span class="n">track</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">)</span>
+
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">End</span><span class="bp">()</span>
+</code></pre>
+</div>
+
+<p>Now run the game, and marvel at the glorious green boxes making their way left-ward! Okay, it’s not much, but we’re on our way.</p>
+
+<p><img src="/assets/posts/make-santa-jump-obstacles.png" alt="" /></p>
+
+<h2 id="santa">Santa</h2>
+
+<p>Now that we’re animating and drawing some obstacles, we need a Santa to jump over them. We’ll start by drawing a white box representing Santa, then we’ll load an actual texture, and finally we’ll animate Santa.</p>
+
+<p>We’ll start with a <code class="highlighter-rouge">Santa</code> type. Add this above the <code class="highlighter-rouge">Obstacle</code> type, near the top of <code class="highlighter-rouge">Game.fs</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">santaX</span> <span class="p">=</span> <span class="mi">50</span>
+    <span class="k">let</span> <span class="n">santaWidth</span> <span class="p">=</span> <span class="mi">30</span>
+    <span class="k">let</span> <span class="n">santaHeight</span> <span class="p">=</span> <span class="mi">30</span>
+
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">y</span> <span class="p">=</span> <span class="n">single</span><span class="p">(</span><span class="n">startBottom</span> <span class="p">-</span> <span class="n">santaHeight</span><span class="p">)</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Bounds</span>
+        <span class="k">with</span> <span class="n">get</span><span class="bp">()</span> <span class="p">=</span> <span class="nc">Rectangle</span><span class="p">(</span><span class="n">santaX</span><span class="p">,</span> <span class="kt">int</span><span class="p">(</span><span class="n">y</span><span class="o">),</span> <span class="n">santaWidth</span><span class="p">,</span> <span class="n">santaHeight</span><span class="p">)</span>
+
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">texture</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nc">Bounds</span><span class="p">,</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">White</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>We need to update our <code class="highlighter-rouge">Track</code> type to create and draw Santa. Add this after the existing <code class="highlighter-rouge">obstacles</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="n">santa</span> <span class="p">=</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">bounds</span><span class="p">.</span><span class="nc">Bottom</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Then replace <code class="highlighter-rouge">Track.Draw</code> with this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">texture</span><span class="p">,</span> <span class="n">bounds</span><span class="p">,</span> <span class="n">color</span><span class="p">)</span> <span class="o">//</span> <span class="nc">Track</span> <span class="n">background</span>
+        <span class="k">for</span> <span class="n">obstacle</span> <span class="k">in</span> <span class="n">obstacles</span> <span class="k">do</span>
+            <span class="n">obstacle</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+        <span class="n">santa</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>This is another chance to run the game! Hit F5 and you should see a white box in the bottom left. Don’t worry, we’ll make Santa look a little more interesting in the next section.</p>
+
+<p><img src="/assets/posts/make-santa-jump-santa-texture.png" alt="" /></p>
+
+<h3 id="santa-sprite">Santa sprite</h3>
+
+<p>I can’t draw at all, but after searching for a while, I found a suitable Santa sprite with a permissive licence <a href="http://opengameart.org/content/santa-claus">here on OpenGameArt</a>. (Thank you Casey!) Here’s the original image:</p>
+
+<p><img src="/assets/posts/make-santa-jump-sprite-original.png" alt="" /></p>
+
+<p>The original image has 2 frames at the beginning with Santa standing still, and 1 frame at the end with him jumping, which interrupt the running animation. I cracked open my trusty <a href="http://www.getpaint.net/index.html">paint.net</a>, figured out that each sprite in the animation is 64 pixels wide, and then removed the first 2 and last sprites, ending up with this:</p>
+
+<p><img src="/assets/posts/make-santa-jump-sprite.png" alt="" /></p>
+
+<p>I also made the background transparent, and saved it as a non-indexed PNG (because MonoGame complained when I tried to load an indexed PNG).</p>
+
+<p>We’re going to treat that texture as 8 frames of an animation, and cycle through each frame in turn.</p>
+
+<p>I chose not to use MonoGame’s content pipeline. The MonoGame content pipeline tool hasn’t been officially released yet, and I’d prefer not to send you off to download nightly builds. The content pipeline tool is going to be great; it’s just not ready yet. So we’ll load our textures directly, which fortunately is supported just fine by MonoGame.</p>
+
+<p>The first thing to do is <a href="https://github.com/tgjones/make-santa-jump/blob/master/src/MakeSantaJump/Santa.png">download the Santa sprite texture</a>. Then right-click the project in Solution Explorer, choose “Add” &gt; “Existing Item…”, and find the <code class="highlighter-rouge">Santa.png</code> file you just downloaded. This will copy it into your project folder and add it to the project.</p>
+
+<p>Select <code class="highlighter-rouge">Santa.png</code> in Solution Explorer, and in the Properties window, change “Build Action” to “Content” and “Copy to Output Directory” to “Copy if newer”:</p>
+
+<p><img src="/assets/posts/make-santa-jump-santa-properties.png" alt="" /></p>
+
+<p>Now we’ll add the code to load and draw the Santa texture. At the top of <code class="highlighter-rouge">Game.fs</code>, below the <code class="highlighter-rouge">let</code> statements controlling game difficulty, add this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SpriteTexture</span> <span class="p">=</span>
+    <span class="p">{</span>
+        <span class="n">texture</span> <span class="p">:</span> <span class="nc">Texture2D</span><span class="p">;</span>
+        <span class="n">textureData</span> <span class="p">:</span> <span class="nc">Color</span> <span class="kt">array</span><span class="p">;</span>
+        <span class="n">spriteWidth</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+        <span class="n">numSprites</span> <span class="p">:</span> <span class="kt">int</span><span class="p">;</span>
+    <span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Then change the <code class="highlighter-rouge">Santa</code> declaration and first few lines to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">santaX</span> <span class="p">=</span> <span class="mi">50</span>
+    <span class="k">let</span> <span class="n">santaWidth</span> <span class="p">=</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">spriteWidth</span>
+    <span class="k">let</span> <span class="n">santaHeight</span> <span class="p">=</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">texture</span><span class="p">.</span><span class="nc">Height</span>
+
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">y</span> <span class="p">=</span> <span class="n">single</span><span class="p">(</span><span class="n">startBottom</span> <span class="p">-</span> <span class="n">santaHeight</span><span class="p">)</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">spriteIndex</span> <span class="p">=</span> <span class="mi">0</span>
+</code></pre>
+</div>
+
+<p>We’ll use <code class="highlighter-rouge">spriteIndex</code> later to control cycling through each frame of the animation.</p>
+
+<p>Replace <code class="highlighter-rouge">Santa.Draw</code> with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">spriteBounds</span> <span class="p">=</span>
+            <span class="nc">Rectangle</span><span class="p">(</span><span class="n">spriteIndex</span> <span class="p">*</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">spriteWidth</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span>
+                      <span class="n">spriteTexture</span><span class="p">.</span><span class="n">spriteWidth</span><span class="p">,</span> 
+                      <span class="n">spriteTexture</span><span class="p">.</span><span class="n">texture</span><span class="p">.</span><span class="nc">Height</span><span class="p">)</span>
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteTexture</span><span class="p">.</span><span class="n">texture</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nc">Bounds</span><span class="p">,</span> 
+                         <span class="nn">System</span><span class="p">.</span><span class="nc">Nullable</span><span class="p">(</span><span class="n">spriteBounds</span><span class="o">),</span>
+                         <span class="nn">Color</span><span class="p">.</span><span class="nc">White</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>We need to pass the <code class="highlighter-rouge">spriteTexture</code> into the <code class="highlighter-rouge">Track</code> constructor, and use it when creating Santa:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">)</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">obstacles</span> <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">empty</span><span class="p">&lt;</span><span class="nc">Obstacle</span><span class="p">&gt;</span>
+    <span class="k">let</span> <span class="n">santa</span> <span class="p">=</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span><span class="p">,</span> <span class="n">bounds</span><span class="p">.</span><span class="nc">Bottom</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>In <code class="highlighter-rouge">Track.Draw</code>, change the <code class="highlighter-rouge">santa.Draw</code> line to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>        <span class="n">santa</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>In <code class="highlighter-rouge">MakeSantaGame</code>, add this code below <code class="highlighter-rouge">let mutable texture = ...</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="k">let</span> <span class="k">mutable</span> <span class="n">spriteTexture</span> <span class="p">=</span> <span class="nn">Unchecked</span><span class="p">.</span><span class="n">defaultof</span><span class="p">&lt;</span><span class="nc">SpriteTexture</span><span class="p">&gt;</span>
+</code></pre>
+</div>
+
+<p>We’re almost done with this part! Replace the last line of <code class="highlighter-rouge">LoadContent</code> with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>        <span class="n">use</span> <span class="n">santaStream</span> <span class="p">=</span> <span class="nn">System</span><span class="p">.</span><span class="nn">IO</span><span class="p">.</span><span class="nn">File</span><span class="p">.</span><span class="nc">OpenRead</span><span class="p">(</span><span class="s2">"Santa.png"</span><span class="p">)</span>
+        <span class="k">let</span> <span class="n">santaTexture</span> <span class="p">=</span> <span class="nn">Texture2D</span><span class="p">.</span><span class="nc">FromStream</span><span class="p">(</span><span class="n">this</span><span class="p">.</span><span class="nc">GraphicsDevice</span><span class="p">,</span> <span class="n">santaStream</span><span class="p">)</span>
+        <span class="k">let</span> <span class="n">santaTextureData</span> <span class="p">=</span> <span class="nn">Array</span><span class="p">.</span><span class="n">create</span><span class="p">&lt;</span><span class="nc">Color</span><span class="p">&gt;</span> <span class="p">(</span><span class="n">santaTexture</span><span class="p">.</span><span class="nc">Width</span> <span class="p">*</span> <span class="n">santaTexture</span><span class="p">.</span><span class="nc">Height</span><span class="p">)</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Transparent</span>
+        <span class="n">santaTexture</span><span class="p">.</span><span class="nc">GetData</span><span class="p">(</span><span class="n">santaTextureData</span><span class="p">)</span>
+        <span class="n">spriteTexture</span> <span class="p">&lt;-</span> <span class="p">{</span> <span class="n">texture</span> <span class="p">=</span> <span class="n">santaTexture</span><span class="p">;</span>
+                           <span class="n">textureData</span> <span class="p">=</span> <span class="n">santaTextureData</span><span class="p">;</span>
+                           <span class="n">spriteWidth</span> <span class="p">=</span> <span class="n">santaTexture</span><span class="p">.</span><span class="nc">Width</span> <span class="o">/</span> <span class="mi">8</span><span class="p">;</span>
+                           <span class="n">numSprites</span> <span class="p">=</span> <span class="mi">8</span> <span class="p">}</span>
+
+        <span class="n">tracks</span> <span class="p">&lt;-</span> <span class="p">[</span> <span class="nc">Track</span><span class="p">(</span><span class="nn">Color</span><span class="p">.</span><span class="nc">Red</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nc">Bounds</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">)</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>Since we’re not using the content pipeline, we load the texture ourselves using <code class="highlighter-rouge">Texture2D.FromStream</code>. The next couple of lines copy the pixel data out of the texture into an array of <code class="highlighter-rouge">Color</code>s - we don’t need this now, but we’ll need it soon when we do pixel-perfect collision detection. Then, we set the number of sprites in the texture - this is hardcoded, which is fine for us, but in a bigger game you’d probably want to load this dynamically from some kind of sidecar file.</p>
+
+<p>Run the game, and if everything went right, you should see something like this:</p>
+
+<p><img src="/assets/posts/make-santa-jump-santa-sprite-static.png" alt="" /></p>
+
+<p>That was a lot of fairly boring but necessary code. The next section - animating Santa - should be more fun!</p>
+
+<h3 id="animated-santa">Animated Santa</h3>
+
+<p>At the moment, we’re loading a texture that contains 8 frames of a Santa animation, but we’re only showing the first frame. We’re going to work on that now. We’ll show each frame of the animation for 80 milliseconds (that’s an arbitrary figure; feel free to adjust it if you think it makes the animation look better).</p>
+
+<p>We’ll do the animation by keeping track of the time since we last cycled to the next animation frame. When that timer reaches 80ms, we’ll move to the next frame and reset the timer to zero.</p>
+
+<p>Let’s write some code. First, add this code, just above the existing <code class="highlighter-rouge">spriteIndex</code> binding, to keep track of the timer value:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">spriteTimer</span> <span class="p">=</span> <span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="n">f</span>
+</code></pre>
+</div>
+
+<p>Now add a new <code class="highlighter-rouge">Santa.Update</code> method, just above the existing <code class="highlighter-rouge">Draw</code> method:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="nc">Update</span> <span class="n">sprite</span><span class="p">.</span>
+        <span class="k">let</span> <span class="n">spriteChangeTime</span> <span class="p">=</span> <span class="mi">80</span><span class="p">.</span><span class="mi">0</span><span class="n">f</span>
+        <span class="n">spriteTimer</span> <span class="p">&lt;-</span> <span class="n">spriteTimer</span> <span class="o">+</span> <span class="n">deltaTime</span>
+        <span class="k">if</span> <span class="n">spriteTimer</span> <span class="o">&gt;=</span> <span class="n">spriteChangeTime</span> <span class="k">then</span>
+            <span class="n">spriteTimer</span> <span class="p">&lt;-</span> <span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="n">f</span>
+            <span class="k">let</span> <span class="n">wrap</span> <span class="k">value</span> <span class="n">max</span> <span class="p">=</span>
+                <span class="k">if</span> <span class="k">value</span> <span class="p">&gt;</span> <span class="n">max</span> <span class="k">then</span> <span class="mi">0</span> <span class="k">else</span> <span class="k">value</span>
+            <span class="n">spriteIndex</span> <span class="p">&lt;-</span> <span class="n">wrap</span> <span class="p">(</span><span class="n">spriteIndex</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="p">(</span><span class="n">spriteTexture</span><span class="p">.</span><span class="n">numSprites</span> <span class="p">-</span> <span class="mi">1</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Hopefully that makes sense. Each time <code class="highlighter-rouge">Update</code> is called, <code class="highlighter-rouge">spriteTimer</code> is incremented with the time that has elapsed since the last frame. If enough time has passed that it’s now time to move to the next sprite, we reset the timer to zero and update <code class="highlighter-rouge">spriteIndex</code> (taking care to wrap it back to 0 if appropriate).</p>
+
+<p>Then we just need to call <code class="highlighter-rouge">Santa.Update</code>. Add this code at the very start of <code class="highlighter-rouge">Track.Update</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">)</span> <span class="p">=</span>
+    <span class="n">santa</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+    <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Run the game now, and you should see Santa marching merrily. And marching straight through the obstacles, but don’t worry about that for now… Next, we’ll implement some keyboard input to, as the name of the game suggests, make Santa jump!</p>
+
+<h2 id="make-santa-actually-jump">Make Santa <em>actually</em> jump</h2>
+
+<p>When you run the game right now, it’s not very… interactive. We’ve got an animated Santa, and we’ve got obstacles that move along the screen, but we can’t yet control Santa, as it were. Let’s fix that now, by setting up some keyboard input and implementing some physics. (I use “physics” in the loosest possible sense of the word.)</p>
+
+<p>We won’t hardcode the trigger key inside the <code class="highlighter-rouge">Santa</code> type, because later we’ll be drawing multiple tracks, each with their own Santa, and each Santa will need a different trigger key. So we need to update the <code class="highlighter-rouge">Santa</code> constructor to pass in the trigger key:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">trigger</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Once Santa has started jumping, we need to keep track of his vertical speed, as well as whether he is jumping at all. Add these two lines of code just above the existing <code class="highlighter-rouge">spriteTimer</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="k">let</span> <span class="k">mutable</span> <span class="n">dy</span> <span class="p">=</span> <span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="n">f</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">isJumping</span> <span class="p">=</span> <span class="bp">false</span>
+</code></pre>
+</div>
+
+<p>Let’s assume that we have a function, <code class="highlighter-rouge">isKeyPressedSinceLastFrame</code>, which tells us whether any given key has been pressed since the last frame. (We’ll actually write that function shortly.) We’ll pass that function in to <code class="highlighter-rouge">Santa.Update</code>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="p">:</span> <span class="nc">Keys</span> <span class="p">-&gt;</span> <span class="kt">bool</span><span class="p">,</span> <span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Next, we’ll see if the trigger key (i.e. Space) was pressed between the last frame and this one. Add this code at the top of <code class="highlighter-rouge">Santa.Update</code> (don’t delete the existing code to update the sprite index):</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="p">:</span> <span class="nc">Keys</span> <span class="p">-&gt;</span> <span class="kt">bool</span><span class="p">,</span> <span class="n">trackBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="nc">Should</span> <span class="n">we</span> <span class="n">start</span> <span class="n">a</span> <span class="n">jump</span><span class="p">?</span>
+        <span class="k">if</span> <span class="n">not</span> <span class="n">isJumping</span> <span class="p">&amp;&amp;</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">(</span><span class="n">trigger</span><span class="p">)</span> <span class="k">then</span>
+            <span class="n">isJumping</span> <span class="p">&lt;-</span> <span class="bp">true</span>
+            <span class="n">dy</span> <span class="p">&lt;-</span> <span class="p">-</span><span class="mi">0</span><span class="p">.</span><span class="mi">45</span><span class="n">f</span>
+
+        <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Without <code class="highlighter-rouge">not isJumping</code>, it would be possible for Santa to chain jumps, which would make the game trivially easy - nobody wants that. So if Santa is not already jumping, and the player has hit the trigger key, we start him jumping. We do that by setting <code class="highlighter-rouge">isJumping</code> to <code class="highlighter-rouge">true</code>, and setting <code class="highlighter-rouge">dy</code>. <code class="highlighter-rouge">dy</code> represents Santa’s vertical speed. You might wonder why <code class="highlighter-rouge">dy</code> is set to a negative value. Well, when drawing sprites in MonoGame, the Y axis points downwards. So to make Santa jump upwards, we need to set his vertical speed to a negative value. (In a more complex game, I’d try to use real-world units in my game code, and then convert as necessary when rendering.)</p>
+
+<p>Each time <code class="highlighter-rouge">Santa.Update</code> is called, we’ll update Santa’s position using a little bit of physics. You might remember from school that velocity is the rate of change of position over time ($v(t)=\frac{dx}{dt}$). If we assume Santa’s velocity is constant over the whole frame (and let’s face it, this is not a game in which we need to worry too much about non-constant velocity), then we can calculate the change in position for a whole frame using $dx = v*dt$. And since Santa can only move in the vertical direction, our job is even simpler.</p>
+
+<p>As soon as Santa starts jumping, we need to apply some gravity to drag him back down (presumably this is not normally an issue for Santa Claus). This gravity will cause his upward speed to slow, pass through zero, and become downward speed, and eventually result in him falling back to “earth” (or at least, the track from which he jumped). When we detect that he has landed, we fix his position to be resting on the track (to make sure he doesn’t fall below the track).</p>
+
+<p>Here’s how we implement our game’s “physics”. Add this code to <code class="highlighter-rouge">Santa.Update</code>, below the code we just added to start a jump, and above the existing sprite update code. If this is getting a bit confusing, feel free to <a href="https://github.com/tgjones/make-santa-jump/blob/master/src/MakeSantaJump/Game.fs">have a look at the final source code on GitHub</a>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>        <span class="k">if</span> <span class="n">isJumping</span> <span class="k">then</span>
+            <span class="o">//</span> <span class="nc">Physics</span><span class="o">!</span>
+            <span class="n">y</span> <span class="p">&lt;-</span> <span class="n">y</span> <span class="o">+</span> <span class="n">dy</span> <span class="p">*</span> <span class="n">deltaTime</span>
+
+            <span class="k">let</span> <span class="n">hasLanded</span> <span class="p">=</span> <span class="kt">int</span><span class="p">(</span><span class="n">y</span><span class="p">)</span> <span class="o">+</span> <span class="n">santaHeight</span> <span class="o">&gt;=</span> <span class="n">trackBounds</span><span class="p">.</span><span class="nc">Bottom</span>
+            <span class="k">if</span> <span class="n">hasLanded</span> <span class="k">then</span>
+                <span class="n">y</span> <span class="p">&lt;-</span> <span class="n">single</span><span class="p">(</span><span class="n">trackBounds</span><span class="p">.</span><span class="nc">Bottom</span> <span class="p">-</span> <span class="n">santaHeight</span><span class="p">)</span>
+                <span class="n">isJumping</span> <span class="p">&lt;-</span> <span class="bp">false</span>
+                <span class="n">dy</span> <span class="p">&lt;-</span> <span class="mi">0</span><span class="p">.</span><span class="mi">0</span><span class="n">f</span>
+            <span class="k">else</span>
+                <span class="n">dy</span> <span class="p">&lt;-</span> <span class="n">dy</span> <span class="o">+</span> <span class="n">gravity</span>
+        <span class="k">else</span>
+            <span class="o">//</span> <span class="nc">Existing</span> <span class="n">sprite</span> <span class="n">update</span> <span class="n">code</span> <span class="n">here</span><span class="p">.</span>
+</code></pre>
+</div>
+
+<p>Now we need to update <code class="highlighter-rouge">Track</code>. First, add <code class="highlighter-rouge">triggerKey</code> to the type declaration, and pass it to the <code class="highlighter-rouge">Santa</code> constructor:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="n">santa</span> <span class="p">=</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">,</span> <span class="n">bounds</span><span class="p">.</span><span class="nc">Bottom</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Then change the definition and first line of <code class="highlighter-rouge">Track.Update</code> to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">santa</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">,</span> <span class="n">bounds</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>In <code class="highlighter-rouge">MakeSantaJumpGame.LoadContent</code>, change the last line of code (that creates the track) to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>        <span class="n">tracks</span> <span class="p">&lt;-</span> <span class="p">[</span> <span class="nc">Track</span><span class="p">(</span><span class="nn">Color</span><span class="p">.</span><span class="nc">Red</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nc">Bounds</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">Space</span><span class="p">)</span> <span class="p">]</span>
+</code></pre>
+</div>
+
+<p>MonoGame gives us a nice way to interact with the keyboard. We can ask the keyboard for its current state, and we’ll get back an object that we can query. Let’s say we use the Space key to make Santa jump. But we don’t only want to know whether the Space key is down <em>now</em> - we want to know whether it has been pressed since the last frame. That’s to prevent players sitting with their fingers permanently on the Space key - which, admittedly, wouldn’t work too well as a strategy, but we’ll prevent it anyway.</p>
+
+<p>Replace <code class="highlighter-rouge">MakeSantaJumpGame.Update</code> with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">currentKeyState</span> <span class="p">=</span> <span class="nn">Keyboard</span><span class="p">.</span><span class="nc">GetState</span><span class="bp">()</span>
+        <span class="k">let</span> <span class="n">deltaTime</span> <span class="p">=</span> <span class="n">single</span><span class="p">(</span><span class="n">gameTime</span><span class="p">.</span><span class="nn">ElapsedGameTime</span><span class="p">.</span><span class="nc">TotalMilliseconds</span><span class="p">)</span>
+
+        <span class="k">let</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="n">key</span> <span class="p">=</span>
+            <span class="n">currentKeyState</span><span class="p">.</span><span class="nc">IsKeyDown</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="p">&amp;&amp;</span> <span class="n">lastKeyState</span><span class="p">.</span><span class="nc">IsKeyUp</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+            <span class="n">track</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">)</span>
+
+        <span class="n">lastKeyState</span> <span class="p">&lt;-</span> <span class="n">currentKeyState</span>
+</code></pre>
+</div>
+
+<p>The main change is adding <code class="highlighter-rouge">isKeyPressedSinceLastFrame</code>, which returns true if the specified <code class="highlighter-rouge">key</code> is pressed now, and wasn’t pressed last time we checked.</p>
+
+<p>Finally, add this line below the <code class="highlighter-rouge">tracks</code> binding just above <code class="highlighter-rouge">LoadContent</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="k">let</span> <span class="k">mutable</span> <span class="n">lastKeyState</span> <span class="p">=</span> <span class="nc">KeyboardState</span><span class="bp">()</span>
+</code></pre>
+</div>
+
+<p>Now is another good time to run the game. Hit the Space key, and watch in amazement as Santa arcs gracefully over the barren landscape.</p>
+
+<p>It’s starting to feel like a game! We have three things left to do:</p>
+
+<ul>
+  <li>Detecting and handling collisions between Santa and the obstacles</li>
+  <li>Drawing multiple tracks on the screen, each with their own trigger key and background colour</li>
+  <li>Game state management - showing a menu, showing a “game over” screen, keeping score</li>
+</ul>
+
+<h2 id="collisions">Collisions</h2>
+
+<p>Right now, Santa can run and jump over obstacles, but if he hits an obstacle, nothing happens. We want to know when he hits an obstacle (also known as “collision detection”), so that we can end the game. Let’s work on that.</p>
+
+<p>We’re going to implement two-phase collision detection:</p>
+
+<ol>
+  <li>
+    <p>Santa, and all of the obstacles, have a “bounding rectangle”. This is the rectangle that completely encloses them. For obstacles, it’s easy - the bounding rectangle is exactly the shape of the obstacle. For Santa, the bounding rectangle is the size of a single frame of the sprite texture. As a first pass, we’ll check if Santa’s bounding rectangle overlaps with any of the obstacles’ bounding rectangles.</p>
+  </li>
+  <li>
+    <p>If Santa’s bounding rectangle <em>does</em> overlap with an obstacle’s bounding rectangle, it doesn’t necessary mean he has collided with the obstacle. Have a look at the sprite texture we’re using for Santa - there’s a lot of empty space around the corners. It would be unfair to penalise the player just because an empty corner of the Santa sprite has collided with an obstacle. So if the bounding rectangles overlap, we will proceed to check every pixel of the current frame of Santa’s sprite texture. If we find any non-transparent pixels overlapping the obstacle, then we can be sure that there is a collision.</p>
+  </li>
+</ol>
+
+<p>We’ll implement this with a new method, <code class="highlighter-rouge">HasCollisions</code>. Add this code to the <code class="highlighter-rouge">Track</code> type, after <code class="highlighter-rouge">Draw</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">HasCollisions</span><span class="bp">()</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">santaBounds</span> <span class="p">=</span> <span class="n">santa</span><span class="p">.</span><span class="nc">Bounds</span>
+
+        <span class="k">let</span> <span class="n">obstacleCollidingWithSanta</span> <span class="p">(</span><span class="n">obstacle</span> <span class="p">:</span> <span class="nc">Obstacle</span><span class="p">)</span> <span class="p">=</span>
+            <span class="o">//</span> <span class="nc">First</span> <span class="k">do</span> <span class="n">simple</span> <span class="n">intersection</span><span class="p">.</span>
+            <span class="k">let</span> <span class="n">obstacleBounds</span> <span class="p">=</span> <span class="n">obstacle</span><span class="p">.</span><span class="nc">GetBounds</span><span class="p">(</span><span class="n">bounds</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">Intersects</span><span class="p">(</span><span class="n">obstacleBounds</span><span class="p">)</span> <span class="k">then</span>
+                <span class="o">//</span> <span class="nc">If</span> <span class="n">the</span> <span class="n">bounding</span> <span class="n">rectangles</span> <span class="n">overlap</span><span class="p">,</span> <span class="k">then</span> <span class="k">do</span> <span class="n">pixel</span><span class="p">-</span><span class="n">perfect</span> <span class="n">collision</span> <span class="n">detection</span><span class="p">.</span>
+                <span class="k">let</span> <span class="n">x1</span> <span class="p">=</span> <span class="n">max</span> <span class="p">(</span><span class="n">obstacleBounds</span><span class="p">.</span><span class="nc">X</span> <span class="p">-</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">X</span><span class="p">)</span> <span class="mi">0</span>
+                <span class="k">let</span> <span class="n">x2</span> <span class="p">=</span> <span class="n">min</span> <span class="p">(</span><span class="n">obstacleBounds</span><span class="p">.</span><span class="nc">Right</span> <span class="p">-</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">X</span><span class="p">)</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">Width</span>
+
+                <span class="k">let</span> <span class="n">y1</span> <span class="p">=</span> <span class="n">max</span> <span class="p">(</span><span class="n">obstacleBounds</span><span class="p">.</span><span class="nc">Y</span> <span class="p">-</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">Y</span><span class="p">)</span> <span class="mi">0</span>
+                <span class="k">let</span> <span class="n">y2</span> <span class="p">=</span> <span class="n">min</span> <span class="p">(</span><span class="n">obstacleBounds</span><span class="p">.</span><span class="nc">Bottom</span> <span class="p">-</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">Y</span><span class="p">)</span> <span class="n">santaBounds</span><span class="p">.</span><span class="nc">Height</span>
+
+                <span class="n">santa</span><span class="p">.</span><span class="nc">AnyNonTransparentPixels</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">)</span>
+            <span class="k">else</span>
+                <span class="bp">false</span>
+
+        <span class="nn">List</span><span class="p">.</span><span class="n">exists</span> <span class="n">obstacleCollidingWithSanta</span> <span class="n">obstacles</span>
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">List.exists</code> call on the last line means that we’ll call <code class="highlighter-rouge">obstacleCollidingWithSanta</code> for each obstacle in <code class="highlighter-rouge">obstacles</code>. We first check if the bounding rectangles overlap; if they do, we proceed to pixel-perfect collision detection. Because pixel-perfect collision detection can get expensive (i.e. it can take a long time), we limit it to just the pixels from Santa’s sprite texture that are overlapping with the obstacle.</p>
+
+<p>Now add this code to the end of the <code class="highlighter-rouge">Santa</code> type, after <code class="highlighter-rouge">Draw</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Santa</span><span class="p">(</span><span class="n">spriteTexture</span> <span class="p">:</span> <span class="nc">SpriteTexture</span><span class="p">,</span> <span class="n">trigger</span><span class="p">,</span> <span class="n">startBottom</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">AnyNonTransparentPixels</span><span class="p">(</span><span class="n">x1</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">y2</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">xOffset</span> <span class="p">=</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">spriteWidth</span> <span class="p">*</span> <span class="n">spriteIndex</span>
+        <span class="k">let</span> <span class="n">pixelsInsideRegion</span> <span class="p">=</span> <span class="n">seq</span> <span class="p">{</span>
+            <span class="k">for</span> <span class="n">y</span> <span class="k">in</span> <span class="n">y1</span><span class="p">..</span><span class="n">y2</span><span class="p">-</span><span class="mi">1</span> <span class="k">do</span>
+                <span class="k">for</span> <span class="n">x</span> <span class="k">in</span> <span class="p">(</span><span class="n">x1</span> <span class="o">+</span> <span class="n">xOffset</span><span class="o">)..(</span><span class="n">x2</span> <span class="o">+</span> <span class="n">xOffset</span> <span class="p">-</span> <span class="mi">1</span><span class="p">)</span> <span class="k">do</span>
+                    <span class="k">let</span> <span class="n">index</span> <span class="p">=</span> <span class="p">(</span><span class="n">y</span> <span class="p">*</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">texture</span><span class="p">.</span><span class="nc">Width</span><span class="p">)</span> <span class="o">+</span> <span class="n">x</span>
+                    <span class="n">yield</span> <span class="n">spriteTexture</span><span class="p">.</span><span class="n">textureData</span><span class="o">.[</span><span class="n">index</span><span class="p">]</span>
+        <span class="p">}</span>
+        <span class="nn">Seq</span><span class="p">.</span><span class="n">exists</span> <span class="p">(</span><span class="k">fun</span> <span class="n">c</span> <span class="p">-&gt;</span> <span class="n">c</span> <span class="o">&lt;&gt;</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Transparent</span><span class="p">)</span> <span class="n">pixelsInsideRegion</span>
+</code></pre>
+</div>
+
+<p>As soon as we find a non-transparent pixel inside the search region, we want to exit the function. However, in F#, we can’t do an explicit <code class="highlighter-rouge">return</code>, or <code class="highlighter-rouge">break</code> like we can in C# (although there are <a href="http://latkin.org/blog/2014/12/26/nested-looping-to-programmatic-depth-in-f/">clever ways</a> to simulate this kind of control flow). So I’m using a sequence, which is basically an <code class="highlighter-rouge">IEnumerable&lt;T&gt;</code>. The <code class="highlighter-rouge">pixelsInsideRegion</code> sequence yields all of the pixels inside the search region. Calling <code class="highlighter-rouge">Seq.exists</code> with the <code class="highlighter-rouge">pixelsInsideRegion</code> function means that as soon as we find a non-transparent pixel, we’ll stop the search and return.</p>
+
+<p>Now we can detect collisions, but we’re not yet calling this code. Soon, we’ll implement a proper “Game Over” screen, but for now, let’s just stop the game as soon as we detect a collision. Add this code to <code class="highlighter-rouge">MakeSantaJumpGame</code>, just below the <code class="highlighter-rouge">lastKeyState</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">gameOver</span> <span class="p">=</span> <span class="bp">false</span>
+</code></pre>
+</div>
+
+<p>Then in <code class="highlighter-rouge">MakeSantaJumpGame.Update</code>, replace the loop which updates each track with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="k">if</span> <span class="n">not</span> <span class="n">gameOver</span> <span class="k">then</span>
+            <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+                <span class="n">track</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nn">List</span><span class="p">.</span><span class="n">exists</span> <span class="p">(</span><span class="k">fun</span> <span class="p">(</span><span class="n">t</span> <span class="p">:</span> <span class="nc">Track</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">t</span><span class="p">.</span><span class="nc">HasCollisions</span><span class="bp">()</span><span class="p">)</span> <span class="n">tracks</span> <span class="k">then</span>
+                <span class="n">gameOver</span> <span class="p">&lt;-</span> <span class="bp">true</span>
+        <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>Now run the game again. When Santa hits an obstacle, the game should come to an abrupt halt. That’s collision detection done!</p>
+
+<p><img src="/assets/posts/make-santa-jump-collision-detection.png" alt="" /></p>
+
+<h2 id="multiple-tracks">Multiple tracks</h2>
+
+<p>Next, we’ll ramp up the difficulty level by having Santa run along multiple “tracks” at the same time. Each track will have its own trigger key, and the player needs to make Santa jump at the appropriate time on each track.</p>
+
+<p>Fortunately, we’ve done most of the work already. We have a <code class="highlighter-rouge">Track</code> type, which abstracts everything related to an individual track. All we need to do is split the game window up into sections, and put a track in each section. To make it look nicer, we’ll leave some “padding” space between each track, and each track will have its own background colour.</p>
+
+<p>This is all implemented in the following code. Add it below the <code class="highlighter-rouge">Track</code> type, and above the <code class="highlighter-rouge">MakeSantaJumpGame</code> type:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[&lt;</span><span class="nc">CompilationRepresentation</span><span class="p">(</span><span class="nn">CompilationRepresentationFlags</span><span class="p">.</span><span class="nc">ModuleSuffix</span><span class="o">)&gt;]</span>
+<span class="k">module</span> <span class="nc">Track</span> <span class="p">=</span>
+    <span class="k">let</span> <span class="n">createTracks</span> <span class="p">(</span><span class="n">gameBounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">)</span> <span class="n">spriteTexture</span> <span class="n">numTracks</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">padding</span> <span class="p">=</span> <span class="mi">10</span>
+        <span class="k">let</span> <span class="n">totalPadding</span> <span class="p">=</span> <span class="p">(</span><span class="n">numTracks</span> <span class="p">-</span> <span class="mi">1</span><span class="p">)</span> <span class="p">*</span> <span class="n">padding</span>
+        <span class="k">let</span> <span class="n">availableHeight</span> <span class="p">=</span> <span class="n">gameBounds</span><span class="p">.</span><span class="nc">Height</span> <span class="p">-</span> <span class="n">totalPadding</span>
+        <span class="k">let</span> <span class="n">trackHeight</span> <span class="p">=</span> <span class="n">availableHeight</span> <span class="o">/</span> <span class="n">numTracks</span>
+
+        <span class="k">let</span> <span class="n">colors</span> <span class="p">=</span> <span class="p">[</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Red</span><span class="p">;</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Blue</span><span class="p">;</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Purple</span><span class="p">;</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Brown</span><span class="p">;</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Gold</span> <span class="p">]</span>
+        <span class="k">let</span> <span class="n">keys</span> <span class="p">=</span> <span class="p">[</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">A</span><span class="p">;</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">S</span><span class="p">;</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D</span><span class="p">;</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">F</span><span class="p">;</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">Space</span> <span class="p">]</span>
+
+        <span class="k">let</span> <span class="n">makeTrack</span> <span class="n">i</span> <span class="p">=</span>
+            <span class="k">let</span> <span class="n">trackBounds</span> <span class="p">=</span> <span class="nc">Rectangle</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span> <span class="p">*</span> <span class="p">(</span><span class="n">trackHeight</span> <span class="o">+</span> <span class="n">padding</span><span class="o">),</span>
+                                        <span class="n">gameBounds</span><span class="p">.</span><span class="nc">Width</span><span class="p">,</span> <span class="n">trackHeight</span><span class="p">)</span>
+            <span class="nc">Track</span><span class="p">(</span><span class="n">colors</span><span class="o">.[</span><span class="n">i</span><span class="o">],</span> <span class="n">trackBounds</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span>
+                  <span class="n">keys</span><span class="o">.[</span><span class="n">i</span> <span class="o">+</span> <span class="p">(</span><span class="n">keys</span><span class="p">.</span><span class="nc">Length</span> <span class="p">-</span> <span class="n">numTracks</span><span class="o">)])</span>
+
+        <span class="nn">List</span><span class="p">.</span><span class="n">init</span> <span class="n">numTracks</span> <span class="n">makeTrack</span>
+</code></pre>
+</div>
+
+<p>We do some calculation to create padding space between each track, and then calculate how high each track should be.</p>
+
+<p>The <code class="highlighter-rouge">colors</code> and <code class="highlighter-rouge">keys</code> lists are hardcoded to 5 items, so this code will crash if we ever call it with <code class="highlighter-rouge">numTracks</code> &gt; 5.</p>
+
+<p>Now change the last line in <code class="highlighter-rouge">MakeSantaJump.LoadContent</code>, which populates the <code class="highlighter-rouge">tracks</code> list, to this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">LoadContent</span><span class="bp">()</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="n">tracks</span> <span class="p">&lt;-</span> <span class="nn">Track</span><span class="p">.</span><span class="n">createTracks</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nc">Bounds</span> <span class="n">spriteTexture</span> <span class="mi">3</span>
+</code></pre>
+</div>
+
+<p>The last parameter to <code class="highlighter-rouge">Track.createTracks</code> is the number of tracks - try adjusting this anywhere between <code class="highlighter-rouge">1</code> and <code class="highlighter-rouge">5</code> to see the result. (Yes, 5 tracks is insanely difficult…)</p>
+
+<p>With 3 tracks, the trigger keys are “D”, “F”, and “Space”, respectively. I’ve tried to make it comfortable to hit these keys when your hands are in the “home” position on the keyboard. I’m probably exhibiting a bit of left-handed bias - of course, you can change the trigger keys to whatever you prefer!</p>
+
+<p>If you run the game now, hopefully you’ll agree that it’s starting to become quite playable! Have a try - and if you want to try adjusting the difficulty level by tweaking the parameters at the top of <code class="highlighter-rouge">Game.fs</code>, now is a good time.</p>
+
+<p><img src="/assets/posts/make-santa-jump-multiple-tracks.png" alt="" /></p>
+
+<h2 id="drawing-text">Drawing text</h2>
+
+<p>Before we go further, it would helpful if we had some way to draw text to the screen. It would be nice to tell the player what the trigger key is for each track. And later on, we’ll also want to show the player their score, and make a menu screen, and a game over screen - all of which will require text.</p>
+
+<p>The normal way to draw text in MonoGame is to:</p>
+
+<ul>
+  <li>Create a SpriteFont file, which is an XML description of the font you want to use</li>
+  <li>Build the SpriteFont file using the content pipeline</li>
+  <li>Load it into your game, and call <code class="highlighter-rouge">SpriteBatch.DrawString</code>.</li>
+</ul>
+
+<p>Because we’re not using the content pipeline for this game, this won’t work for us. Instead, we’ll go old-school and do the hard work ourselves. Or more specifically, we’ll use the hard work that somebody else has already done. <a href="http://www.angelcode.com/products/bmfont/">BMFont</a> is a handy bitmap font generator tool, and I found <a href="http://www.craftworkgames.com/blog/tutorial-bmfont-rendering-with-monogame/">this article about using BMFont with MonoGame</a>. You can either follow that article, or (recommended) download the files I already created using BMFont.</p>
+
+<p>You’ll need these two files:</p>
+
+<ul>
+  <li><a href="https://raw.githubusercontent.com/tgjones/make-santa-jump/master/src/MakeSantaJump/GameFont.fnt">GameFont.fnt</a></li>
+  <li><a href="https://raw.githubusercontent.com/tgjones/make-santa-jump/master/src/MakeSantaJump/GameFont_0.png">GameFont_0.png</a></li>
+</ul>
+
+<p>As you did with <code class="highlighter-rouge">Santa.png</code>, download these 2 files and add them to your project as existing items (right-click the project in Solution Explorer, “Add” &gt; “Existing Item…”). Change the “Build Action” for both files to “Content”, and “Copy to Output Directory” to “Copy if newer”.</p>
+
+<p>You’ll also need some boilerplate code to load the font file and use it draw text. <a href="https://raw.githubusercontent.com/tgjones/make-santa-jump/master/src/MakeSantaJump/FontRendering.fs">Download FontRendering.fs</a>, and add it to your project above <code class="highlighter-rouge">Game.fs</code>. (Right-click <code class="highlighter-rouge">Game.fs</code> in Solution Explorer, click “Add Above” &gt; “Existing Item”, and find the <code class="highlighter-rouge">FontRendering.fs</code> you just downloaded.)</p>
+
+<p><code class="highlighter-rouge">FontRendering.fs</code> makes use of some XML types, so you’ll need to add a reference to <code class="highlighter-rouge">System.XML</code>. In Solution Explorer, right-click the References node, and “Add Reference…”. In the Assemblies &gt; Framework tab, find the <code class="highlighter-rouge">System.XML</code> assembly, check the box next to it, and click OK.</p>
+
+<p><img src="/assets/posts/make-santa-jump-xml-reference.png" alt="" /></p>
+
+<p>Now add this code to <code class="highlighter-rouge">MakeSantaJumpGame.LoadContent</code>, just before the last line that creates the tracks:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">LoadContent</span><span class="bp">()</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="n">use</span> <span class="n">fontTextureStream</span> <span class="p">=</span> <span class="nn">System</span><span class="p">.</span><span class="nn">IO</span><span class="p">.</span><span class="nn">File</span><span class="p">.</span><span class="nc">OpenRead</span><span class="p">(</span><span class="s2">"GameFont_0.png"</span><span class="p">)</span>
+        <span class="k">let</span> <span class="n">fontTexture</span> <span class="p">=</span> <span class="nn">Texture2D</span><span class="p">.</span><span class="nc">FromStream</span><span class="p">(</span><span class="n">this</span><span class="p">.</span><span class="nc">GraphicsDevice</span><span class="p">,</span> <span class="n">fontTextureStream</span><span class="p">)</span>
+        <span class="k">let</span> <span class="n">fontFile</span> <span class="p">=</span> <span class="nn">FontRendering</span><span class="p">.</span><span class="nn">FontLoader</span><span class="p">.</span><span class="nc">Load</span><span class="p">(</span><span class="s2">"GameFont.fnt"</span><span class="p">)</span>
+        <span class="n">fontRenderer</span> <span class="p">&lt;-</span> <span class="nn">FontRendering</span><span class="p">.</span><span class="nc">FontRenderer</span><span class="p">(</span><span class="n">fontFile</span><span class="p">,</span> <span class="n">fontTexture</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Then, add this line just below the existing <code class="highlighter-rouge">spriteTexture</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">fontRenderer</span> <span class="p">=</span> <span class="nn">Unchecked</span><span class="p">.</span><span class="n">defaultof</span><span class="p">&lt;</span><span class="nn">FontRendering</span><span class="p">.</span><span class="nc">FontRenderer</span><span class="p">&gt;</span>
+</code></pre>
+</div>
+
+<p>Just to prove it works, add this line to <code class="highlighter-rouge">MakeSantaJumpGame.Draw</code>, just before the last line (<code class="highlighter-rouge">spriteBatch.End()</code>):</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"HO HO HO"</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p><img src="/assets/posts/make-santa-jump-drawing-text.png" alt="" /></p>
+
+<p>Once you’ve run the game and checked it works, remove this line - we don’t want it in our final game :)</p>
+
+<h2 id="game-state-management">Game state management</h2>
+
+<p>We’re nearly there! We’ve got the majority of the game in place. Santa can jump over obstacles, we can detect when he hits an obstacle and we can stop the game. But it’s not very player-friendly; we should</p>
+
+<ul>
+  <li>give the player a way to choose the difficulty level</li>
+  <li>show the player her score</li>
+  <li>allow the player to start a new game without having to restart the whole program</li>
+</ul>
+
+<p>First, add this enumeration type just above the <code class="highlighter-rouge">MakeSantaJumpGame</code> type:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">GameState</span> <span class="p">=</span>
+    <span class="p">|</span> <span class="nc">MainMenu</span>
+    <span class="p">|</span> <span class="nc">Game</span>
+    <span class="p">|</span> <span class="nc">GamePaused</span>
+    <span class="p">|</span> <span class="nc">GameOver</span>
+</code></pre>
+</div>
+
+<p>Then add this line just above the <code class="highlighter-rouge">tracks</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">gameState</span> <span class="p">=</span> <span class="nc">MainMenu</span>
+</code></pre>
+</div>
+
+<p>Remove the <code class="highlighter-rouge">gameOver</code> binding - we don’t need it anymore.</p>
+
+<p>Also remove the last line of <code class="highlighter-rouge">LoadContent</code> (the line which populates <code class="highlighter-rouge">tracks</code>) - we’re going to do that in a different way now.</p>
+
+<p>Replace <code class="highlighter-rouge">MakeSantaJumpGame.Update</code> with this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="k">let</span> <span class="n">currentKeyState</span> <span class="p">=</span> <span class="nn">Keyboard</span><span class="p">.</span><span class="nc">GetState</span><span class="bp">()</span>
+        <span class="k">let</span> <span class="n">deltaTime</span> <span class="p">=</span> <span class="n">single</span><span class="p">(</span><span class="n">gameTime</span><span class="p">.</span><span class="nn">ElapsedGameTime</span><span class="p">.</span><span class="nc">TotalMilliseconds</span><span class="p">)</span>
+
+        <span class="k">let</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="n">key</span> <span class="p">=</span>
+            <span class="n">currentKeyState</span><span class="p">.</span><span class="nc">IsKeyDown</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="p">&amp;&amp;</span> <span class="n">lastKeyState</span><span class="p">.</span><span class="nc">IsKeyUp</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="k">match</span> <span class="n">gameState</span> <span class="k">with</span>
+        <span class="p">|</span> <span class="nc">MainMenu</span> <span class="p">-&gt;</span>
+            <span class="k">let</span> <span class="n">startGame</span> <span class="n">numTracks</span> <span class="p">=</span>
+                <span class="n">tracks</span> <span class="p">&lt;-</span> <span class="nn">Track</span><span class="p">.</span><span class="n">createTracks</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nc">Bounds</span> <span class="n">spriteTexture</span> <span class="n">numTracks</span>
+                <span class="n">gameState</span> <span class="p">&lt;-</span> <span class="nc">Game</span>
+
+            <span class="k">if</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D1</span> <span class="k">then</span> <span class="n">startGame</span> <span class="mi">1</span>
+            <span class="n">elif</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D2</span> <span class="k">then</span> <span class="n">startGame</span> <span class="mi">2</span>
+            <span class="n">elif</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D3</span> <span class="k">then</span> <span class="n">startGame</span> <span class="mi">3</span>
+            <span class="n">elif</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D4</span> <span class="k">then</span> <span class="n">startGame</span> <span class="mi">4</span>
+            <span class="n">elif</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">D5</span> <span class="k">then</span> <span class="n">startGame</span> <span class="mi">5</span>
+        <span class="p">|</span> <span class="nc">Game</span> <span class="p">-&gt;</span>
+            <span class="k">if</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">P</span> <span class="k">then</span>
+                <span class="n">gameState</span> <span class="p">&lt;-</span> <span class="nc">GamePaused</span>
+            <span class="k">else</span>
+                <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+                    <span class="n">track</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nn">List</span><span class="p">.</span><span class="n">exists</span> <span class="p">(</span><span class="k">fun</span> <span class="p">(</span><span class="n">t</span> <span class="p">:</span> <span class="nc">Track</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">t</span><span class="p">.</span><span class="nc">HasCollisions</span><span class="bp">()</span><span class="p">)</span> <span class="n">tracks</span> <span class="k">then</span>
+                    <span class="n">gameState</span> <span class="p">&lt;-</span> <span class="nc">GameOver</span>
+        <span class="p">|</span> <span class="nc">GamePaused</span> <span class="p">-&gt;</span>
+            <span class="k">if</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">P</span> <span class="k">then</span>
+                <span class="n">gameState</span> <span class="p">&lt;-</span> <span class="nc">Game</span>
+        <span class="p">|</span> <span class="nc">GameOver</span> <span class="p">-&gt;</span>
+            <span class="k">if</span> <span class="n">isKeyPressedSinceLastFrame</span> <span class="nn">Keys</span><span class="p">.</span><span class="nc">Space</span> <span class="k">then</span>
+                <span class="n">gameState</span> <span class="p">&lt;-</span> <span class="nc">MainMenu</span>
+
+        <span class="n">lastKeyState</span> <span class="p">&lt;-</span> <span class="n">currentKeyState</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">D1</code>, <code class="highlighter-rouge">D2</code>, etc. are the number keys. So when we’re in the <code class="highlighter-rouge">MainMenu</code> state, and the player presses a number key between 1 and 5, we’ll start the game using the specified number of tracks.</p>
+
+<p>If we’re in the <code class="highlighter-rouge">Game</code> state, we’ll do what we were doing before, with the addition of allowing the player to pause the game with the P key.</p>
+
+<p>If we’re in the <code class="highlighter-rouge">GamePaused</code> state, pressing the P key will unpause the game.</p>
+
+<p>Finally, in the <code class="highlighter-rouge">GameOver</code> state, pressing Space will return the player to the main menu.</p>
+
+<p>We also need to update the <code class="highlighter-rouge">Draw</code> method. Replace <code class="highlighter-rouge">MakeSantaJumpGame.Draw</code> with this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">MakeSantaJumpGame</span><span class="bp">()</span> <span class="k">as</span> <span class="n">this</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nc">Clear</span> <span class="nn">Color</span><span class="p">.</span><span class="nc">Black</span>
+
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">Begin</span><span class="p">(</span><span class="nn">SpriteSortMode</span><span class="p">.</span><span class="nc">Deferred</span><span class="p">,</span> <span class="nn">BlendState</span><span class="p">.</span><span class="nc">NonPremultiplied</span><span class="p">)</span>
+
+        <span class="k">match</span> <span class="n">gameState</span> <span class="k">with</span>
+        <span class="p">|</span> <span class="nc">MainMenu</span> <span class="p">-&gt;</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="s2">"Choose a difficulty."</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="s2">"1 - Even Rudolph could handle it"</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">,</span> <span class="s2">"2 - Not nice"</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">250</span><span class="p">,</span> <span class="s2">"3 - Ho ho HO NO"</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="s2">"4 - I don't get paid enough for this"</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">350</span><span class="p">,</span> <span class="s2">"5 - This is why Santa drinks"</span><span class="p">)</span>
+        <span class="p">|</span> <span class="nc">Game</span>
+        <span class="p">|</span> <span class="nc">GamePaused</span> <span class="p">-&gt;</span>
+            <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+                <span class="n">track</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">fontRenderer</span><span class="p">)</span>
+        <span class="p">|</span> <span class="nc">GameOver</span> <span class="p">-&gt;</span>
+            <span class="k">for</span> <span class="n">track</span> <span class="k">in</span> <span class="n">tracks</span> <span class="k">do</span>
+                <span class="n">track</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">fontRenderer</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="s2">"Game Over!"</span><span class="p">)</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">150</span><span class="p">,</span> <span class="s2">"Press Space to continue."</span><span class="p">)</span>
+
+        <span class="n">spriteBatch</span><span class="p">.</span><span class="nc">End</span><span class="bp">()</span>
+</code></pre>
+</div>
+
+<p>We want to show the player the trigger key for each track. So update <code class="highlighter-rouge">Track.Draw</code> to have this signature:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">fontRenderer</span> <span class="p">:</span> <span class="nn">FontRendering</span><span class="p">.</span><span class="nc">FontRenderer</span><span class="p">)</span> <span class="p">=</span>
+</code></pre>
+</div>
+
+<p>And then add this as the last line in <code class="highlighter-rouge">Track.Draw</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">spriteBatch</span> <span class="p">:</span> <span class="nc">SpriteBatch</span><span class="p">,</span> <span class="n">texture</span><span class="p">,</span> <span class="n">fontRenderer</span> <span class="p">:</span> <span class="nn">FontRendering</span><span class="p">.</span><span class="nc">FontRenderer</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">10</span> <span class="o">+</span> <span class="n">bounds</span><span class="p">.</span><span class="nc">Y</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Run the game now, and be impressed with yourself for getting this far! We almost have a fully working, albeit very simple, game.</p>
+
+<p><img src="/assets/posts/make-santa-jump-menu.png" alt="" /></p>
+
+<p><img src="/assets/posts/make-santa-jump-game.png" alt="" /></p>
+
+<p><img src="/assets/posts/make-santa-jump-game-over.png" alt="" /></p>
+
+<p>One final touch - let’s the show the player the current score. It’s not really a game if you can’t compete with yourself and / or your friends!</p>
+
+<p>Add this line at the top of the <code class="highlighter-rouge">Track</code> type, above the existing <code class="highlighter-rouge">santa</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="k">let</span> <span class="k">mutable</span> <span class="n">avoidedObstacles</span> <span class="p">=</span> <span class="mi">0</span>
+</code></pre>
+</div>
+
+<p>Then add this code just below the <code class="highlighter-rouge">santa</code> binding:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Track</span><span class="p">(</span><span class="n">color</span><span class="p">,</span> <span class="n">bounds</span> <span class="p">:</span> <span class="nc">Rectangle</span><span class="p">,</span> <span class="n">spriteTexture</span><span class="p">,</span> <span class="n">triggerKey</span><span class="p">)</span> <span class="p">=</span>
+    <span class="o">//</span> <span class="o">...</span>
+    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">AvoidedObstacles</span>
+        <span class="k">with</span> <span class="n">get</span><span class="bp">()</span> <span class="p">=</span> <span class="n">avoidedObstacles</span>
+</code></pre>
+</div>
+
+<p>In <code class="highlighter-rouge">Track.Update</code>, after the loop which updates the obstacles, and before the last line which removes old obstacles and adds new ones, add this code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">member</span> <span class="n">this</span><span class="p">.</span><span class="nc">Update</span><span class="p">(</span><span class="n">deltaTime</span><span class="p">,</span> <span class="n">isKeyPressedSinceLastFrame</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="k">let</span> <span class="n">oldObstaclesCount</span> <span class="p">=</span>
+            <span class="n">obstacles</span>
+            <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">filter</span> <span class="p">(</span><span class="k">fun</span> <span class="n">o</span> <span class="p">-&gt;</span> <span class="n">not</span> <span class="n">o</span><span class="p">.</span><span class="nc">Visible</span><span class="p">)</span>
+            <span class="o">|&gt;</span> <span class="nn">List</span><span class="p">.</span><span class="n">length</span>
+        <span class="n">avoidedObstacles</span> <span class="p">&lt;-</span> <span class="n">avoidedObstacles</span> <span class="o">+</span> <span class="n">oldObstaclesCount</span>
+        <span class="o">//</span> <span class="o">...</span>
+</code></pre>
+</div>
+
+<p>This isn’t a perfect implementation. It won’t count an obstacle until it has disappeared off the left edge of the screen. It would be better to count it as soon as it has gone past Santa - but that’s more complicated, because we need to make sure we don’t count obstacles twice. Feel free to experiment with this, and let me know if you come up with a better solution!</p>
+
+<p>Then in <code class="highlighter-rouge">MakeSantaJumpGame.Draw</code>, add this line just after <code class="highlighter-rouge">spriteBatch.Begin(...)</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>    <span class="n">override</span> <span class="n">this</span><span class="p">.</span><span class="nc">Draw</span><span class="p">(</span><span class="n">gameTime</span><span class="p">)</span> <span class="p">=</span>
+        <span class="o">//</span> <span class="o">...</span>
+        <span class="k">let</span> <span class="n">avoidedObstacles</span> <span class="p">=</span> <span class="nn">List</span><span class="p">.</span><span class="n">sumBy</span> <span class="p">(</span><span class="k">fun</span> <span class="p">(</span><span class="n">o</span> <span class="p">:</span> <span class="nc">Track</span><span class="p">)</span> <span class="p">-&gt;</span> <span class="n">o</span><span class="p">.</span><span class="nc">AvoidedObstacles</span><span class="p">)</span> <span class="n">tracks</span>
+</code></pre>
+</div>
+
+<p><strong>Finally</strong>, still in <code class="highlighter-rouge">MakeSantaJumpGame.Draw</code>, add this line at the end of <em>both</em> the <code class="highlighter-rouge">Game</code>/<code class="highlighter-rouge">GamePaused</code> and also the <code class="highlighter-rouge">GameOver</code> cases:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code>            <span class="o">//</span> <span class="o">...</span>
+            <span class="n">fontRenderer</span><span class="p">.</span><span class="nc">DrawText</span><span class="p">(</span><span class="n">spriteBatch</span><span class="p">,</span> <span class="n">this</span><span class="p">.</span><span class="nn">GraphicsDevice</span><span class="p">.</span><span class="nn">Viewport</span><span class="p">.</span><span class="nn">Bounds</span><span class="p">.</span><span class="nc">Right</span> <span class="p">-</span> <span class="mi">60</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span>
+                                  <span class="n">avoidedObstacles</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Now run the game, and you’ll see the current score in the top right, both while playing the game, and also on the “game over” screen.</p>
+
+<p><img src="/assets/posts/make-santa-jump-score.png" alt="" /></p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>That’s it! If you’ve made it this far, well done! You’ve made a complete 2D endless runner game, in ~300 lines of F# code. Okay, there’s a lot that could be added to it - sound, perhaps a parallax background, nicer looking menus - but it’s playable as it is, and, I hope you agree, quite fun!</p>
+
+<p>I ran out of time to run the game on a Mac prior to posting this, but I hope to do that soon, and then write a follow-up post. I expect that it will work without too many changes on both Mac and Linux, which would be pretty cool. It should even work on iOS and Android, although you’d have to make some adjustments - you don’t want to use keyboard input on mobile devices :)</p>
+
+<p>Let me know in the comments if you have any feedback on the content or style of this tutorial. I’ve enjoyed putting it together - any excuse to make a game!</p>
+
+<p>(As I was preparing this game and blog post, a somewhat similar game, <a href="http://albertxing.com/rudolph-runner/">Rudolph Runner</a>, appeared on <a href="https://news.ycombinator.com/item?id=8782069">Hacker News</a>. Rudolph Runner is a lot prettier than my game, but I think Make Santa Jump has the edge when it comes to difficulty. I’m not sure if that’s a good thing…)</p>
+
+<p>Happy jumping!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/11/24/getting-started-with-jetbrains-nitra">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2015/04/13/cascaded-shadow-maps-sample-for-monogame">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Marshalling C# structures into Direct3D 11 cbuffers using SharpDX - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Marshalling C# structures into Direct3D 11 cbuffers using SharpDX</h1>
+
+    <div class="post-date">
+        <time datetime="2011-03-08T01:18:00+00:00">08 March 2011</time>
+    </div>
+
+    
+
+    <p><strong>UPDATE 08/03/2011</strong></p>
+
+<ul>
+  <li>I have incorporated Alexandre Mutel’s refactoring suggestion from his comment below, to avoid creating a <code class="highlighter-rouge">DataStream</code> every time.</li>
+  <li>He also suggests an alternative approach, which is more elegant but requires more code.</li>
+</ul>
+
+<p>It’s tempting, after Googling a problem, finding no solutions, then going old-school and actually trying to solve it myself, and eventually coming up with a solution, to keep running and never look back. But this particular problem gave me lots of SEO-friendly keywords to put in the page title of a blog post, so here we are.</p>
+
+<h2 id="background">Background</h2>
+
+<p>A bit of background - I’m working on some enhancements to <a href="http://github.com/tgjones/dotwarp">DotWarp</a>, which will allow an arbitrary number of directional lights, point lights, and spotlights to be applied to a scene. DotWarp uses <a href="http://code.google.com/p/sharpdx/">SharpDX</a> to wrap Direct3D 11. DotWarp works with a single material type, defined in a file called <code class="highlighter-rouge">BasicEffect.fx</code>. I used that name because it roughly follows XNA’s <code class="highlighter-rouge">BasicEffect</code> API (or rather it did until this most recent change to support arbitrary numbers of different light types).</p>
+
+<p>The <code class="highlighter-rouge">.fx</code> extension is also misleading, because I’m not using the Direct3D 11 Effects framework - instead I compile the vertex and pixel shaders separately. I have a <code class="highlighter-rouge">BasicEffect</code> class defined in C# that tries to abstract that fact away from callers.</p>
+
+<h2 id="the-problem">The problem</h2>
+
+<p>Direct3D 11 shader parameters are declared inside <code class="highlighter-rouge">cbuffer</code> structures (parameters declared in global scope will be added to an implicit <code class="highlighter-rouge">cbuffer</code>). cbuffers themselves are outside the scope of this blog post, but they’re pretty cool and offer some good performance improvements over the Direct3D 9 way of doing things. A typical <code class="highlighter-rouge">cbuffer</code> might look like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">cbuffer</span> <span class="n">BasicEffectVertexConstants</span> <span class="o">:</span> <span class="k">register</span><span class="p">(</span><span class="n">b0</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="n">matrix</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+	<span class="n">matrix</span> <span class="n">World</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>The difficulty comes in setting the values for <code class="highlighter-rouge">WorldViewProjection</code> and <code class="highlighter-rouge">World</code> from your C# code. It gets even tricker if you want to use arrays inside your structures.</p>
+
+<h2 id="a-solution">A solution</h2>
+
+<p>What follows is fairly SharpDX-specific, although the same general principle should work for SlimDX too. First, we need to define a C# struct that matches the HLSL struct.</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[StructLayout(LayoutKind.Explicit, Size = 128)]</span>
+<span class="k">internal</span> <span class="k">struct</span> <span class="nc">BasicEffectVertexConstants</span>
+<span class="p">{</span>
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">0</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Matrix</span> <span class="n">WorldViewProjection</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">64</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Matrix</span> <span class="n">World</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>You will notice I’ve used attributes to explicitly set the size and field offsets. This is to avoid differences between .NET and HLSL in how fields are packed. MSDN has a good page on <a href="http://msdn.microsoft.com/en-us/library/bb509632.aspx">Packing Rules for Constant Variables</a>, which covers the HLSL side. For the struct above, it would be packed correctly for HLSL even without the attributes, but that isn’t always true, so I prefer to be consistent and always set the size and field offsets explicitly.</p>
+
+<p>Now we need a couple of helper methods. The first is going to create a Direct3D 11 constant buffer resource, for a particular struct type. The second helper method is going to update that Direct3D 11 constant buffer resource with new values. <em>UPDATE</em> To keep things simple, we’ll create a new class:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="k">internal</span> <span class="k">class</span> <span class="nc">ConstantBuffer</span><span class="p">&lt;</span><span class="n">T</span><span class="p">&gt;</span> <span class="p">:</span> <span class="n">IDisposable</span>
+	<span class="k">where</span> <span class="n">T</span> <span class="p">:</span> <span class="k">struct</span>
+<span class="err">{</span>
+	<span class="nc">private</span> <span class="k">readonly</span> <span class="n">Device</span> <span class="n">_device</span><span class="p">;</span>
+	<span class="k">private</span> <span class="k">readonly</span> <span class="n">Buffer</span> <span class="n">_buffer</span><span class="p">;</span>
+	<span class="k">private</span> <span class="k">readonly</span> <span class="n">DataStream</span> <span class="n">_dataStream</span><span class="p">;</span>
+
+	<span class="k">public</span> <span class="n">Buffer</span> <span class="n">Buffer</span>
+	<span class="p">{</span>
+		<span class="k">get</span> <span class="p">{</span> <span class="k">return</span> <span class="n">_buffer</span><span class="p">;</span> <span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="k">public</span> <span class="nf">ConstantBuffer</span><span class="p">(</span><span class="n">Device</span> <span class="n">device</span><span class="p">)</span>
+	<span class="p">{</span>
+		<span class="n">_device</span> <span class="p">=</span> <span class="n">device</span><span class="p">;</span>
+
+		<span class="c1">// If no specific marshalling is needed, can use
+</span>		<span class="c1">// SharpDX.Utilities.SizeOf&lt;T&gt;() for better performance.
+</span>		<span class="kt">int</span> <span class="n">size</span> <span class="p">=</span> <span class="n">Marshal</span><span class="p">.</span><span class="nf">SizeOf</span><span class="p">(</span><span class="k">typeof</span> <span class="p">(</span><span class="n">T</span><span class="p">));</span>
+
+		<span class="n">_buffer</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">Buffer</span><span class="p">(</span><span class="n">device</span><span class="p">,</span> <span class="k">new</span> <span class="n">BufferDescription</span>
+		<span class="p">{</span>
+			<span class="n">Usage</span> <span class="p">=</span> <span class="n">ResourceUsage</span><span class="p">.</span><span class="n">Default</span><span class="p">,</span>
+			<span class="n">BindFlags</span> <span class="p">=</span> <span class="n">BindFlags</span><span class="p">.</span><span class="n">ConstantBuffer</span><span class="p">,</span>
+			<span class="n">SizeInBytes</span> <span class="p">=</span> <span class="n">size</span><span class="p">,</span>
+			<span class="n">CpuAccessFlags</span> <span class="p">=</span> <span class="n">CpuAccessFlags</span><span class="p">.</span><span class="n">None</span><span class="p">,</span>
+			<span class="n">OptionFlags</span> <span class="p">=</span> <span class="n">ResourceOptionFlags</span><span class="p">.</span><span class="n">None</span><span class="p">,</span>
+			<span class="n">StructureByteStride</span> <span class="p">=</span> <span class="m">0</span>
+		<span class="p">});</span>
+
+		<span class="n">_dataStream</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">DataStream</span><span class="p">(</span><span class="n">size</span><span class="p">,</span> <span class="k">true</span><span class="p">,</span> <span class="k">true</span><span class="p">);</span>
+	<span class="p">}</span>
+
+	<span class="k">public</span> <span class="k">void</span> <span class="nf">UpdateValue</span><span class="p">(</span><span class="n">T</span> <span class="k">value</span><span class="p">)</span>
+	<span class="p">{</span>
+		<span class="c1">// If no specific marshalling is needed, can use 
+</span>		<span class="c1">// dataStream.Write(value) for better performance.
+</span>		<span class="n">Marshal</span><span class="p">.</span><span class="nf">StructureToPtr</span><span class="p">(</span><span class="k">value</span><span class="p">,</span> <span class="n">_dataStream</span><span class="p">.</span><span class="n">DataPointer</span><span class="p">,</span> <span class="k">false</span><span class="p">);</span>
+
+		<span class="kt">var</span> <span class="n">dataBox</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">DataBox</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="m">0</span><span class="p">,</span> <span class="n">_dataStream</span><span class="p">);</span>
+		<span class="n">_device</span><span class="p">.</span><span class="n">ImmediateContext</span><span class="p">.</span><span class="nf">UpdateSubresource</span><span class="p">(</span><span class="n">dataBox</span><span class="p">,</span> <span class="n">_buffer</span><span class="p">,</span> <span class="m">0</span><span class="p">);</span>
+	<span class="p">}</span>
+
+	<span class="k">public</span> <span class="k">void</span> <span class="nf">Dispose</span><span class="p">()</span>
+	<span class="p">{</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">_dataStream</span> <span class="p">!=</span> <span class="k">null</span><span class="p">)</span>
+			<span class="n">_dataStream</span><span class="p">.</span><span class="nf">Dispose</span><span class="p">();</span>
+		<span class="k">if</span> <span class="p">(</span><span class="n">_buffer</span> <span class="p">!=</span> <span class="k">null</span><span class="p">)</span>
+			<span class="n">_buffer</span><span class="p">.</span><span class="nf">Dispose</span><span class="p">();</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Armed with this class, we can start to write our actual code. First, we’ll create the constant buffer. This should be in your initialisation code:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">_vertexConstantBuffer</span> <span class="p">=</span> <span class="k">new</span> <span class="n">ConstantBuffer</span><span class="p">&lt;</span><span class="n">BasicEffectVertexConstants</span><span class="p">&gt;(</span><span class="n">device</span><span class="p">);</span>
+</code></pre>
+</div>
+
+<p>Don’t forget to <code class="highlighter-rouge">Dispose()</code> of that instance in your cleanup code.</p>
+
+<p>Finally, we can update the values inside the <code class="highlighter-rouge">cbuffer</code> using the values from our C# struct with this code. Obviously you’ll want to replace the structure type, and the setting of the field values, with your own parameters.</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="kt">var</span> <span class="n">vertexConstants</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">BasicEffectVertexConstants</span><span class="p">();</span>
+
+<span class="n">Matrix</span> <span class="n">wvp</span> <span class="p">=</span> <span class="n">ConversionUtility</span><span class="p">.</span><span class="nf">ToSharpDXMatrix</span><span class="p">(</span><span class="n">World</span> <span class="p">*</span> <span class="n">View</span> <span class="p">*</span> <span class="n">Projection</span><span class="p">);</span>
+<span class="n">vertexConstants</span><span class="p">.</span><span class="n">WorldViewProjection</span> <span class="p">=</span> <span class="n">Matrix</span><span class="p">.</span><span class="nf">Transpose</span><span class="p">(</span><span class="n">wvp</span><span class="p">);</span>
+<span class="n">vertexConstants</span><span class="p">.</span><span class="n">World</span> <span class="p">=</span> <span class="n">Matrix</span><span class="p">.</span><span class="nf">Transpose</span><span class="p">(</span><span class="n">ConversionUtility</span><span class="p">.</span><span class="nf">ToSharpDXMatrix</span><span class="p">(</span><span class="n">World</span><span class="p">));</span>
+
+<span class="n">_vertexConstantBuffer</span><span class="p">.</span><span class="nf">UpdateValue</span><span class="p">(</span><span class="n">vertexConstants</span><span class="p">);</span>
+
+<span class="n">DeviceContext</span><span class="p">.</span><span class="n">VertexShader</span><span class="p">.</span><span class="nf">SetConstantBuffer</span><span class="p">(</span><span class="m">0</span><span class="p">,</span> <span class="n">_vertexConstantBuffer</span><span class="p">.</span><span class="n">Buffer</span><span class="p">);</span>
+</code></pre>
+</div>
+
+<h2 id="field-offsets">Field offsets</h2>
+
+<p>If your <code class="highlighter-rouge">cbuffer</code> is more complicated, then you’ll have some other problems. Take this example:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">cbuffer</span> <span class="n">BasicEffectPixelConstants</span> <span class="o">:</span> <span class="k">register</span><span class="p">(</span><span class="n">b0</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="n">float3</span> <span class="n">CameraPosition</span> <span class="o">=</span> <span class="n">float3</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">20</span><span class="p">);</span>
+
+	<span class="n">bool</span> <span class="n">LightingEnabled</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+
+	<span class="n">float3</span> <span class="n">AmbientLightColor</span> <span class="o">=</span> <span class="n">float3</span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">,</span> <span class="mi">0</span><span class="p">.</span><span class="mi">3</span><span class="p">);</span>
+
+	<span class="n">float3</span> <span class="n">DiffuseColor</span> <span class="o">=</span> <span class="n">float3</span><span class="p">(</span><span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">.</span><span class="mi">7</span><span class="p">,</span> <span class="mi">0</span><span class="p">.</span><span class="mi">1</span><span class="p">);</span>
+	<span class="n">float3</span> <span class="n">SpecularColor</span> <span class="o">=</span> <span class="n">float3</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+	<span class="kt">float</span> <span class="n">SpecularPower</span> <span class="o">=</span> <span class="mi">16</span><span class="p">;</span>
+
+	<span class="n">bool</span> <span class="n">TextureEnabled</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+	<span class="kt">float</span> <span class="n">Alpha</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>If you tried to map that onto a C# struct without explicitly setting field offsets, it wouldn’t work, because HLSL has very strict <a href="http://msdn.microsoft.com/en-us/library/bb509632.aspx">rules</a> for packing constant variables, which are not the same as .NET. I haven’t found an automatic way of calculating the correct field offsets, but I have setup unit tests that allow me to check that I got it right. In this case, the corresponding C# struct looks like this:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[StructLayout(LayoutKind.Explicit, Size = 80)]</span>
+<span class="k">internal</span> <span class="k">struct</span> <span class="nc">BasicEffectPixelConstants</span>
+<span class="p">{</span>
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">0</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">CameraPosition</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">12</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">bool</span> <span class="n">LightingEnabled</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">16</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">AmbientLightColor</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">32</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">DiffuseColor</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">48</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">SpecularColor</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">60</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">float</span> <span class="n">SpecularPower</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">64</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">bool</span> <span class="n">TextureEnabled</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">68</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">float</span> <span class="n">Alpha</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<h2 id="arrays">Arrays</h2>
+
+<p>Finally, I can cover the case that prompted this blog post: using arrays inside your structs. You’ll want to do this, for example, if you want to have a collection of lights, and loop through them in your shader code.</p>
+
+<p>I have a DirectionalLight structure in HLSL:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">struct</span> <span class="n">DirectionalLight</span>
+<span class="p">{</span>
+	<span class="n">bool</span> <span class="n">Enabled</span><span class="p">;</span>
+	<span class="n">float3</span> <span class="n">Direction</span><span class="p">;</span>
+	<span class="n">float3</span> <span class="n">Color</span><span class="p">;</span>
+<span class="p">};</span>
+</code></pre>
+</div>
+
+<p>… for which I’ve defined the corresponding structure in C#:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[StructLayout(LayoutKind.Explicit, Size = 32)]</span>
+<span class="k">internal</span> <span class="k">struct</span> <span class="nc">BasicEffectDirectionalLight</span>
+<span class="p">{</span>
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">0</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">bool</span> <span class="n">Enabled</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">4</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">Direction</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">16</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">Vector3</span> <span class="n">Color</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>I then have this <code class="highlighter-rouge">cbuffer</code>:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="cp">#define MAX_LIGHTS 16
+</span>
+<span class="n">cbuffer</span> <span class="n">LightConstants</span> <span class="o">:</span> <span class="k">register</span><span class="p">(</span><span class="n">b1</span><span class="p">)</span>
+<span class="p">{</span>
+	<span class="kt">int</span> <span class="n">ActiveDirectionalLights</span><span class="p">;</span>
+	<span class="n">DirectionalLight</span> <span class="n">DirectionalLights</span><span class="p">[</span><span class="n">MAX_LIGHTS</span><span class="p">];</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>… which maps to this C# structure:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code>
+<span class="k">private</span> <span class="k">const</span> <span class="kt">int</span> <span class="n">MaxLights</span> <span class="p">=</span> <span class="m">16</span><span class="p">;</span>
+
+<span class="na">[StructLayout(LayoutKind.Explicit, Size = 4 + (32 * MaxLights) + 12 /* padding */)]</span>
+<span class="k">internal</span> <span class="k">struct</span> <span class="nc">BasicEffectLightConstants</span>
+<span class="p">{</span>
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">0</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="kt">int</span> <span class="n">ActiveDirectionalLights</span><span class="p">;</span>
+
+	<span class="p">[</span><span class="nf">FieldOffset</span><span class="p">(</span><span class="m">16</span><span class="p">),</span> <span class="nf">MarshalAs</span><span class="p">(</span><span class="n">UnmanagedType</span><span class="p">.</span><span class="n">ByValArray</span><span class="p">,</span> <span class="n">SizeConst</span> <span class="p">=</span> <span class="n">MaxLights</span><span class="p">)]</span>
+	<span class="k">public</span> <span class="n">BasicEffectDirectionalLight</span><span class="p">[]</span> <span class="n">DirectionalLights</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>The additional <code class="highlighter-rouge">MarshalAs</code> attribute on the array is the key to getting this to work. Without that, .NET won’t know how to map the structure into the fixed size bit of memory that Direct3D has allocated to the <code class="highlighter-rouge">cbuffer</code>.</p>
+
+<p>In summary - mapping structures from C# to HLSL cbuffers is non-trivial, but can certainly be done in entirely managed code. Have a look at the source code for <a href="http://github.com/tgjones/dotwarp">DotWarp</a> to see a complete working example.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2011/02/23/dotwarp-server-side-d-renderer-for">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2011/05/05/integrating-dotliquid-with-sharepoint-2010">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

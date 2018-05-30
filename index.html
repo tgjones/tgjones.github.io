@@ -1,17 +1,772 @@
----
----
+<!DOCTYPE html>
+<html>
 
-<div class="posts-container">
+<head>
+    <meta charset="utf-8">
 
-  {% capture written_year %}'None'{% endcapture %}
-  {% for post in site.posts %}
-    {% capture year %}{{ post.date | date: '%Y' }}{% endcapture %}
-    {% if year != written_year %}
-      <h2 id="{{ year | slugify }}" class="archive__subtitle">{{ year }}</h2>
-      {% capture written_year %}{{ year }}{% endcapture %}
-    {% endif %}
+    <title>timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <div class="posts-container">
+
+  
+  
     
-    <h3><a href="{{ post.url }}">{{ post.title }}</a></h3>
-  {% endfor %}
+    
+      <h2 id="2018" class="archive__subtitle">2018</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2018/05/19/introducing-shader-playground">Introducing Shader Playground</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2018/03/06/parsing-command-and-conquer-generals-replay-files">Parsing Command & Conquer: Generals replay files</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2018/02/10/opensage-dev-diary-6-and-first-release">OpenSAGE Dev Diary #6 (2018-02-10) - and 1st release!</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2018/01/07/opensage-dev-diary-5">OpenSAGE Dev Diary #5 (2018-01-07)</a></h3>
+  
+    
+    
+      <h2 id="2017" class="archive__subtitle">2017</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24">OpenSAGE Dev Diary #4 (2017-12-24)</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17">OpenSAGE Dev Diary #3 (2017-12-17)</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10">OpenSAGE Dev Diary #2 (2017-12-10)</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03">OpenSAGE Dev Diary #1 (2017-12-03)</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/05/05/syntax-highlighting-for-hlsl-shaderlab-files-on-github">Syntax highlighting for HLSL and ShaderLab files on GitHub.com</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/03/21/xbox-one-xdk-shader-intrinsics-now-in-hlsl-tools">Xbox One XDK shader intrinsics now available in HLSL Tools for Visual Studio</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/03/01/syntax-highlighting-for-hlsl-in-vscode">Syntax highlighting for HLSL in Visual Studio Code</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2017/02/11/try-hlsl-online">Try HLSL online</a></h3>
+  
+    
+    
+      <h2 id="2016" class="archive__subtitle">2016</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2016/04/25/hlsl-tools-for-visual-studio-v1.0-released">HLSL Tools for Visual Studio v1.0 released</a></h3>
+  
+    
+    
+      <h2 id="2015" class="archive__subtitle">2015</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2015/10/06/introducing-hlsl-tools-for-visual-studio">Introducing HLSL Tools for Visual Studio</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2015/09/20/gemini-v0.6-released">Gemini v0.6 released</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2015/09/19/cross-platform-csharp-and-fsharp-in-2015">Cross-platform C# and F# in 2015</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2015/09/05/comparing-api-footprints-of-direct3d-12-11-10-and-9">Comparing API footprints of Direct3D 12, 11, 10, and 9</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2015/09/02/parsing-direct3d-shader-bytecode">Parsing Direct3D shader bytecode</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2015/04/13/cascaded-shadow-maps-sample-for-monogame">Cascaded shadow maps sample for MonoGame</a></h3>
+  
+    
+    
+      <h2 id="2014" class="archive__subtitle">2014</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2014/12/28/make-santa-jump-game-in-fsharp-using-monogame">Make Santa Jump - Making an endless runner game in F# using MonoGame</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/11/24/getting-started-with-jetbrains-nitra">Getting started with JetBrains Nitra</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/10/20/the-matrix-inverted">The Matrix Inverted</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/09/14/writing-a-minic-to-msil-compiler-in-fsharp-part-6-conclusion">Writing a MiniC-to-MSIL compiler in F# - Part 6 - Conclusion</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/09/13/writing-a-minic-to-msil-compiler-in-fsharp-part-5-code-generation">Writing a MiniC-to-MSIL compiler in F# - Part 5 - Code generation</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">Writing a MiniC-to-MSIL compiler in F# - Part 4 - Building the intermediate representation</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">Writing a MiniC-to-MSIL compiler in F# - Part 3 - Semantic analysis</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">Writing a MiniC-to-MSIL compiler in F# - Part 2 - Lexing and parsing</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">Writing a MiniC-to-MSIL compiler in F# - Part 1 - Defining the abstract syntax tree</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F# - Part 0 - Introduction</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/01/19/dryrunner-isolated-integration-testing-for-aspnet">DryRunner: Isolated integration testing for ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/01/10/new-sharpdx-module-for-gemini-direct3d-in-your-avalondock">New SharpDX module for Gemini - Direct3D in your AvalonDock</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2014/01/07/introducing-hlslunit-unit-tests-for-your-hlsl-shader-code">Introducing HlslUnit: unit tests for your HLSL shader code</a></h3>
+  
+    
+    
+      <h2 id="2013" class="archive__subtitle">2013</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2013/06/21/gemini-aka-make-your-own-visual-studio">Gemini - a.k.a. "Make your own Visual Studio"</a></h3>
+  
+    
+    
+      <h2 id="2012" class="archive__subtitle">2012</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2012/12/15/ndepend-4-review">NDepend 4 review</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2012/03/20/multi-file-item-templates-in-visual-studio-2010">Multi-file item templates in Visual Studio 2010</a></h3>
+  
+    
+    
+      <h2 id="2011" class="archive__subtitle">2011</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2011/05/05/integrating-dotliquid-with-sharepoint-2010">Integrating DotLiquid with SharePoint 2010</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2011/03/08/marshalling-c-structures-into-directd-cbuffers-using">Marshalling C# structures into Direct3D 11 cbuffers using SharpDX</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2011/02/23/dotwarp-server-side-d-renderer-for">DotWarp - Server-side 3D renderer for .NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2011/02/22/meshellator-open-source-d-asset-import">Meshellator - Open source 3D asset import library for .NET / Silverlight</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2011/02/22/nexus-vector-and-matrix-maths-library">Nexus - vector and matrix maths library for .NET / Silverlight, suitable for 3D development</a></h3>
+  
+    
+    
+      <h2 id="2010" class="archive__subtitle">2010</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2010/12/30/stitchup-in-action">StitchUp in action</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/10/drawing-an-xna-model-bounding-box">Drawing an XNA Model bounding box</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/09/xbuilder-v-released">XBuilder v0.2 released</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/03/content-aware-image-resizing-for-aspnet">Content Aware Image Resizing for ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/01/xbuilder-updates-show-normals">XBuilder updates - Show normals</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/01/extracting-the-normals-from-a-model-at-runtime">Extracting the normals from a Model at runtime</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/12/01/xbuilder-updates-grid-rotation-indicator-mouse">XBuilder updates - Grid, rotation indicator, mouse wheel zoom</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/28/stitchup-support-for-multiple-techniques">StitchUp - Support for multiple techniques</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/26/announcing-xbuilder-a-free-open-source-content">Announcing XBuilder, a free & open source content viewer for XNA 4.0 integrated with Visual Studio 2010</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/23/a-sneak-preview-of-xna-inspector">A sneak preview of "XNA Inspector"</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/20/xna-model-viewer-inside-visual-studio">XNA Model Viewer inside Visual Studio 2010</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/20/ds-obj-and-nff-content-importers-for-xna">3DS, OBJ, and NFF content importers for XNA 4.0</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/18/some-stitchup-updates">Some StitchUp updates</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/16/terrain-geomipmapping-on-windows-phone">Terrain GeoMipMapping on Windows Phone 7</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/16/an-xna-content-pipeline-processor-for-terrain">An XNA 4.0 Content Pipeline processor for Terrain GeoMipMapping</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/13/introducing-stitchup-generating-shaders-from-hlsl-shader-fragments">Introducing StitchUp: "Generating Shaders from HLSL Shader Fragments" implemented in XNA 4.0</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/08/nuget-package-now-available-for-dotliquid">NuGet package now available for DotLiquid</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/05/my-default-stack">My default stack</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/04/creating-website-thumbnail-images-in-aspnet">Creating website thumbnail images in ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/04/creating-thumbnails-of-a-pdf-in-aspnet">Creating thumbnails of a PDF in ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/11/04/rolling-your-own-blog-engine-part">Rolling Your Own Blog Engine: Part 1</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/10/26/farewell-xd">Farewell, 0x1D</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2010/10/25/introducing-dotliquid-the-secure-open-source-template-engine">Introducing DotLiquid: the secure, open-source template engine for .NET</a></h3>
+  
+    
+    
+      <h2 id="2008" class="archive__subtitle">2008</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2008/07/29/osiris-scenegraph-development-part-introduction">Osiris SceneGraph Development Part 1 - Introduction</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2008/06/24/setting-the-default-button-for-a-nested-control">Setting the default button for a nested control in ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2008/05/15/xna-hybrid-ray-tracer">XNA 3.0 Hybrid Ray Tracer</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2008/01/02/aspnet-html-control-mapping">ASP.NET HTML Control Mapping</a></h3>
+  
+    
+    
+      <h2 id="2007" class="archive__subtitle">2007</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2007/05/19/a-few-things-i-wonder-about">A few things I wonder about</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/05/19/milky-way-andromedia-milkomeda">Milky Way + Andromedia = Milkomeda</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/05/10/depressible-buttons-on-drink-carton-lids">Depressible buttons on drink carton lids</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/04/09/reversible-quotations">Reversible quotations</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/04/05/overriding-the-meaning-of-in-aspnet">Overriding the meaning of ~ in ASP.NET</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/03/25/clever-shit">Clever shit</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/03/20/climate-science">Climate science</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/03/18/toilet-paper-folder-and-dispenser">Toilet paper folder and dispenser</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/03/15/increasing-the-maximum-connections-to-a-server-in">Increasing the maximum connections to a server in IE and Firefox</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/03/14/urinal-etiquette">Urinal etiquette</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/02/26/the-not-so-beautiful-game">The not-so-beautiful game</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/02/12/is-your-second-cousin-once-removed-the-child">Is your second cousin once removed the child of your first cousin twice removed?</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/02/05/solved-the-great-religion-debate">Solved: The Great Religion Debate</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/01/29/sacrificial-chips">Sacrificial chips</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/01/16/free-will">Free will</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/01/12/happiness">Happiness</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/01/06/thief-steals-urinal">Thief Steals Urinal</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2007/01/03/new-years-resolutions">New Year's Resolutions</a></h3>
+  
+    
+    
+      <h2 id="2006" class="archive__subtitle">2006</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2006/12/30/our-car-game-now-has-a-car">Our car game now has a car...</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/29/vista-failed-to-install-iskernel-files">Vista - Failed to install ISKernel files</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/27/things-i-wonder-about">Things I wonder about</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/27/vista-clear-connected-clumsy">Vista: Clear, Connected, Clumsy</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/22/days-of-christmas">12 Days of Christmas</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/21/why-i-am-not-a-christian">Why I Am Not A Christian</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/21/zooomr">Zooomr</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/16/packing">Packing</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/12/13/xmlspy-irritations">XMLSpy irritations</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/11/30/progress-on-the-coloured-squares">Progress on the coloured squares</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/11/26/christmas-cheer">Christmas cheer</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/11/24/when-is-a-choice-not-a-choice">When is a choice not a choice?</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/11/16/they-dont-call-me-tim-michael-schumacher-jones">They don't call me Tim "Michael Schumacher" Jones for nothing... actually they don't call me that at all</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/11/15/flaming-lips">Flaming Lips</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/10/20/coloured-squares">Coloured squares</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/10/16/goo-goo-dolls">Goo Goo Dolls</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/10/10/little-preview-of-my-coast-to-coast-video">Little preview of my coast to coast video</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/10/01/spiders">Spiders</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/10/01/miles-woo">100000 miles - woo!</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/09/30/changing-the-lcd-screen-on-a-sony-ericsson">Changing the LCD screen on a Sony Ericsson K750i</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/09/11/writing-your-own-os-with-visual-studio">Writing your own OS with Visual Studio 2005</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/09/01/dvd-taxonomy">DVD Taxonomy</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/23/desert-island-discs">Desert Island Discs</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/19/the-size-of-space">The size of space</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/15/customising-the-axwebbrowser">Customising the AxWebBrowser</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/14/ilyrics">iLyrics</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/14/getting-setup-with-itunes">Getting setup with iTunes</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/13/christianity-a-new-religion">Christianity - a new religion?</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/12/french-holiday">French holiday</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/08/03/this-ungodly-blog">This ungodly blog</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/07/30/renamed-brands">Renamed brands</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/07/29/starting-from-scratch">Starting from scratch</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/07/28/primitive-professions">Primitive Professions</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2006/07/27/coast-to-coast">Coast to Coast</a></h3>
+  
+    
+    
+      <h2 id="2005" class="archive__subtitle">2005</h2>
+      
+    
+    
+    <h3><a href="/blog/archive/2005/06/17/batman-has-begun">Batman has Begun</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2005/06/03/solving-cracks-in-geomipmapping-the-wrong">Solving cracks in geomipmapping - the wrong way...</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2005/06/01/torq2">Torq2</a></h3>
+  
+    
+    
+    
+    <h3><a href="/blog/archive/2005/06/01/and-we-begin">And we begin...</a></h3>
+  
 
 </div>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

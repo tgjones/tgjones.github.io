@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Introducing HLSL Tools for Visual Studio - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Introducing HLSL Tools for Visual Studio</h1>
+
+    <div class="post-date">
+        <time datetime="2015-10-06T08:03:00+00:00">06 October 2015</time>
+    </div>
+
+    
+
+    <h2 id="tldr">TL/DR</h2>
+
+<p>HLSL Tools is a Visual Studio extension - for VS2013 and VS2015, Community Edition upwards - that provides enhanced support for editing High Level Shading Language (HLSL) files.</p>
+
+<ul>
+  <li>You can install HLSL Tools from within Visual Studio (<code class="highlighter-rouge">Tools &gt; Extensions and Updates</code>, search for “HLSL Tools”)</li>
+  <li>or download it from the <a href="https://visualstudiogallery.msdn.microsoft.com/75ddd3be-6eda-4433-a850-458b51186658">Visual Studio Gallery</a></li>
+  <li>and <a href="https://github.com/tgjones/HlslTools">here’s the GitHub repo</a></li>
+</ul>
+
+<h2 id="what">What?</h2>
+
+<p><img src="/assets/posts/hlsl-tools.png" alt="HLSL Tools screenshot" /></p>
+
+<p>Visual Studio, since VS2013, has included limited language support for HLSL. This support is built on top of the C++ editor (you can tell that in a couple of ways; changing C++ options affects HLSL, and sometimes the automatic formatting after you type a <code class="highlighter-rouge">;</code> or <code class="highlighter-rouge">}</code> is a bit off, presumably because the C++ automatic formatter doesn’t recognise all HLSL syntax constructs). It’s certainly better than not having it at all, but we Visual Studio users are used to a bit more. So HLSL Tools adds these features:</p>
+
+<ul>
+  <li>
+    <p><strong>Navigation bar</strong> - shows namespaces (yes, HLSL has them, who knew!), classes, structs, interfaces, constant buffers, global variables, functions.
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/navigation-bar.gif" alt="Navigation bar demo" /></p>
+  </li>
+  <li>
+    <p><strong>Navigate to</strong> - activate Navigate to by typing <code class="highlighter-rouge">Ctrl+,</code>, and start typing a search term.
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/navigate-to.gif" alt="Navigate to demo" /></p>
+  </li>
+  <li>
+    <p><strong>Live syntax errors</strong>
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/live-errors.gif" alt="Live syntax errors demo" /></p>
+  </li>
+  <li>
+    <p><strong>Go to definition</strong> - currently, F12 / go to definition is only supported for preprocessor macros. More complete support is <a href="https://github.com/tgjones/HlslTools/blob/master/CHANGELOG.md">on the roadmap</a>.
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/go-to-definition.gif" alt="Go to definition demo" /></p>
+  </li>
+  <li>
+    <p><strong>Quick info</strong> - again, quick info is currently only supported for preprocessor macros - more complete support is <a href="https://github.com/tgjones/HlslTools/blob/master/CHANGELOG.md">on the roadmap</a>.
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/quick-info.gif" alt="Quick info demo" /></p>
+  </li>
+  <li>
+    <p><strong>Preprocessor support</strong> - the parser in HLSL Tools understands preprocessor directives, and can gray out excluded code. You can control that using the predefined <code class="highlighter-rouge">__INTELLISENSE__</code> macro (same as in the VS C++ editor).
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/intellisense-macro.gif" alt="Preprocessor support demo" /></p>
+  </li>
+  <li>
+    <p><strong>Options</strong> - HLSL Tools gives HLSL its own set of options, so you can adjust things separately from C++.
+<img src="https://github.com/tgjones/HlslTools/raw/master/art/options.gif" alt="Options demo" /></p>
+  </li>
+</ul>
+
+<h2 id="why">Why?</h2>
+
+<p>I’ve always wanted to have a go at putting together a Visual Studio language service. They seemed, if I’m honest, impossibly difficult, which is usually a reliable indicator of something that will make for a fun challenge (of course, very few types of software are actually that difficult, if you break them down into small enough pieces, and that held true here). HLSL is perhaps (?) the most popular language edited in Visual Studio that <em>doesn’t</em> have its own language service. I’m familiar with HLSL from working with XNA and SharpDX, so I thought I’d have a go. I started tinkering back in April, and - <a href="https://www.youtube.com/watch?v=pFrMLRQIT_k">insert montage here</a> - the result is HLSL Tools. (It might have been quicker, but it turns out having a baby, while an unqualifiedly wonderful experience, severely reduces one’s hobby coding time.)</p>
+
+<h2 id="how">How?</h2>
+
+<p>For those who are interested in such things, I wanted to call out a few of the interesting problems I encountered while developing HLSL Tools.</p>
+
+<p>Almost every feature in HLSL Tools is built on top of the syntax tree produced by an HLSL parser. I initially <a href="https://gist.github.com/tgjones/d8df1d9a8e695b7d25ce">used ANTLR to generate a lexer and parser</a>, and this worked quite well. But I found two problems: performance, and error recovery. Every time you type a character, HLSL Tools queues up a background job to reparse the code (although to be clear, very few of those jobs will actually get executed, because it tries to be intelligent about discarding or cancelling obsolete jobs.) Parser performance makes a noticeable difference to editor responsiveness. Obviously performance is relative - and in this case, it’s relative to a handwritten parser that I initially wrote as a test. I found that my handwritten lexer and parser performed quicker than the ANTLR-generated one, in almost all cases. The second aspect was error recovery. Error recovery is what happens when the parser encounters invalid code - which, in an editor, is almost all of the time. To have good error recovery means to discard as little code as possible before you can resume parsing the next valid bit of code. By using a handwritten parser, I could customise error recovery much more than I could with an ANTLR-generated parser.</p>
+
+<p>Getting performance to an acceptable level was one of the big challenges in writing HLSL Tools. I tested performance using BC7Encode.hlsl, a shader from the old DirectX SDK that is 65KB in size and has 1685 lines of code. Hopefully that’s at the upper end of what most people work with - so if that one works well, most other shaders should too. By comparison, the popular fxaa.hlsl is 33KB and 792 lines. The system I’ve ended up with, as I mentioned, is that any text changes in the editor result in a job being queued up on a background thread. Only one parse job is active at a time. If the text in the editor changes while a parse job is active, that job is cancelled, because we are only going to discard its results anyway. The code responsible for this lives in <a href="https://github.com/tgjones/HlslTools/blob/master/src/HlslTools.VisualStudio/Parsing/BackgroundParser.cs">BackgroundParser.cs</a>. Assuming the parse completes without being cancelled, the next step is to send the resulting syntax tree to whatever needs it. There’s a priority system, so that, for example, syntax highlighting happens first (since that’s the most jarring when it takes too long to update). Then the navigation bar is updated, brace matching and outlining is done, and finally syntax error squiggles and tasks in the error list are refreshed. As much work as possible is done on a background thread; some things can only be done on the UI thread, but that is kept to a minimum.</p>
+
+<p>Like Roslyn, the HLSL parser in HLSL Tools creates a full fidelity syntax tree - this means that the syntax tree contains every piece of information contained in the source code, including whitespace and preprocessor directives. Preprocessor directives are evaluated as they are encountered, which enables HLSL Tools to do gray out unused code (HLSL files are often passed preprocessor defines during compilation, but you can customise what the parser “sees” using the predefined <code class="highlighter-rouge">__INTELLISENSE__</code> macro). And because all the information about both the original preprocessor tokens, and (in the case of macros) expanded tokens, are stored in the syntax tree, HLSL Tools supports F12 go to definition and quick info for preprocessor macros. Getting preprocessor macro expansion working correctly was one of the hardest parts of writing HLSL Tools. In C, C++, and HLSL, preprocessor macro references can appear basically anywhere, including within other macros, and so keeping track of the original macro reference, as well as the expanded macro tokens, and using the expanded tokens in the syntax tree, is fiddly and not fun code to write.</p>
+
+<p>Automatic formatting is a feature that, as users of Visual Studio, we take for granted, but it’s non-trivial to implement. I based my implementation on the <a href="https://github.com/Microsoft/nodejstools/blob/master/Nodejs/Product/Analysis/Formatting/FormattingVisitor.cs">automatic formatter in Node.js Tools for Visual Studio</a>. It still required a lot of tweaking to get it right, and it’s the part of HLSL Tools that makes me most nervous - in theory, it’s only supposed to remove or add whitespace, but there’s always the potential for bugs, despite a reasonable set of tests around it. Automatic formatting is the main reason that the initial release of HLSL Tools is version 0.9. Once I’m satisfied that it’s functioning correctly, I’ll release 1.0.</p>
+
+<p>Fortunately, people much smarter than I have solved a number of these problems before. Adapting, or studying and then rewriting, other people’s code is much easier than writing code from scratch. I’ve mentioned the projects I used as references in the <a href="https://github.com/tgjones/HlslTools#acknowledgements">acknowledgements in the readme</a>.</p>
+
+<h2 id="whats-next">What’s next?</h2>
+
+<p>I believe that, even in this initial release, HLSL Tools includes enough features, on top of what’s in plain Visual Studio, to make it useful. But this is just the start. I expect most people’s first question will be: does it include IntelliSense? The answer is: not yet. IntelliSense is the aggregate name for a number of different features, including quick info, parameter completion, statement completion, etc. The groundwork is there to support these features, but much more work remains to be done. Keep an eye on the <a href="https://github.com/tgjones/HlslTools#acknowledgements">roadmap</a> if you want to track progress.</p>
+
+<p>Lastly, and perhaps most importantly - if you find a bug, please <a href="https://github.com/tgjones/HlslTools/issues">report it</a>, including as much detail as possible. Thank you!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2015/09/20/gemini-v0.6-released">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2016/04/25/hlsl-tools-for-visual-studio-v1.0-released">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

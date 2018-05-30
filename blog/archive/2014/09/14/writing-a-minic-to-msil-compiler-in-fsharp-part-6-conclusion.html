@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 6 - Conclusion - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 6 - Conclusion</h1>
+
+    <div class="post-date">
+        <time datetime="2014-09-14T14:53:00+00:00">14 September 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h2 id="compiler-entry-point">Compiler entry point</h2>
+
+<p>Each blog post in this <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">series</a> has described one piece of the compiler pipeline. Specifically:</p>
+
+<ul>
+  <li><a href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">Part 2</a> described the lexer and parser. The entry point to this code is <code class="highlighter-rouge">Parser.parse</code>.</li>
+  <li><a href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">Part 3</a> described semantic analysis. The entry point is <code class="highlighter-rouge">SemanticAnalysis.analyze</code>.</li>
+  <li><a href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">Part 4</a> described building the intermediate representation. The entry point is the <code class="highlighter-rouge">ILBuilder</code> type and its <code class="highlighter-rouge">BuildClass</code> method.</li>
+  <li><a href="/blog/archive/2014/09/13/writing-a-minic-to-msil-compiler-in-fsharp-part-5-code-generation">Part 5</a> described code generation. The entry point is the <code class="highlighter-rouge">CodeGenerator</code> type and its <code class="highlighter-rouge">GenerateType</code> method.</li>
+</ul>
+
+<p>We can now bring all those pieces of the compiler pipeline together in the <code class="highlighter-rouge">compile</code> function, defined in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Compiler.fs">Compiler.fs</a>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">compile</span> <span class="p">(</span><span class="n">assemblyBuilder</span> <span class="p">:</span> <span class="nc">AssemblyBuilder</span><span class="p">)</span> <span class="n">code</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">assemblyName</span> <span class="p">=</span> <span class="n">assemblyBuilder</span><span class="p">.</span><span class="nc">GetName</span><span class="bp">()</span>
+  <span class="k">let</span> <span class="n">moduleBuilder</span> <span class="p">=</span> <span class="n">assemblyBuilder</span><span class="p">.</span><span class="nc">DefineDynamicModule</span><span class="p">(</span><span class="n">assemblyName</span><span class="p">.</span><span class="nc">Name</span><span class="p">,</span> <span class="n">assemblyName</span><span class="p">.</span><span class="nc">Name</span> <span class="o">+</span> <span class="s2">".exe"</span><span class="p">,</span> <span class="bp">true</span><span class="p">)</span>
+
+  <span class="k">let</span> <span class="n">program</span> <span class="p">=</span> <span class="nn">Parser</span><span class="p">.</span><span class="n">parse</span> <span class="n">code</span>
+  <span class="k">let</span> <span class="n">semanticAnalysisResult</span> <span class="p">=</span> <span class="nn">SemanticAnalysis</span><span class="p">.</span><span class="n">analyze</span> <span class="n">program</span>
+
+  <span class="k">let</span> <span class="n">ilBuilder</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">ILBuilder</span><span class="p">(</span><span class="n">semanticAnalysisResult</span><span class="p">)</span>
+  <span class="k">let</span> <span class="n">ilClass</span> <span class="p">=</span> <span class="n">ilBuilder</span><span class="p">.</span><span class="nc">BuildClass</span> <span class="n">program</span>
+
+  <span class="k">let</span> <span class="n">codeGenerator</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">CodeGenerator</span><span class="p">(</span><span class="n">moduleBuilder</span><span class="p">,</span> <span class="n">ilClass</span><span class="p">,</span> <span class="n">assemblyName</span><span class="p">.</span><span class="nc">Name</span><span class="p">)</span>
+  <span class="k">let</span> <span class="p">(</span><span class="n">compiledType</span><span class="p">,</span> <span class="n">entryPoint</span><span class="p">)</span> <span class="p">=</span> <span class="n">codeGenerator</span><span class="p">.</span><span class="nc">GenerateType</span><span class="bp">()</span>
+  <span class="n">assemblyBuilder</span><span class="p">.</span><span class="nc">SetEntryPoint</span> <span class="n">entryPoint</span>
+  <span class="p">(</span><span class="n">compiledType</span><span class="p">,</span> <span class="n">entryPoint</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>This function uses a <code class="highlighter-rouge">System.Reflection.Emit</code> type we haven’t seen before: <a href="http://msdn.microsoft.com/en-us/library/system.reflection.emit.assemblybuilder.aspx">AssemblyBuilder</a>. This is the top-level “builder” type. From it, we can create the hierarchy of modules, types, fields and methods.</p>
+
+<p>The <code class="highlighter-rouge">compile</code> function isn’t used directly by calling code; instead, there are a couple of wrapper functions to compile to an in-memory assembly, or save to disk. They mainly differ in how the <code class="highlighter-rouge">AssemblyBuilder</code> object is created:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">compileToMemory</span> <span class="n">assemblyName</span> <span class="n">code</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">assemblyBuilder</span> <span class="p">=</span>
+    <span class="nn">AppDomain</span><span class="p">.</span><span class="nn">CurrentDomain</span><span class="p">.</span><span class="nc">DefineDynamicAssembly</span><span class="p">(</span>
+      <span class="n">assemblyName</span><span class="p">,</span> <span class="nn">AssemblyBuilderAccess</span><span class="p">.</span><span class="nc">RunAndSave</span><span class="p">)</span>
+  <span class="n">compile</span> <span class="n">assemblyBuilder</span> <span class="n">code</span>
+</code></pre>
+</div>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">compileToFile</span> <span class="n">fileName</span> <span class="n">code</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">assemblyName</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">AssemblyName</span> <span class="p">(</span><span class="nn">Path</span><span class="p">.</span><span class="nc">GetFileNameWithoutExtension</span> <span class="n">fileName</span><span class="p">)</span>
+  <span class="k">let</span> <span class="n">assemblyBuilder</span> <span class="p">=</span>
+    <span class="nn">AppDomain</span><span class="p">.</span><span class="nn">CurrentDomain</span><span class="p">.</span><span class="nc">DefineDynamicAssembly</span><span class="p">(</span>
+      <span class="n">assemblyName</span><span class="p">,</span> <span class="nn">AssemblyBuilderAccess</span><span class="p">.</span><span class="nc">RunAndSave</span><span class="p">,</span>
+      <span class="nn">Path</span><span class="p">.</span><span class="nc">GetDirectoryName</span><span class="p">(</span><span class="n">fileName</span><span class="o">))</span>
+  <span class="k">let</span> <span class="o">(_,</span> <span class="o">_)</span> <span class="p">=</span> <span class="n">compile</span> <span class="n">assemblyBuilder</span> <span class="n">code</span>
+  <span class="n">assemblyBuilder</span><span class="p">.</span><span class="nc">Save</span> <span class="p">(</span><span class="nn">Path</span><span class="p">.</span><span class="nc">GetFileName</span> <span class="n">fileName</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>The <a href="https://github.com/tgjones/mini-c/tree/master/src/MiniC.Compiler.Tests">unit tests</a> mostly use <code class="highlighter-rouge">compileToMemory</code>, but a standard compiler executable (if there was one; actually there isn’t) would use <code class="highlighter-rouge">compileToFile</code>.</p>
+
+<h2 id="tests">Tests</h2>
+
+<p>Talking about unit tests: I haven’t really mentioned them in this series, but there are <a href="https://github.com/tgjones/mini-c/tree/master/src/MiniC.Compiler.Tests">quite a few unit tests</a> covering several parts of the pipeline.</p>
+
+<p>In addition to unit tests, there are also <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler.Tests/CompilerTests.fs">some integration tests</a> that compile the code into an executable file, run the executable file, and check for the correct return value:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test1.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="p">-</span><span class="mi">5</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test2.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="mi">55</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test3.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="mi">3</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test4.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="mi">9</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test5.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="mi">127</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"test6.minic"</span><span class="p">,</span> <span class="nc">Result</span> <span class="p">=</span> <span class="mi">15</span><span class="o">)&gt;]</span>
+<span class="k">let</span> <span class="err">``</span><span class="n">can</span> <span class="n">compile</span><span class="p">,</span> <span class="n">save</span> <span class="ow">and</span> <span class="n">execute</span> <span class="n">console</span> <span class="n">application</span> <span class="k">with</span> <span class="n">correct</span> <span class="n">return</span> <span class="k">value</span><span class="err">``</span> <span class="n">sourceFile</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">code</span> <span class="p">=</span> <span class="nn">File</span><span class="p">.</span><span class="nc">ReadAllText</span><span class="p">(</span><span class="nn">Path</span><span class="p">.</span><span class="nc">Combine</span><span class="p">(</span><span class="s2">"Sources"</span><span class="p">,</span> <span class="n">sourceFile</span><span class="o">))</span>
+  <span class="k">let</span> <span class="n">targetFileName</span> <span class="p">=</span> <span class="nn">Path</span><span class="p">.</span><span class="nc">Combine</span><span class="p">(</span><span class="s2">"Sources"</span><span class="p">,</span> <span class="nn">Path</span><span class="p">.</span><span class="nc">GetFileNameWithoutExtension</span><span class="p">(</span><span class="n">sourceFile</span><span class="p">)</span> <span class="o">+</span> <span class="s2">".exe"</span><span class="p">)</span>
+  <span class="nn">Compiler</span><span class="p">.</span><span class="n">compileToFile</span> <span class="n">targetFileName</span> <span class="n">code</span>
+
+  <span class="k">let</span> <span class="n">testProcess</span> <span class="p">=</span> <span class="nn">Process</span><span class="p">.</span><span class="nc">Start</span><span class="p">(</span><span class="n">targetFileName</span><span class="p">)</span>
+  <span class="n">testProcess</span><span class="p">.</span><span class="nc">WaitForExit</span><span class="bp">()</span>
+    
+  <span class="n">testProcess</span><span class="p">.</span><span class="nc">ExitCode</span>
+</code></pre>
+</div>
+
+<p>Just to show that the Mini-C compiler can compile somewhat useful code, here is one of the test programs (based on one of the tests that James Van Boxtel wrote for <a href="http://jamesvanboxtel.com/portfolio/programming/c-plus-plus">his implementation of Mini-C</a>):</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">isqrt</span><span class="p">(</span><span class="kt">int</span> <span class="n">a</span><span class="p">,</span> <span class="kt">int</span> <span class="n">guess</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">int</span> <span class="n">x</span><span class="p">;</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">guess</span> <span class="o">==</span> <span class="p">(</span><span class="n">x</span> <span class="o">=</span> <span class="p">(</span><span class="n">guess</span> <span class="o">+</span> <span class="n">a</span><span class="o">/</span><span class="n">guess</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">guess</span><span class="p">;</span>
+  <span class="k">return</span> <span class="n">isqrt</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">x</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="n">num</span><span class="p">;</span>
+<span class="kt">float</span> <span class="n">f</span><span class="p">;</span>
+
+<span class="kt">void</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span> <span class="p">{</span>
+  <span class="n">num</span> <span class="o">=</span> <span class="n">iread</span><span class="p">();</span>
+  <span class="n">iprint</span><span class="p">(</span><span class="n">isqrt</span><span class="p">(</span><span class="n">num</span><span class="p">,</span> <span class="n">num</span><span class="o">/</span><span class="mi">2</span><span class="p">));</span>
+
+  <span class="n">f</span> <span class="o">=</span> <span class="n">fread</span><span class="p">();</span>
+  <span class="n">fprint</span><span class="p">(</span><span class="n">f</span> <span class="o">*</span> <span class="mi">2</span><span class="p">.</span><span class="mi">0</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>I also wrote a number of tests that check error handling works as expected:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error1.minic"</span><span class="p">,</span> <span class="s2">"MC003 A variable named 'x' is already defined in this scope"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error2.minic"</span><span class="p">,</span> <span class="s2">"MC003 A variable named 'y' is already defined in this scope"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error3.minic"</span><span class="p">,</span> <span class="s2">"MC001 Lexer error: Invalid character '^'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error4.minic"</span><span class="p">,</span> <span class="s2">"MC004 Cannot convert type 'bool' to 'int'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error5.minic"</span><span class="p">,</span> <span class="s2">"MC002 Parser error: Illegal token [a-zA-Z_][a-zA-Z_0-9]*. Expected </span><span class="err">\</span><span class="s2">+,-,</span><span class="err">\</span><span class="s2">*,</span><span class="err">\</span><span class="s2">(,</span><span class="err">\</span><span class="s2">),</span><span class="err">\</span><span class="s2">[,</span><span class="err">\</span><span class="s2">],;,,,%,/,=,</span><span class="err">\</span><span class="s2">|</span><span class="err">\</span><span class="s2">|,==,!=,&lt;=,&lt;,&gt;=,&gt;,&amp;&amp;,</span><span class="err">\</span><span class="s2">."</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error6.minic"</span><span class="p">,</span> <span class="s2">"MC005 Operator '&lt;' cannot be applied to operands of type 'bool' and 'int'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error9.minic"</span><span class="p">,</span> <span class="s2">"MC006 The name 'foo' does not exist in the current context"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error10.minic"</span><span class="p">,</span> <span class="s2">"MC004 Cannot convert type 'bool' to 'void'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error11.minic"</span><span class="p">,</span> <span class="s2">"MC007 Call to function 'test' has some invalid arguments. Argument 1: Cannot convert from 'int' to 'bool'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error12.minic"</span><span class="p">,</span> <span class="s2">"MC008 Function 'test' takes 1 arguments, but here was given 2"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error13.minic"</span><span class="p">,</span> <span class="s2">"MC006 The name 'foo' does not exist in the current context"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error14.minic"</span><span class="p">,</span> <span class="s2">"MC009 No enclosing loop out of which to break"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error15.minic"</span><span class="p">,</span> <span class="s2">"MC004 Cannot convert type 'void' to 'int'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error22.minic"</span><span class="p">,</span> <span class="s2">"MC010 Cannot apply indexing with [] to an expression of type 'int'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error23.minic"</span><span class="p">,</span> <span class="s2">"MC004 Cannot convert type 'int[]' to 'int'"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error24.minic"</span><span class="p">,</span> <span class="s2">"MC011 A function named 'func' is already defined"</span><span class="o">)&gt;]</span>
+<span class="p">[&lt;</span><span class="nc">TestCase</span><span class="p">(</span><span class="s2">"error25.minic"</span><span class="p">,</span> <span class="s2">"MC012 Program does not contain a 'main' method suitable for an entry point"</span><span class="o">)&gt;]</span>
+<span class="k">let</span> <span class="err">``</span><span class="n">can</span> <span class="n">detect</span> <span class="n">semantic</span> <span class="n">errors</span><span class="err">``</span> <span class="n">sourceFile</span> <span class="p">(</span><span class="n">compilerError</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span> <span class="n">code</span> <span class="p">=</span> <span class="nn">File</span><span class="p">.</span><span class="nc">ReadAllText</span><span class="p">(</span><span class="nn">Path</span><span class="p">.</span><span class="nc">Combine</span><span class="p">(</span><span class="s2">"Sources"</span><span class="p">,</span> <span class="n">sourceFile</span><span class="o">))</span>
+  <span class="nn">Assert</span><span class="p">.</span><span class="nc">That</span><span class="p">(</span>
+    <span class="p">(</span><span class="k">fun</span> <span class="bp">()</span> <span class="p">-&gt;</span> <span class="nn">Compiler</span><span class="p">.</span><span class="n">compileToMemory</span> <span class="p">(</span><span class="nc">AssemblyName</span><span class="p">(</span><span class="nn">Path</span><span class="p">.</span><span class="nc">GetFileNameWithoutExtension</span> <span class="n">sourceFile</span><span class="o">))</span> <span class="n">code</span> <span class="o">|&gt;</span> <span class="n">ignore</span><span class="o">),</span>
+    <span class="nn">Throws</span><span class="p">.</span><span class="nc">TypeOf</span><span class="p">&lt;</span><span class="nc">CompilerException</span><span class="o">&gt;().</span><span class="nn">With</span><span class="p">.</span><span class="nn">Message</span><span class="p">.</span><span class="nc">EqualTo</span> <span class="n">compilerError</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>This is one of the areas that, in my opinion, I got right: in most cases I wrote the tests first, and then implemented the required functionality. This approximately-TDD way of working is great for writing compiler code, where the inputs and outputs are often very clear and can be tested easily. (Obviously, I’m speaking from the experience of writing Mini-C; everything gets more complicated in a real language.)</p>
+
+<h2 id="gui">GUI</h2>
+
+<p>Towards the end of the project, I added a GUI to showcase the most interesting parts of the compiler pipeline:</p>
+
+<p><img src="/assets/posts/mini-c.png" alt="" /></p>
+
+<p>If you’ve followed along this far, I encourage you to <a href="https://github.com/tgjones/mini-c">download the code</a> and try out the GUI by running the MiniC.Compiler.Demo application.</p>
+
+<p>As you change the source code on the left, the Abstract Syntax Tree and Intermediate Language panels update in real-time.</p>
+
+<h2 id="post-mortem">Post-mortem</h2>
+
+<p>If I was starting this project now, I would do some things differently.</p>
+
+<ol>
+  <li>
+    <p>I wouldn’t use the Piglet lexing and parsing library. It’s an elegant library, but it’s really designed for C#. Instead, I would use <a href="http://www.quanttec.com/fparsec/">FParsec</a>. Philip Trelford has a nice <a href="http://trelford.com/blog/post/parsecsharp.aspx">write-up about using FParsec to parse C#</a>.</p>
+  </li>
+  <li>
+    <p>I would use modules and functions more, and types and methods less. For example, I have a <code class="highlighter-rouge">CodeGenerator</code> type with a single public method, <code class="highlighter-rouge">GenerateType</code>. It would be more idiomatic, and I think more elegant, to simply have a <code class="highlighter-rouge">generateType</code> function in a <code class="highlighter-rouge">CodeGenerator</code> module. There are certainly times when writing F# code where full-blown types make sense, but I can’t think of many in the Mini-C source code. The fact that I used them at all probably betrays my C# background, even though I was trying my best to write idiomatic F# code.</p>
+  </li>
+  <li>
+    <p>I would extend the language and compiler to support calling into other .NET assemblies - that would be an interesting addition, and is obviously an important step towards making a real language.</p>
+  </li>
+  <li>
+    <p>I wouldn’t wait so long to write about it!</p>
+  </li>
+</ol>
+
+<p>And that about wraps things up. I’ve been writing this series (on and, admittedly, mostly off) since April. Thank you for reading this far. I hope it has been interesting, and perhaps even inspired some of you to write your own compilers, toy or otherwise! The more interesting language design concepts there are out there, the better for all of us.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/09/13/writing-a-minic-to-msil-compiler-in-fsharp-part-5-code-generation">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/10/20/the-matrix-inverted">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 2 - Lexing and parsing - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 2 - Lexing and parsing</h1>
+
+    <div class="post-date">
+        <time datetime="2014-05-29T10:05:00+00:00">29 May 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h3 id="introduction">Introduction</h3>
+
+<p>In the <a href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">last post</a>, we defined an abstract syntax tree (AST) for our compiler. Now we’ll focus on turning Mini-C source code like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">while</span> <span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="k">break</span><span class="p">;</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>into a tree of objects (or, an abstract syntax tree) like this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionDeclaration</span><span class="p">(</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"main"</span><span class="p">,</span>
+  <span class="p">[</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span> <span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Bool</span><span class="p">,</span> <span class="s2">"b"</span><span class="p">)</span> <span class="o">],</span>
+  <span class="p">(</span>
+    <span class="bp">[]</span><span class="p">,</span>
+    <span class="p">[</span>
+      <span class="nn">Ast</span><span class="p">.</span><span class="nc">WhileStatement</span><span class="p">(</span>
+        <span class="nn">Ast</span><span class="p">.</span><span class="nc">IdentifierExpression</span> <span class="p">{</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="s2">"b"</span> <span class="o">},</span>
+        <span class="nn">Ast</span><span class="p">.</span><span class="nc">BreakStatement</span>
+      <span class="p">)</span>
+      <span class="nn">Ast</span><span class="p">.</span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">LiteralExpression</span> <span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">IntLiteral</span> <span class="mi">1</span><span class="o">)))</span>
+    <span class="p">]</span>
+  <span class="p">)</span>
+<span class="o">)]</span>
+</code></pre>
+</div>
+
+<p>(That’s an actual example from <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler.Tests/ParserTests.fs#L313">one of Mini-C’s unit tests</a>.)</p>
+
+<p>Compilers traditionally break this transformation down into two steps: <em>lexing</em> and <em>parsing</em>.</p>
+
+<h4 id="lexing">Lexing</h4>
+
+<p>A lexer takes the raw source code, and breaks it up into “tokens”. For example, if you take this source code:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="k">while</span> <span class="p">(</span><span class="n">b</span><span class="p">)</span>
+  <span class="k">break</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>and pass it through a C lexer, you will get something like this back:</p>
+
+<p><code class="highlighter-rouge">while keyword</code> <code class="highlighter-rouge">openParen</code> <code class="highlighter-rouge">identifier</code> <code class="highlighter-rouge">closeParen</code> <code class="highlighter-rouge">break keyword</code> <code class="highlighter-rouge">semicolon</code></p>
+
+<p>In C-based languages, including Mini-C, white space is insignificant, so the lexer throws it away.</p>
+
+<p>Note that the lexer doesn’t understand or verify the language syntax; for example, if you left out a <code class="highlighter-rouge">)</code> in the previous example, the lexer would still work. Validating syntax one of the tasks performed by a parser.</p>
+
+<h4 id="parsing">Parsing</h4>
+
+<p>A parser takes the stream of tokens output by a lexer, and builds some sort of structural representation, validating syntax in the process. For example, given this stream of tokens from the lexer:</p>
+
+<p><code class="highlighter-rouge">while keyword</code> <code class="highlighter-rouge">openParen</code> <code class="highlighter-rouge">identifier</code> <code class="highlighter-rouge">closeParen</code> <code class="highlighter-rouge">break keyword</code> <code class="highlighter-rouge">semicolon</code></p>
+
+<p>Mini-C’s parser will build this abstract syntax tree:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="nn">Ast</span><span class="p">.</span><span class="nc">WhileStatement</span><span class="p">(</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">IdentifierExpression</span> <span class="p">{</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="s2">"b"</span> <span class="o">},</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">BreakStatement</span>
+<span class="p">)</span>
+</code></pre>
+</div>
+
+<p>If there are any syntax errors - for example, a missing <code class="highlighter-rouge">)</code> - the parser will (hopefully) detect that and return the relevant error message.</p>
+
+<p>That’s as much detail as I’m going to go into on lexing and parsing in the abstract - it’s a fascinating area though, and I recommend <a href="http://blog.reverberate.org/2013/07/ll-and-lr-parsing-demystified.html">LL and LR parsing demystified</a> as a good introduction to parsing.</p>
+
+<h4 id="hand-coded-or-generated">Hand-coded or generated?</h4>
+
+<p>It’s perfectly possible (and quite fun) to write a lexer and parser from scratch. I did just that for <a href="https://github.com/tgjones/stitchup/tree/master/src/StitchUp.Content.Pipeline/FragmentLinking/Parser">StitchUp</a> a few years ago. For simple languages, it’s not that hard to write a <a href="http://en.wikipedia.org/wiki/Recursive_descent_parser">recursive descent parser</a>.</p>
+
+<p>Perhaps the most popular (?) option is to use a parser generator. <a href="http://www.antlr.org/">ANTLR</a>, <a href="http://www.gnu.org/software/bison/">Bison</a> and <a href="http://dinosaur.compilertools.net/">Yacc</a> are some of the most used parser generators. <a href="http://fsprojects.github.io/FsLexYacc/">FsLex and FsYacc</a> are lexer and parser generator tools for use with F#. I actually did originally use FsLex and FsYacc for Mini-C, but I didn’t like the separate steps required to first build the parser generator code, and then compile it into my project. It’s a very context-specific decision, though - for a “real” language project, this type of tool would probably be my go-to.</p>
+
+<p>A third option is to use a runtime library, where you build the language grammar using the same language as you’re using for the rest of the compiler. I chose this option for Mini-C; specifically, I used the <a href="http://dervall.github.io/Piglet/">Piglet parsing library</a> for both lexing and parsing. This is a small and elegant library which allows the language grammar to be written in F# code, with no separate build step needed.</p>
+
+<h3 id="configuring-piglet">Configuring Piglet</h3>
+
+<p>To parse source code using Piglet, we have to tell Piglet about the the following types of entity. I’ll talk more about each one in the following sections.</p>
+
+<ul>
+  <li>Nonterminal symbols</li>
+  <li>Terminal symbols</li>
+  <li>Precedence</li>
+  <li>Productions</li>
+  <li>Entry point</li>
+</ul>
+
+<p>Before any of that, Piglet requires us to create an <code class="highlighter-rouge">IParserConfigurator</code> object:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">configurator</span> <span class="p">=</span> <span class="nn">ParserFactory</span><span class="p">.</span><span class="nc">Configure</span><span class="p">&lt;</span><span class="n">obj</span><span class="o">&gt;()</span>
+</code></pre>
+</div>
+
+<h4 id="nonterminal-symbols">Nonterminal symbols</h4>
+
+<p>Nonterminal symbols are composed of other (nonterminal or terminal) symbols. For example, in Mini-C, a <code class="highlighter-rouge">Statement</code> is a nonterminal symbol. It’s nonterminal because a statement is itself composed of other symbols, such as expressions, assignments, local variable declarations, etc.</p>
+
+<p>Here is how we define nonterminal symbols using Piglet. I’m only including a few here - the full list is in the <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L14">source code</a>. (I wrote some <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/ParsingUtilities.fs">F#-friendly wrappers</a> on top of Piglet’s API, which I’m using here; they make for a more pleasant experience when using Piglet from F#.)</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="k">'</span><span class="nc">T</span><span class="p">&gt;</span> <span class="bp">()</span> <span class="p">=</span> <span class="k">new</span> <span class="nc">NonTerminalWrapper</span><span class="p">&lt;</span><span class="k">'</span><span class="nc">T</span><span class="o">&gt;(</span><span class="n">configurator</span><span class="p">.</span><span class="nc">CreateNonTerminal</span><span class="bp">()</span><span class="p">)</span>
+
+<span class="k">let</span> <span class="n">program</span>                   <span class="p">=</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="nc">Program</span><span class="o">&gt;()</span>
+<span class="k">let</span> <span class="n">declarationList</span>           <span class="p">=</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="nc">Declaration</span> <span class="kt">list</span><span class="o">&gt;()</span>
+<span class="k">let</span> <span class="n">declaration</span>               <span class="p">=</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="nc">Declaration</span><span class="o">&gt;()</span>
+<span class="k">let</span> <span class="n">staticVariableDeclaration</span> <span class="p">=</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="nc">VariableDeclaration</span><span class="o">&gt;()</span>
+<span class="k">let</span> <span class="n">functionDeclaration</span>       <span class="p">=</span> <span class="n">nonTerminal</span><span class="p">&lt;</span><span class="nc">FunctionDeclaration</span><span class="o">&gt;()</span>
+</code></pre>
+</div>
+
+<p>There isn’t yet any connection between these nonterminals - that’s what productions are for. We’ll get to them shortly.</p>
+
+<h4 id="terminal-symbols">Terminal symbols</h4>
+
+<p>Terminal symbols are those symbols which are <em>not</em> composed of other symbols. If you imagine the source code as a tree, terminal symbols are the “leaves”. Keywords, string literals, number literals and punctuation are all terminal symbols.</p>
+
+<p>First, we define a couple of helper methods - don’t pay too much attention to them, they just allow us to write terminal symbols in a strongly-typed way, which Piglet itself doesn’t really support:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">terminalParse</span><span class="p">&lt;</span><span class="k">'</span><span class="nc">T</span><span class="p">&gt;</span> <span class="n">regex</span> <span class="p">(</span><span class="n">onParse</span> <span class="p">:</span> <span class="p">(</span><span class="kt">string</span> <span class="p">-&gt;</span> <span class="k">'</span><span class="nc">T</span><span class="o">))</span> <span class="p">=</span>
+    <span class="k">new</span> <span class="nc">TerminalWrapper</span><span class="p">&lt;</span><span class="k">'</span><span class="nc">T</span><span class="o">&gt;(</span><span class="n">configurator</span><span class="p">.</span><span class="nc">CreateTerminal</span><span class="p">(</span><span class="n">regex</span><span class="p">,</span> <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="n">box</span> <span class="p">(</span><span class="n">onParse</span> <span class="n">s</span><span class="o">))))</span>
+
+<span class="k">let</span> <span class="n">terminal</span> <span class="n">regex</span> <span class="p">=</span>
+    <span class="k">new</span> <span class="nc">TerminalWrapper</span><span class="p">&lt;</span><span class="kt">string</span><span class="o">&gt;(</span><span class="n">configurator</span><span class="p">.</span><span class="nc">CreateTerminal</span><span class="p">(</span><span class="n">regex</span><span class="o">))</span>
+</code></pre>
+</div>
+
+<p>Now we can define some terminals. I’ll include a few of each type here; again, the rest are in the <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L49">source code</a>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="o">//</span> <span class="nc">Keywords</span>
+<span class="k">let</span> <span class="n">ifKeyword</span>    <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">"if"</span>
+<span class="k">let</span> <span class="n">elseKeyword</span>  <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">"else"</span>
+<span class="k">let</span> <span class="n">whileKeyword</span> <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">"while"</span>
+
+<span class="o">//</span> <span class="nc">Operators</span>
+<span class="k">let</span> <span class="n">minus</span>        <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">"-"</span>
+<span class="k">let</span> <span class="n">exclamation</span>  <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">"!"</span>
+
+<span class="o">//</span> <span class="nc">Literals</span>
+<span class="k">let</span> <span class="n">intLiteral</span>   <span class="p">=</span> <span class="n">terminalParse</span> <span class="o">@</span><span class="s2">"</span><span class="err">\</span><span class="s2">d+"</span>      <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IntLiteral</span><span class="p">(</span><span class="n">int32</span> <span class="n">s</span><span class="o">))</span>
+<span class="k">let</span> <span class="bp">true</span><span class="nc">Literal</span>  <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"true"</span>      <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BoolLiteral</span><span class="p">(</span><span class="bp">true</span><span class="o">))</span>
+<span class="k">let</span> <span class="bp">false</span><span class="nc">Literal</span> <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"false"</span>     <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BoolLiteral</span><span class="p">(</span><span class="bp">false</span><span class="o">))</span>
+<span class="k">let</span> <span class="n">boolKeyword</span>  <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"bool"</span>      <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Bool</span><span class="p">)</span>
+
+<span class="o">//</span> <span class="nc">Identifier</span> <span class="p">(</span><span class="n">i</span><span class="p">.</span><span class="n">e</span><span class="p">.</span> <span class="n">variable</span> <span class="n">name</span><span class="p">,</span> <span class="k">function</span> <span class="n">name</span><span class="p">,</span> <span class="n">parameter</span> <span class="n">name</span><span class="p">,</span> <span class="n">etc</span><span class="o">.)</span>
+<span class="k">let</span> <span class="n">identifier</span>   <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"[a-zA-Z_][a-zA-Z_0-9]*"</span>  <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="n">s</span><span class="p">)</span>
+
+<span class="o">//</span> <span class="nc">Punctuation</span>
+<span class="k">let</span> <span class="n">semicolon</span>    <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">";"</span>
+<span class="k">let</span> <span class="n">comma</span>        <span class="p">=</span> <span class="n">terminal</span>      <span class="s2">","</span>
+</code></pre>
+</div>
+
+<h4 id="precedence">Precedence</h4>
+
+<p>Next, we have to tell Piglet about precedence. To simplify somewhat, precedence is essentially how we resolve situations like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="mi">3</span>
+</code></pre>
+</div>
+
+<p>Does this mean <code class="highlighter-rouge">1 + (2 * 3)</code> or <code class="highlighter-rouge">(1 + 2) * 3</code>? Precedence rules define exactly how to resolve this kind of ambiguity.  C-based languages have long-standing conventions for precedence order. For example, multiplications and divisions are evaluated before additions and subtractions.</p>
+
+<p>With Piglet, we call the <code class="highlighter-rouge">LeftAssociative</code> method multiple times in increasing order of precedence. For each call, we pass in the terminal symbols that should be grouped together at the same precedence level. Here is the code to tell Piglet that multiplications and divisions have a <em>greater precedence</em> than additions and subtractions:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">configurator</span><span class="p">.</span><span class="nc">LeftAssociative</span><span class="p">(</span><span class="n">downcast</span> <span class="n">exclamation</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">,</span>
+                             <span class="n">downcast</span> <span class="n">plus</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">,</span>
+                             <span class="n">downcast</span> <span class="n">minus</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">)</span>
+                             <span class="o">|&gt;</span> <span class="n">ignore</span>
+<span class="n">configurator</span><span class="p">.</span><span class="nc">LeftAssociative</span><span class="p">(</span><span class="n">downcast</span> <span class="n">asterisk</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">,</span>
+                             <span class="n">downcast</span> <span class="n">forwardSlash</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">,</span>
+                             <span class="n">downcast</span> <span class="n">percent</span><span class="p">.</span><span class="nc">Symbol</span><span class="p">)</span>
+                             <span class="o">|&gt;</span> <span class="n">ignore</span>
+</code></pre>
+</div>
+
+<p>Here is the <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L92">full code responsible for configuring Mini-C’s precedence rules</a>.</p>
+
+<h4 id="productions">Productions</h4>
+
+<p>Now that we’ve created our nonterminals and terminals, we need to tell Piglet how they relate to each other. We also need to tell Piglet how to build the abstract syntax tree. Both these tasks are handled using productions (or equivalently, production rules).</p>
+
+<p>We already know from <a href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">Mini-C’s grammar</a> how each element in the syntax connects together. We just need to express this in code.</p>
+
+<p>Let’s start with the first production: the one for a <code class="highlighter-rouge">program</code>. This is the relevant line from Mini-C’s grammar:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>program → decl_list
+</code></pre>
+</div>
+
+<p>And here is how we defined the abstract syntax tree node for a program:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Program</span> <span class="p">=</span> <span class="nc">Declaration</span> <span class="kt">list</span>
+</code></pre>
+</div>
+
+<p>Now, here is the production rule:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">program</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">declarationList</span><span class="o">).</span><span class="nc">SetReduceToFirst</span><span class="bp">()</span>
+</code></pre>
+</div>
+
+<p>Let’s break it down:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">program</code> and <code class="highlighter-rouge">declarationList</code> are both nonterminals that we declared above.</li>
+  <li>A <code class="highlighter-rouge">program</code> nonterminal is composed of one symbol, a <code class="highlighter-rouge">declarationList</code> nonterminal.</li>
+  <li>Piglet is a <a href="http://en.wikipedia.org/wiki/Shift-reduce_parser">shift-reduce parser</a>, which I won’t get into here, but that means that we need to tell Piglet “after you find some code which matches this list of symbols, here is how you convert that list of symbols into something useful”.</li>
+  <li>In this case, there is only one symbol for the <code class="highlighter-rouge">program</code> production (<code class="highlighter-rouge">declarationList</code>), so <code class="highlighter-rouge">SetReduceToFirst</code> tells Piglet to simply return <code class="highlighter-rouge">declarationList</code>.</li>
+</ul>
+
+<p>Let’s keep going - hopefully things will become clearer once we’ve looked at some more examples. First, here is the grammar rule for declaration lists:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>decl_list → decl_list decl | decl
+</code></pre>
+</div>
+
+<p>This is a recursive definition. A declaration list is composed of either:</p>
+
+<ul>
+  <li>a declaration list, followed by a declaration, or</li>
+  <li>a declaration.</li>
+</ul>
+
+<p>And here is how we turn that into F# code:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">declarationList</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">declarationList</span><span class="p">,</span> <span class="n">declaration</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="n">b</span> <span class="p">-&gt;</span> <span class="n">a</span> <span class="o">@</span> <span class="p">[</span><span class="n">b</span><span class="o">])</span>
+<span class="n">declarationList</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">declaration</span><span class="o">).</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="o">])</span>
+</code></pre>
+</div>
+
+<p>Hopefully you can see that there’s a marked similarity between that code and the grammar rule above.</p>
+
+<p>The <code class="highlighter-rouge">SetReduceFunction</code> method calls provide functions that indicate how to build the AST from the nonterminals. The first one - <code class="highlighter-rouge">fun a b -&gt; a @ [b]</code> - appends declaration to the end of the declaration list that we’re in the middle of building up. The second one wraps a single declaration into a list. We have to perform these acrobatics in order to get both productions to return the same type - <code class="highlighter-rouge">Declaration list</code>.</p>
+
+<p>Let’s do one more: here is the grammar rule for declarations:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>decl → var_decl | fun_decl
+</code></pre>
+</div>
+
+<p>And here are the productions:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">declaration</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">staticVariableDeclaration</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span> <span class="n">a</span><span class="p">)</span>
+<span class="n">declaration</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">functionDeclaration</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionDeclaration</span> <span class="n">a</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<p>Finally, we can see a concrete use of the abstract syntax tree types that defined in the <a href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">previous part</a>.</p>
+
+<p>Let’s skip ahead a bit to production rules for expressions. Here are the grammar rules for expressions:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>expr → IDENT = expr | IDENT [ expr ] = expr
+     → expr OR expr
+     → expr EQ expr | expr NE expr 
+     → expr LE expr | expr &lt; expr | expr GE expr  | expr &gt; expr
+     → expr AND expr
+     → expr + expr | expr - expr 
+     → expr * expr | expr / expr  | expr % expr
+     → ! expr | - expr | + expr
+     → ( expr )
+     → IDENT | IDENT [ expr ] | IDENT ( args ) | IDENT . size
+     → BOOL_LIT | INT_LIT  | FLOAT_LIT | NEW type_spec [ expr ]
+</code></pre>
+</div>
+
+<p>And here are (some of) the production rules for expressions:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">doublePipes</span><span class="p">,</span> <span class="n">expression</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">_</span> <span class="n">c</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ConditionalOr</span><span class="p">,</span> <span class="n">c</span><span class="o">))</span>
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">doubleEquals</span><span class="p">,</span> <span class="n">expression</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">_</span> <span class="n">c</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Equal</span><span class="p">,</span> <span class="n">c</span><span class="o">))</span>
+
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">plus</span><span class="p">,</span> <span class="n">expression</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">_</span> <span class="n">c</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Add</span><span class="p">,</span> <span class="n">c</span><span class="o">))</span>
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span> <span class="n">minus</span><span class="p">,</span> <span class="n">expression</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">_</span> <span class="n">c</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Subtract</span><span class="p">,</span> <span class="n">c</span><span class="o">))</span>
+
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">openParen</span><span class="p">,</span> <span class="n">expression</span><span class="p">,</span> <span class="n">closeParen</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="p">_</span> <span class="n">b</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="n">b</span><span class="p">)</span>
+
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">identifier</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">IdentifierExpression</span> <span class="o">({</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="n">a</span> <span class="o">}))</span>
+<span class="n">expression</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">identifier</span><span class="p">,</span> <span class="n">openSquare</span><span class="p">,</span> <span class="n">expression</span><span class="p">,</span> <span class="n">closeSquare</span><span class="p">)</span>
+  <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">_</span> <span class="n">c</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayIdentifierExpression</span><span class="o">({</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="n">a</span> <span class="o">},</span> <span class="n">c</span><span class="o">))</span>
+</code></pre>
+</div>
+
+<p>Hopefully it’s starting to make sense! Some of the symbols in these productions - i.e. <code class="highlighter-rouge">identifier</code> - is a terminal, and some are nonterminals. Every nonterminal needs to have at least one production associated with it. If we start with <code class="highlighter-rouge">program</code>, and follow the productions for each nonterminal, we eventually get down to a production rule that only contains terminals (i.e. keywords, literals, etc).</p>
+
+<p>Here is the <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs#L124">full code for configuring productions</a>.</p>
+
+<h4 id="entry-point">Entry point</h4>
+
+<p>The final step is to define an entry point to the parser. This turns out to be straightforward:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="n">parser</span> <span class="p">=</span> <span class="n">configurator</span><span class="p">.</span><span class="nc">CreateParser</span><span class="bp">()</span>
+
+<span class="k">let</span> <span class="n">parse</span> <span class="p">(</span><span class="n">s</span> <span class="p">:</span> <span class="kt">string</span><span class="p">)</span> <span class="p">=</span>
+  <span class="k">try</span>
+    <span class="n">parser</span><span class="p">.</span><span class="nc">Parse</span><span class="p">(</span><span class="n">s</span><span class="p">)</span> <span class="o">:?&gt;</span> <span class="nc">Program</span>
+  <span class="k">with</span>
+    <span class="p">|</span> <span class="o">:?</span> <span class="nn">Piglet</span><span class="p">.</span><span class="nn">Lexer</span><span class="p">.</span><span class="nc">LexerException</span> <span class="k">as</span> <span class="n">ex</span> <span class="p">-&gt;</span>
+      <span class="k">raise</span> <span class="p">(</span><span class="n">lexerError</span> <span class="n">ex</span><span class="p">.</span><span class="nc">Message</span><span class="p">)</span>
+    <span class="p">|</span> <span class="o">:?</span> <span class="nn">Piglet</span><span class="p">.</span><span class="nn">Parser</span><span class="p">.</span><span class="nc">ParseException</span> <span class="k">as</span> <span class="n">ex</span> <span class="p">-&gt;</span>
+      <span class="k">raise</span> <span class="p">(</span><span class="n">parserError</span> <span class="n">ex</span><span class="p">.</span><span class="nc">Message</span><span class="p">)</span>
+</code></pre>
+</div>
+
+<h3 id="a-worked-example">A worked example</h3>
+
+<p>Let’s use a practical example to see how the parser takes in source code, and builds an abstract syntax tree.</p>
+
+<p>We’ll use this code - it’s a simple top-level variable declaration, but it is also a complete Mini-C program, even if it doesn’t do a lot…</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>And here is how Piglet will parse this code (more accurately, it is first lexing it, but Piglet hides that step behind its parser API):</p>
+
+<ol>
+  <li>
+    <p>Shift-reduce parsers start from the “bottom” and work their way up. The first symbol that Piglet will parse will be <code class="highlighter-rouge">int</code>. This matches the <code class="highlighter-rouge">intKeyword</code> terminal.</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="k">let</span> <span class="n">intKeyword</span> <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"int"</span> <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">)</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Next, Piglet sees that the <code class="highlighter-rouge">typeSpec</code> nonterminal has a production rule composed of (only) the <code class="highlighter-rouge">intKeyword</code> terminal:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="n">typeSpec</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">intKeyword</span><span class="o">).</span><span class="nc">SetReduceToFirst</span><span class="bp">()</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Piglet calls that production’s reduce function, resulting in:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Next, Piglet sees that <code class="highlighter-rouge">a</code> matches the <code class="highlighter-rouge">identifier</code> terminal:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="k">let</span> <span class="n">identifier</span> <span class="p">=</span> <span class="n">terminalParse</span> <span class="s2">"[a-zA-Z_][a-zA-Z_0-9]*"</span> <span class="p">(</span><span class="k">fun</span> <span class="n">s</span> <span class="p">-&gt;</span> <span class="n">s</span><span class="p">)</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Next, Piglet parses <code class="highlighter-rouge">;</code> and finds that it matches the <code class="highlighter-rouge">semicolon</code> terminal:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="k">let</span> <span class="n">semicolon</span> <span class="p">=</span> <span class="n">terminal</span> <span class="s2">";"</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>So Piglet has now matched three symbols - <code class="highlighter-rouge">typeSpec</code>, <code class="highlighter-rouge">identifier</code> and <code class="highlighter-rouge">semicolon</code>. It sees that one of the nonterminals has a production rule that matches these three terminals (order is important):</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="n">staticVariableDeclaration</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">typeSpec</span><span class="p">,</span> <span class="n">identifier</span><span class="p">,</span> <span class="n">semicolon</span><span class="p">)</span>
+   <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="n">b</span> <span class="p">_</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="o">))</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Piglet calls that production’s reduce function, resulting in:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"a"</span><span class="p">)</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>The <code class="highlighter-rouge">declaration</code> nonterminal has a production rule which matches a single <code class="highlighter-rouge">staticVariableDeclaration</code> symbol:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="n">declaration</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">staticVariableDeclaration</span><span class="p">)</span>
+   <span class="p">.</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span> <span class="n">a</span><span class="p">)</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Piglet calls that production rule’s reduce function, resulting in:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code> <span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"a"</span><span class="o">))</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>The <code class="highlighter-rouge">declarationList</code> nonterminal has a matching production rule:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">declarationList</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">declaration</span><span class="o">).</span><span class="nc">SetReduceFunction</span> <span class="p">(</span><span class="k">fun</span> <span class="n">a</span> <span class="p">-&gt;</span> <span class="p">[</span><span class="n">a</span><span class="o">])</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Calling <code class="highlighter-rouge">declarationList</code>’s reduce function gives us:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"a"</span><span class="o">))]</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p>Finally, the top-level <code class="highlighter-rouge">program</code> nonterminal has a production rule which matches <code class="highlighter-rouge">declarationList</code>:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="n">program</span><span class="p">.</span><span class="nc">AddProduction</span><span class="p">(</span><span class="n">declarationList</span><span class="o">).</span><span class="nc">SetReduceToFirst</span><span class="bp">()</span>
+</code></pre>
+    </div>
+  </li>
+  <li>
+    <p><code class="highlighter-rouge">SetReduceToFirst</code> gives us the same result as <code class="highlighter-rouge">declarationList</code>’s reduce function:</p>
+
+    <div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"a"</span><span class="o">))]</span>
+</code></pre>
+    </div>
+  </li>
+</ol>
+
+<p><strong>And we’re done!</strong> We’ve gone from the source code, to an abstract syntax tree. Whew, this post was a bit longer than I anticipated… You’ll find all the code for this part in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/ParsingUtilities.fs">ParsingUtilities.fs</a> and <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Parser.fs">Parser.fs</a> in the GitHub repo.</p>
+
+<p>All we’ve done so far is check that the code is syntactically correct, and built an AST. But the program as a whole might still be “wrong” (or more technically, it might be semantically invalid). For example, the code might reference a variable that hasn’t been declared, or it might assign a string to an integer variable. This kind of verification and type checking is called semantic analysis, and will be the subject of the <a href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">next part in this series</a>.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/06/20/writing-a-minic-to-msil-compiler-in-fsharp-part-3-semantic-analysis">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

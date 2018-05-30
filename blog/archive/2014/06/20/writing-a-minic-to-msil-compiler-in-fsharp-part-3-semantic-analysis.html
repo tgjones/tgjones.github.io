@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 3 - Semantic analysis - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 3 - Semantic analysis</h1>
+
+    <div class="post-date">
+        <time datetime="2014-06-20T09:00:00+00:00">20 June 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h3 id="introduction">Introduction</h3>
+
+<p>So far in this <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">series</a>, we have covered the <a href="/blog/archive/2014/04/20/writing-a-minic-to-msil-compiler-in-fsharp-part-1-defining-the-abstract-syntax-tree">abstract syntax tree</a> and <a href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">lexing and parsing</a>. By the end of the previous part, we were able to take source code like this:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">while</span> <span class="p">(</span><span class="n">b</span><span class="p">)</span>
+    <span class="k">break</span><span class="p">;</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>and turn it into an abstract syntax tree like this:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">[</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">FunctionDeclaration</span><span class="p">(</span>
+  <span class="nn">Ast</span><span class="p">.</span><span class="nc">Int</span><span class="p">,</span> <span class="s2">"main"</span><span class="p">,</span>
+  <span class="p">[</span> <span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span> <span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">Bool</span><span class="p">,</span> <span class="s2">"b"</span><span class="p">)</span> <span class="o">],</span>
+  <span class="p">(</span>
+    <span class="bp">[]</span><span class="p">,</span>
+    <span class="p">[</span>
+      <span class="nn">Ast</span><span class="p">.</span><span class="nc">WhileStatement</span><span class="p">(</span>
+        <span class="nn">Ast</span><span class="p">.</span><span class="nc">IdentifierExpression</span> <span class="p">{</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="s2">"b"</span> <span class="o">},</span>
+        <span class="nn">Ast</span><span class="p">.</span><span class="nc">BreakStatement</span>
+      <span class="p">)</span>
+      <span class="nn">Ast</span><span class="p">.</span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">LiteralExpression</span> <span class="p">(</span><span class="nn">Ast</span><span class="p">.</span><span class="nc">IntLiteral</span> <span class="mi">1</span><span class="o">)))</span>
+    <span class="p">]</span>
+  <span class="p">)</span>
+<span class="o">)]</span>
+</code></pre>
+</div>
+
+<p>In this part, we’ll do some semantic analysis on this abstract syntax tree (AST). Semantic analysis refers to understanding the meaning of the code, as opposed to understanding the syntax (which is the job of the parser). Specifically, we will:</p>
+
+<ul>
+  <li>Create a table of all symbols (i.e. names of variables) in the program.</li>
+  <li>Create a table of all function calls in the program.</li>
+  <li>Check that functions are only defined once.</li>
+  <li>Check that types match (for example, check that the <code class="highlighter-rouge">return</code> statement in a function returns a type that matches the function declaration).</li>
+  <li>Create a table of the types of all expressions in the program.</li>
+  <li>Check for the existence of a <code class="highlighter-rouge">main</code> method.</li>
+</ul>
+
+<p>The tables that we create will be used by later stages in our compiler pipeline.</p>
+
+<p>The code for all this is in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/SemanticAnalysis.fs">SemanticAnalysis.fs</a> in the GitHub repo.</p>
+
+<p>My last post was quite heavy on the theory, and also didn’t have much F# code - I’ll try to redress the balance in this post.</p>
+
+<p>F# makes working with an AST - in fact, trees of any kind - really elegant. If I had written this compiler in C#, the code would have undoubtedly been much longer. Pattern matching, in particular, is an awesome feature, and (now that I know it exists) something I really miss when I code in C#.</p>
+
+<p>Another F# characteristic that I liked when working on this compiler is that the order of F# files in a project is significant, and you can only use constructs that appear earlier in the list of files than where you’re trying to use them. A compiler is basically a pipeline - source code comes in at one end, undergoes various transformations, and is spit out at the other end, in this case in the form of an executable .NET console application. Each stage in the pipeline only needs to know about the output of the stage before it. This works really well in F#, where each stage in the pipeline can be a file. Simply by looking at the ordered list of project files in Visual Studio, you immediately know in what order the pipeline executes - in other words, the file order reifies how the compiler itself works.</p>
+
+<p>(That said, I’m not sure if I like the strict compilation order requirement when working on large object-oriented projects; it’s certainly possible to workaround it, but it feels a bit like swimming upstream. The new <a href="http://fsprojects.github.io/VisualFSharpPowerTools/folderorganization.html">folder organisation</a> feature in <a href="http://fsprojects.github.io/VisualFSharpPowerTools">Visual F# Power Tools</a> will help, but it’s only a partial solution. I’d love to know what F# experts do - maybe they just don’t write large object-oriented codebases. I haven’t seen any significant open source examples of such a thing.)</p>
+
+<h3 id="building-the-symbol-table">Building the symbol table</h3>
+
+<p>The <a href="http://en.wikipedia.org/wiki/Symbol_table">symbol table</a> is a structure that maps each identifier to its type. We’ll need the symbol table both later on in semantic analysis, as well as the next stage of our compiler (building the intermediate representation).</p>
+
+<p>I originally started off with F#’s <a href="http://en.wikibooks.org/wiki/F_Sharp_Programming/Sets_and_Maps#Maps">map</a> type, but I found that creating the symbol table using only immutable data structures was hard work. So <code class="highlighter-rouge">SymbolTable</code> will subclass .NET’s <code class="highlighter-rouge">Dictionary</code> type:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="k">inherit</span> <span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nc">IdentifierRef</span><span class="p">,</span> <span class="nc">VariableDeclaration</span><span class="o">&gt;(</span><span class="nn">HashIdentity</span><span class="p">.</span><span class="nc">Reference</span><span class="p">)</span>
+
+  <span class="err">…</span>
+</code></pre>
+</div>
+
+<p>The keys in the symbol table are <code class="highlighter-rouge">IdentifierRef</code>s. This is a <a href="http://en.wikibooks.org/wiki/F_Sharp_Programming/Tuples_and_Records#Defining_Records">record</a> type that we defined as part of the AST:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="nc">IdentifierRef</span> <span class="p">=</span> <span class="p">{</span> <span class="nc">Identifier</span> <span class="p">:</span> <span class="kt">string</span><span class="p">;</span> <span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Records are reference types, not value types, but by default they use structural equality. That’s no good here, because we might have more than one <code class="highlighter-rouge">IdentifierRef</code> instance with the same <code class="highlighter-rouge">Identifier</code> - for example, if a local variable <code class="highlighter-rouge">foo</code> is defined in more than one method. So when we’re storing and fetching symbol types based on <code class="highlighter-rouge">IdentifierRef</code> instances, we want to use reference equality - that’s what <a href="http://msdn.microsoft.com/en-us/library/ee353660.aspx">HashIdentity.Reference</a> does for us.</p>
+
+<p>The values in the symbol table are <code class="highlighter-rouge">VariableDeclaration</code>s, which are defined as:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span> <span class="nc">VariableDeclaration</span> <span class="p">=</span> 
+  <span class="p">|</span> <span class="nc">ScalarVariableDeclaration</span> <span class="k">of</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Identifier</span>
+  <span class="p">|</span> <span class="nc">ArrayVariableDeclaration</span> <span class="k">of</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Identifier</span>
+</code></pre>
+</div>
+
+<p>So our symbol table will map identifiers - i.e. names of static variables, parameters and local variables - to their corresponding <code class="highlighter-rouge">VariableDeclaration</code> objects. As a concrete example, for this program:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kt">float</span> <span class="n">c</span><span class="p">[];</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>our symbol table will look like this:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Variable declaration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">a</code></td>
+      <td><code class="highlighter-rouge">Ast.ScalarVariableDeclaration(Ast.Int, "a")</code></td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">b</code></td>
+      <td><code class="highlighter-rouge">Ast.ScalarVariableDeclaration(Ast.Bool, "b")</code></td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">c</code></td>
+      <td><code class="highlighter-rouge">Ast.ArrayVariableDeclaration(Ast.Float, "c")</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>To build the symbol table, we’re going to need some helper functions and types. We’ll define a type to store all the variable declarations for a single “scope”, where scope means what it normally does in programming languages.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="k">private</span> <span class="nc">SymbolScope</span><span class="p">(</span><span class="n">parent</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolScope</span><span class="err"> </span><span class="n">option</span> <span class="p">)</span> <span class="p">=</span>
+  <span class="k">let</span><span class="err"> </span><span class="k">mutable</span><span class="err"> </span><span class="kt">list</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">empty</span><span class="p">&lt;</span><span class="nc">VariableDeclaration</span><span class="p">&gt;</span>
+
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">identifierFromDeclaration</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">function</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ScalarVariableDeclaration</span><span class="o">(_,</span><span class="err"> </span><span class="n">i</span><span class="p">)</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ArrayVariableDeclaration</span><span class="o">(_,</span><span class="err"> </span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">i</span>
+
+  <span class="k">let</span><span class="err"> </span><span class="n">declaresIdentifier</span><span class="err"> </span><span class="p">(</span><span class="n">identifierRef</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">IdentifierRef</span><span class="p">)</span><span class="err"> </span><span class="n">declaration</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="p">(</span><span class="n">identifierFromDeclaration</span><span class="err"> </span><span class="n">declaration</span><span class="p">)</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">identifierRef</span><span class="p">.</span><span class="nc">Identifier</span>
+
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">AddDeclaration</span><span class="err"> </span><span class="n">declaration</span><span class="err"> </span><span class="p">=</span>
+    <span class="k">let</span> <span class="n">ifd</span> <span class="p">=</span> <span class="n">identifierFromDeclaration</span>
+<span class="err">    </span><span class="k">if</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">exists</span><span class="err"> </span><span class="p">(</span><span class="k">fun</span><span class="err"> </span><span class="n">x</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">ifd</span><span class="err"> </span><span class="n">x</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">ifd</span><span class="err"> </span><span class="n">declaration</span><span class="p">)</span><span class="err"> </span><span class="kt">list</span><span class="err"> </span><span class="k">then</span>
+<span class="err">      </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">variableAlreadyDefined</span><span class="err"> </span><span class="p">(</span><span class="n">identifierFromDeclaration</span><span class="err"> </span><span class="n">declaration</span><span class="o">))</span>
+<span class="err">    </span><span class="kt">list</span><span class="err"> </span><span class="p">&lt;-</span><span class="err"> </span><span class="n">declaration</span><span class="err"> </span><span class="p">::</span><span class="err"> </span><span class="kt">list</span>
+
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">FindDeclaration</span><span class="err"> </span><span class="n">identifierRef</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">let</span><span class="err"> </span><span class="n">found</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">tryFind</span><span class="err"> </span><span class="p">(</span><span class="k">fun</span><span class="err"> </span><span class="n">x</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">declaresIdentifier</span><span class="err"> </span><span class="n">identifierRef</span><span class="err"> </span><span class="n">x</span><span class="p">)</span><span class="err"> </span><span class="kt">list</span>
+<span class="err">    </span><span class="k">match</span><span class="err"> </span><span class="n">found</span><span class="err"> </span><span class="k">with</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">d</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">d</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">None</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span><span class="k">match</span><span class="err"> </span><span class="n">parent</span><span class="err"> </span><span class="k">with</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">ss</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">ss</span><span class="p">.</span><span class="nc">FindDeclaration</span><span class="err"> </span><span class="n">identifierRef</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">None</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">nameDoesNotExist</span><span class="err"> </span><span class="p">(</span><span class="n">identifierRef</span><span class="p">.</span><span class="nc">Identifier</span><span class="o">))</span> 
+</code></pre>
+</div>
+
+<p>Let’s walk through it:</p>
+
+<ul>
+  <li>First, we declare an empty list of <code class="highlighter-rouge">VariableDeclaration</code> objects.</li>
+  <li>Then there are a couple of helper functions: <code class="highlighter-rouge">identifierFromDeclaration</code> takes in a <code class="highlighter-rouge">VariableDeclaration</code> and returns its identifier.</li>
+  <li><code class="highlighter-rouge">declaresIdentifier</code> checks whether a given declaration declares an identifier.</li>
+  <li><code class="highlighter-rouge">AddDeclaration</code> adds a declaration to this scope. We first make sure that this identifier hasn’t already been declared in this scope (our first bit of actual semantic analysis!).</li>
+  <li><code class="highlighter-rouge">FindDeclaration</code> returns the <code class="highlighter-rouge">VariableDeclaration</code> object for a given identifier. It recurses up through the parent symbol scopes, following standard language conventions for name lookup.</li>
+</ul>
+
+<p>Next, we’ll declare a <code class="highlighter-rouge">SymbolScopeStack</code> type to, as the name suggests, keep track of a stack of symbol scopes. For example, in this program, there would be four symbol scopes, as noted in the comments:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>             <span class="c1">// 1. Global scope
+</span><span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span> <span class="c1">// 2. Function scope
+</span>  <span class="kt">float</span> <span class="n">c</span><span class="p">[];</span>       <span class="c1">// 3. Implicit compound statement scope inside function
+</span>  <span class="p">{</span>
+    <span class="n">bool</span> <span class="n">d</span><span class="p">;</span>        <span class="c1">// 4. Explicit compound statement scope inside function
+</span>  <span class="p">}</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Here is <code class="highlighter-rouge">SymbolScopeStack</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="k">private</span><span class="err"> </span><span class="nc">SymbolScopeStack</span><span class="bp">()</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">stack</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="k">new</span><span class="err"> </span><span class="nc">Stack</span><span class="p">&lt;</span><span class="nc">SymbolScope</span><span class="o">&gt;()</span>
+<span class="err">  </span><span class="k">do</span><span class="err"> </span><span class="n">stack</span><span class="p">.</span><span class="nc">Push</span><span class="p">(</span><span class="k">new</span><span class="err"> </span><span class="nc">SymbolScope</span><span class="p">(</span><span class="nc">None</span><span class="o">))</span>
+
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">CurrentScope</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">stack</span><span class="p">.</span><span class="nc">Peek</span><span class="bp">()</span>
+
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">Push</span><span class="bp">()</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">stack</span><span class="p">.</span><span class="nc">Push</span><span class="p">(</span><span class="k">new</span><span class="err"> </span><span class="nc">SymbolScope</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="n">stack</span><span class="p">.</span><span class="nc">Peek</span><span class="bp">()</span><span class="o">)))</span>
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">stack</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">  </span><span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">AddDeclaration</span><span class="err"> </span><span class="n">declaration</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">stack</span><span class="p">.</span><span class="nc">Peek</span><span class="bp">()</span><span class="p">.</span><span class="nc">AddDeclaration</span><span class="err"> </span><span class="n">declaration</span>
+</code></pre>
+</div>
+
+<p>Let’s carry on with defining <code class="highlighter-rouge">SymbolTable</code>:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>
+  <span class="k">let</span><span class="err"> </span><span class="n">whileStatementStack</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Stack</span><span class="p">&lt;</span><span class="nc">WhileStatement</span><span class="o">&gt;()</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">symbolScopeStack</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="k">new</span><span class="err"> </span><span class="nc">SymbolScopeStack</span><span class="bp">()</span> 
+</code></pre>
+</div>
+
+<p>We have to keep track of nested while statements, so that we know which while statement a <code class="highlighter-rouge">break</code> statement applies to.</p>
+
+<p><code class="highlighter-rouge">symbolScopeStack</code> will grow and shrink as we initialise the symbol table.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>
+  <span class="k">let</span><span class="err"> </span><span class="k">rec</span><span class="err"> </span><span class="n">scanDeclaration</span><span class="err"> </span><span class="p">=</span>
+    <span class="k">function</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">AddDeclaration</span><span class="err"> </span><span class="n">x</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">FunctionDeclaration</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err">       </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="n">x</span> 
+</code></pre>
+</div>
+
+<p>Straightforward enough. When we hit a static variable declaration, add it to the current symbol scope. But we’ll have to dig deeper into function declarations…</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">parameters</span><span class="p">,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">let</span><span class="err"> </span><span class="k">rec</span><span class="err"> </span><span class="n">scanCompoundStatement</span><span class="err"> </span><span class="p">(</span><span class="n">localDeclarations</span><span class="p">,</span><span class="err"> </span><span class="n">statements</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+<span class="err">      </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">Push</span><span class="bp">()</span>
+<span class="err">      </span><span class="n">localDeclarations</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="p">(</span><span class="k">fun</span><span class="err"> </span><span class="n">d</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">AddDeclaration</span><span class="err"> </span><span class="n">d</span><span class="p">)</span>
+<span class="err">      </span><span class="n">statements</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanStatement</span>
+<span class="err">      </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span> 
+</code></pre>
+</div>
+
+<p>Compound statements (i.e. a group of statements nested inside curly braces) get their own symbol scope. We add each local declaration to that scope, and then scan each statement inside the compound statement. (Compound statements might be nested, so <code class="highlighter-rouge">scanStatement</code> might end up calling <code class="highlighter-rouge">scanCompoundStatement</code>, hence the <code class="highlighter-rouge">rec</code> keyword.) Note also that we’re making use of F#’s ability to declare functions within functions - it’s really nice for this sort of helper function that is only useful within its parent function.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">parameters</span><span class="p">,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">scanStatement</span><span class="err"> </span><span class="p">=</span>
+      <span class="k">function</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">ExpressionStatement</span><span class="p">(</span><span class="n">es</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="k">match</span><span class="err"> </span><span class="n">es</span><span class="err"> </span><span class="k">with</span>
+<span class="err">  </span>  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">Expression</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+  <span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">Nop</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">CompoundStatement</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanCompoundStatement</span><span class="err"> </span><span class="n">x</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s1</span><span class="p">,</span><span class="err"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">s2</span><span class="o">))</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span>  <span class="err">    </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s1</span>
+<span class="err">  </span>  <span class="err">    </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s2</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s1</span><span class="p">,</span><span class="err"> </span><span class="nc">None</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span>  <span class="err">    </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s1</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">WhileStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="n">whileStatementStack</span><span class="p">.</span><span class="nc">Push</span><span class="err"> </span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s</span><span class="p">)</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span>  <span class="err">    </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s</span>
+<span class="err">  </span>  <span class="err">    </span><span class="n">whileStatementStack</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="n">e</span><span class="o">))</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">None</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="k">if</span><span class="err"> </span><span class="n">functionReturnType</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="nc">Void</span><span class="err"> </span><span class="k">then</span>
+<span class="err">  </span>  <span class="err">  </span>    <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="nn">Void</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">  </span>  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">BreakStatement</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="err">  </span>  <span class="k">if</span><span class="err"> </span><span class="n">whileStatementStack</span><span class="p">.</span><span class="nc">Count</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="mi">0</span><span class="err"> </span><span class="k">then</span>
+<span class="err">  </span>  <span class="err">    </span>  <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">noEnclosingLoop</span><span class="bp">()</span><span class="p">)</span> 
+</code></pre>
+</div>
+
+<p>Most of these are straightforward. We ‘walk’ down the AST, breaking each type of statement into its component parts. Declarations can only occur at the global scope, function scope, or compound statement scope, but usages can occur almost everywhere. When we encounter a declaration, we add it to the current symbol scope. When we encounter a usage, we check that a declaration with that name exists in the current symbol scope or any of its parents, and then add it to the symbol table.</p>
+
+<p>The only thing we need to do for a <code class="highlighter-rouge">BreakStatement</code> is check that there is a parent <code class="highlighter-rouge">WhileStatement</code> to break out of. That’s not really related to building a symbol table, so <a href="http://en.wikipedia.org/wiki/Single_responsibility_principle">SRP</a> purists might balk at it, but… this is my compiler, I’ll break SRP if I want to :-).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">parameters</span><span class="p">,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">identifierRef</span><span class="err"> </span><span class="p">=</span>
+      <span class="k">let</span><span class="err"> </span><span class="n">declaration</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nn">CurrentScope</span><span class="p">.</span><span class="nc">FindDeclaration</span><span class="err"> </span><span class="n">identifierRef</span>
+<span class="err">  </span>  <span class="err">  </span><span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">identifierRef</span><span class="p">,</span><span class="err"> </span><span class="n">declaration</span><span class="p">)</span> 
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">addIdentifierMapping</code> adds an entry to the symbol table, where the key is an <code class="highlighter-rouge">IdentifierRef</code>, and the value is the declaration of that identifier. Because we set our symbol table up to use referential equality for <code class="highlighter-rouge">IdentifierRef</code> instances, we can have multiple usages of the same identifier, resulting in multiple entries in the symbol table.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>  
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">parameters</span><span class="p">,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">  </span>  <span class="k">function</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ScalarAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">    </span>  <span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">i</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ArrayAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e1</span><span class="p">,</span><span class="err"> </span><span class="n">e2</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">    </span>  <span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">i</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e1</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e2</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">e1</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">e2</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e1</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e2</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">UnaryExpression</span><span class="o">(_,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">IdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">      </span><span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">i</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ArrayIdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">      </span><span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">i</span>
+  <span class="err">      </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">FunctionCallExpression</span><span class="o">(_,</span><span class="err"> </span><span class="n">args</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">    </span>  <span class="n">args</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanExpression</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ArraySizeExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">    </span>  <span class="n">addIdentifierMapping</span><span class="err"> </span><span class="n">i</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">LiteralExpression</span><span class="p">(</span><span class="n">l</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+  <span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">ArrayAllocationExpression</span><span class="o">(_,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+  <span class="err">    </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span> 
+</code></pre>
+</div>
+
+<p>Here we scan each type of expression, looking for symbol usages. Many of these are recursive. A <code class="highlighter-rouge">ScalarAssignmentExpression</code> (for example, <code class="highlighter-rouge">i = j + 1</code>) would call <code class="highlighter-rouge">scanExpression</code> for the <code class="highlighter-rouge">j + 1</code> part, which would match the <code class="highlighter-rouge">BinaryExpression</code> pattern, which in turn would call <code class="highlighter-rouge">scanExpression</code> and match <code class="highlighter-rouge">IdentifierExpression</code> and <code class="highlighter-rouge">LiteralExpression</code> for each side of the binary expression, respectively.</p>
+
+<p>Now that we’ve got all our <code class="highlighter-rouge">scanFunctionDeclaration</code> helper functions, we can write the actual implementation:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>  
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">parameters</span><span class="p">,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">Push</span><span class="bp">()</span>
+    <span class="n">parameters</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">AddDeclaration</span>
+    <span class="n">scanCompoundStatement</span><span class="err"> </span><span class="n">compoundStatement</span>
+    <span class="n">symbolScopeStack</span><span class="p">.</span><span class="nc">Pop</span><span class="bp">()</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span> 
+</code></pre>
+</div>
+
+<p>We’ve almost finished <code class="highlighter-rouge">SymbolTable</code> - here are the final parts:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span> <span class="k">as</span> <span class="n">self</span> <span class="p">=</span>
+  <span class="err">…</span>  
+  <span class="k">do</span><span class="err"> </span><span class="n">program</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanDeclaration</span>
+
+  <span class="n">member</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span><span class="err"> </span><span class="n">identifierRef</span><span class="err"> </span><span class="p">=</span>
+    <span class="n">typeOfDeclaration</span><span class="err"> </span><span class="n">self</span><span class="o">.[</span><span class="n">identifierRef</span><span class="p">]</span> 
+
+</code></pre>
+</div>
+
+<p>We kick off the symbol table initialization by calling <code class="highlighter-rouge">scanDeclaration</code> with the top-level <code class="highlighter-rouge">program</code> object.</p>
+
+<p>And we’re done with <code class="highlighter-rouge">SymbolTable</code>! Now let’s build a function table.</p>
+
+<h3 id="building-the-function-table">Building the function table</h3>
+
+<p>The function table is going to serve a similar purpose to the symbol table. But where the symbol table mapped variable identifiers to variable declarations, the function table maps function calls to function declarations.</p>
+
+<p>As usual, we need some helpers. We’ll start with a record, and a related helper function:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">VariableType</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">Type</span><span class="err">    </span><span class="p">:</span><span class="err"> </span><span class="nc">TypeSpec</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="kt">bool</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span>
+<span class="err">  </span><span class="n">override</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="n">x</span><span class="p">.</span><span class="nn">Type</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="err"> </span><span class="o">+</span><span class="err"> </span><span class="p">(</span><span class="k">if</span><span class="err"> </span><span class="n">x</span><span class="p">.</span><span class="nc">IsArray</span><span class="err"> </span><span class="k">then</span><span class="err"> </span><span class="s2">"[]"</span><span class="err"> </span><span class="k">else</span><span class="err"> </span><span class="s2">""</span><span class="p">)</span>
+
+<span class="k">let</span><span class="err"> </span><span class="n">typeOfDeclaration</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="k">function</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ScalarVariableDeclaration</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="err"> </span><span class="o">_)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">t</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="err"> </span><span class="p">}</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nn">Ast</span><span class="p">.</span><span class="nc">ArrayVariableDeclaration</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="err"> </span><span class="o">_)</span><span class="err">  </span><span class="p">-&gt;</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">t</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">true</span><span class="err"> </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>The <code class="highlighter-rouge">typeOfDeclaration</code> function builds a <code class="highlighter-rouge">VariableType</code> record from a variable declaration.</p>
+
+<p>Next, we’ll need a type to store as the “value” in the function table dictionary. We’ll use another record:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">FunctionTableEntry</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">ReturnType</span><span class="err">     </span><span class="p">:</span><span class="err"> </span><span class="nc">TypeSpec</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">VariableType</span><span class="err"> </span><span class="kt">list</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Finally, we can define the function table itself:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="k">inherit</span><span class="err"> </span><span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nc">Identifier</span><span class="p">,</span><span class="err"> </span><span class="nc">FunctionTableEntry</span><span class="o">&gt;()</span>
+
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="k">rec</span><span class="err"> </span><span class="n">scanDeclaration</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">function</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">StaticVariableDeclaration</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err">    </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">FunctionDeclaration</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="err"> </span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">p</span><span class="p">,</span><span class="err"> </span><span class="o">_)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span><span class="k">if</span><span class="err"> </span><span class="n">self</span><span class="p">.</span><span class="nc">ContainsKey</span><span class="err"> </span><span class="n">i</span><span class="err"> </span><span class="k">then</span>
+<span class="err">        </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">functionAlreadyDefined</span><span class="err"> </span><span class="n">i</span><span class="p">)</span>
+<span class="err">      </span><span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">t</span><span class="p">;</span><span class="err"> </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">map</span><span class="err"> </span><span class="n">typeOfDeclaration</span><span class="err"> </span><span class="n">p</span><span class="p">;</span><span class="err"> </span><span class="o">})</span>
+
+<span class="err">  </span><span class="k">do</span>
+<span class="err">    </span><span class="o">//</span><span class="err"> </span><span class="nc">First</span><span class="err"> </span><span class="n">add</span><span class="err"> </span><span class="n">built</span><span class="p">-</span><span class="k">in</span><span class="err"> </span><span class="n">methods</span>
+<span class="err">  </span>  <span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="s2">"iread"</span><span class="p">,</span><span class="err">  </span><span class="p">{</span><span class="err"> </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Int</span><span class="p">;</span><span class="err"> </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">[]</span><span class="p">;</span><span class="err"> </span><span class="o">})</span>
+<span class="err">    </span><span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="s2">"iprint"</span><span class="p">,</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Void</span><span class="p">;</span><span class="err"> </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="p">[</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Int</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="err"> </span><span class="p">}</span><span class="err"> </span><span class="o">];</span><span class="err"> </span><span class="o">})</span>
+<span class="err">    </span><span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="s2">"fread"</span><span class="p">,</span><span class="err">  </span><span class="p">{</span><span class="err"> </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Float</span><span class="p">;</span><span class="err"> </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">[]</span><span class="p">;</span><span class="err"> </span><span class="o">})</span>
+<span class="err">    </span><span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="s2">"fprint"</span><span class="p">,</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">ReturnType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Void</span><span class="p">;</span><span class="err"> </span><span class="nc">ParameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="p">[</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Float</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="err"> </span><span class="p">}</span><span class="err"> </span><span class="o">];</span><span class="err"> </span><span class="o">})</span>
+<span class="err">    </span><span class="n">program</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanDeclaration</span> 
+</code></pre>
+</div>
+
+<p>Unlike the symbol table, the function table uses value-equality. This is because Mini-C functions are global, and we don’t need to differentiate between functions at different scopes. A function name <em>always</em> refers to the same function.</p>
+
+<p>Because functions can only be declared at the global scope, <code class="highlighter-rouge">scanDeclaration</code> is quite simple. It protects against duplicate function declarations, and then adds the function declaration (with its corresponding return type and parameter types) to the function table.</p>
+
+<p>Then there are some (hard-coded) built-in methods - <code class="highlighter-rouge">iread</code>, <code class="highlighter-rouge">iprint</code>, etc. These are available to every Mini-C program. In a real language, obviously, this hard-coding wouldn’t be necessary. You’d be able to import, say,  the <code class="highlighter-rouge">System</code> namespace, and use the <code class="highlighter-rouge">Console</code> class. But Mini-C doesn’t have namespaces or classes, so these hard-coded functions are the only way to communicate with the world outside.</p>
+
+<p>To give a concrete example, for this program:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="n">a</span><span class="p">;</span>
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="n">bool</span> <span class="n">b</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>our function table will look like this:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Function declaration</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">main</code></td>
+      <td><code class="highlighter-rouge"><span class="p">{</span><span class="w"> </span><span class="err">ReturnType</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">Ast.Int,</span><span class="w"> </span><span class="err">ParameterTypes</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">[</span><span class="w"> </span><span class="err">{</span><span class="w"> </span><span class="err">Type</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">Ast.Bool;</span><span class="w"> </span><span class="err">IsArray</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">false</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="err">]</span><span class="w"> </span><span class="err">}</span></code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Armed with symbol and function tables, we can turn our attention to the next, and final, table: the expression types table.</p>
+
+<h3 id="building-the-expression-types-table">Building the expression types table</h3>
+
+<p>The expression types table maps expressions to expression types. For example, given this program:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+  <span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">3</span><span class="p">;</span>
+  <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>we’d end up with this expression types table:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Expression</th>
+      <th>Expression type</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="highlighter-rouge">Ast.BinaryExpression(</code><br />  <code class="highlighter-rouge">Ast.LiteralExpression(Ast.IntLiteral(2)),</code><br />  <code class="highlighter-rouge">Ast.BinaryOperator(Ast.Add),</code><br />  <code class="highlighter-rouge">Ast.LiteralExpression(Ast.IntLiteral(3))</code><br /><code class="highlighter-rouge">)</code></td>
+      <td><code class="highlighter-rouge"><span class="p">{</span></code><br />  <code class="highlighter-rouge">Type = Ast.Int;</code><br />  <code class="highlighter-rouge">IsArray = false</code><br /><code class="highlighter-rouge">}</code></td>
+    </tr>
+    <tr>
+      <td><code class="highlighter-rouge">Ast.LiteralExpression(Ast.IntLiteral(1))</code></td>
+      <td><code class="highlighter-rouge"><span class="p">{</span></code><br />  <code class="highlighter-rouge">Type = Ast.Int;</code><br />  <code class="highlighter-rouge">IsArray = false</code><br /><code class="highlighter-rouge">}</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>We initialize the expression types table by walking all the way through the tree, from top to bottom, looking at and storing the type of every expression. Let’s get started:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="k">inherit</span><span class="err"> </span><span class="nc">Dictionary</span><span class="p">&lt;</span><span class="nc">Expression</span><span class="p">,</span><span class="err"> </span><span class="nc">VariableType</span><span class="o">&gt;(</span><span class="nn">HashIdentity</span><span class="p">.</span><span class="nc">Reference</span><span class="p">)</span>
+  <span class="err">…</span>
+</code></pre>
+</div>
+
+<p>We’re going to make use of the function table and symbol table that we made earlier.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">…</span>
+  <span class="k">let</span><span class="err"> </span><span class="k">rec</span><span class="err"> </span><span class="n">scanDeclaration</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">function</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="nc">FunctionDeclaration</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="n">x</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">_</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span> 
+
+</code></pre>
+</div>
+
+<p>Nothing too exciting here; we handle function declarations, and ignore global variable declarations, because there are no expressions in global variable declarations (in Mini-C).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span><span class="k">let</span><span class="err"> </span><span class="k">rec</span><span class="err"> </span><span class="n">scanCompoundStatement</span><span class="err"> </span><span class="o">(_,</span><span class="err"> </span><span class="n">statements</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+<span class="err">      </span><span class="n">statements</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanStatement</span> 
+</code></pre>
+</div>
+
+<p>This structure might look familiar from the symbol table code. It is quite similar, but we’re producing a different result. In C#, we might be tempted to reach for a <a href="http://en.wikipedia.org/wiki/Visitor_pattern">visitor</a> object, in order to share the traversal code, but F#’s pattern matching makes that unnecessary, in my opinion.</p>
+
+<p>Now the code to peek inside statements:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">scanStatement</span><span class="err"> </span><span class="p">=</span>
+<span class="err">      </span><span class="k">function</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">ExpressionStatement</span><span class="p">(</span><span class="n">es</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span>  <span class="k">match</span><span class="err"> </span><span class="n">es</span><span class="err"> </span><span class="k">with</span>
+<span class="err">        </span><span class="p">|</span><span class="err"> </span><span class="nc">Expression</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">        </span><span class="p">|</span><span class="err"> </span><span class="nc">Nop</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">CompoundStatement</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scanCompoundStatement</span><span class="err"> </span><span class="n">x</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s1</span><span class="p">,</span><span class="err"> </span><span class="nc">Some</span><span class="p">(</span><span class="n">s2</span><span class="o">))</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">        </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s1</span>
+<span class="err">        </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s2</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">IfStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s1</span><span class="p">,</span><span class="err"> </span><span class="nc">None</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">        </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s1</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">WhileStatement</span><span class="p">(</span><span class="n">e</span><span class="p">,</span><span class="err"> </span><span class="n">s</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span>  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="n">ignore</span>
+<span class="err">        </span><span class="n">scanStatement</span><span class="err"> </span><span class="n">s</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="nc">ReturnStatement</span><span class="p">(</span><span class="nc">Some</span><span class="p">(</span><span class="n">e</span><span class="o">))</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">      </span>  <span class="k">let</span><span class="err"> </span><span class="n">typeOfE</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">      </span>  <span class="k">if</span><span class="err"> </span><span class="n">typeOfE</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="n">scalarType</span><span class="err"> </span><span class="n">functionReturnType</span><span class="err"> </span><span class="k">then</span>
+<span class="err">      </span>    <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">      </span><span class="p">|</span><span class="err"> </span><span class="p">_</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span> 
+</code></pre>
+</div>
+
+<p>Apart from walking further down the tree, we do another semantic analysis check for return statements: the type of the expression that follows the <code class="highlighter-rouge">return</code> keyword must match the declared return type of the containing function.</p>
+
+<p>Next, the biggest function so far: the function to extract an expression type from an expression. Because expressions can contain expressions, this is quite recursive in nature. Instead of doing one big code dump, I’ll break it down into separate parts. Here is the basic structure:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">expression</span><span class="err"> </span><span class="p">=</span>
+<span class="err">    </span>  <span class="k">let</span><span class="err"> </span><span class="n">checkArrayIndexType</span><span class="err"> </span><span class="n">e</span><span class="err"> </span><span class="p">=</span>
+<span class="err">      </span>  <span class="k">let</span><span class="err"> </span><span class="n">arrayIndexType</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">        </span><span class="k">if</span><span class="err"> </span><span class="n">arrayIndexType</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Int</span><span class="err"> </span><span class="k">then</span>
+<span class="err">        </span>  <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="n">arrayIndexType</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="nn">Int</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+
+      <span class="k">let</span><span class="err"> </span><span class="n">expressionType</span><span class="err"> </span><span class="p">=</span>
+<span class="err">      </span>  <span class="k">match</span><span class="err"> </span><span class="n">expression</span><span class="err"> </span><span class="k">with</span>
+        <span class="err">…</span> <span class="o">//</span> <span class="nc">Lots</span> <span class="k">of</span> <span class="n">expression</span> <span class="k">type</span> <span class="n">patterns</span> <span class="p">-</span> <span class="n">see</span> <span class="n">next</span> <span class="n">section</span><span class="p">.</span>
+</code></pre>
+</div>
+
+<p>We’ll use the <code class="highlighter-rouge">checkArrayIndexType</code> helper function later, to ensure that expressions used as array indices are of integer type.</p>
+
+<h4 id="scanning-expressions">Scanning expressions</h4>
+
+<p>Let’s go through each expression type.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">ScalarAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">i</span> <span class="p">=</span> <span class="mi">1</span>
+  <span class="k">let</span><span class="err"> </span><span class="n">typeOfE</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">typeOfI</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">symbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span><span class="err"> </span><span class="n">i</span>
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="n">typeOfE</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="n">typeOfI</span><span class="err"> </span><span class="k">then</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfI</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">  </span><span class="n">typeOfI</span>
+</code></pre>
+</div>
+
+<p>Here we recursively call <code class="highlighter-rouge">scanExpression</code> to get the type of the right-hand side of the assignment. Then, we lookup the identifier on the left-hand side in the symbol table. We take the opportunity to check that these two types match. Finally, we return the type of the left-hand side (which we now know is exactly as the type of the right-hand side).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">ArrayAssignmentExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e1</span><span class="p">,</span><span class="err"> </span><span class="n">e2</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">j</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="p">=</span> <span class="mi">3</span>
+  <span class="n">checkArrayIndexType</span><span class="err"> </span><span class="n">e1</span>
+
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">typeOfE2</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e2</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">typeOfI</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">symbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span><span class="err"> </span><span class="n">i</span>
+
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="n">not</span><span class="err"> </span><span class="n">typeOfI</span><span class="p">.</span><span class="nc">IsArray</span><span class="err"> </span><span class="k">then</span>
+  <span class="err">  </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotApplyIndexing</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfI</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">IsArray</span><span class="err"> </span><span class="k">then</span>
+<span class="err">  </span>  <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfI</span><span class="p">.</span><span class="nn">Type</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">Type</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="n">typeOfI</span><span class="p">.</span><span class="nc">Type</span><span class="err"> </span><span class="k">then</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">cannotConvertType</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfI</span><span class="p">.</span><span class="nn">Type</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+
+<span class="err">  </span><span class="n">scalarType</span><span class="err"> </span><span class="n">typeOfI</span><span class="p">.</span><span class="nc">Type</span>
+</code></pre>
+</div>
+
+<p>Array assignments are a bit more involved than scalar assignments. We need to:</p>
+
+<ul>
+  <li>check that the array index expression is of type integer</li>
+  <li>check in the symbol table that the variable on the left-hand side is an array</li>
+  <li>check that the expression on the right-hand side is a scalar (in Mini-C, you can’t have multi-dimensional arrays)</li>
+  <li>check that the type of the right-hand side matches the array type</li>
+</ul>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">BinaryExpression</span><span class="p">(</span><span class="n">e1</span><span class="p">,</span><span class="err"> </span><span class="n">op</span><span class="p">,</span><span class="err"> </span><span class="n">e2</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="mi">1</span> <span class="o">+</span> <span class="mi">2</span>
+  <span class="k">let</span><span class="err"> </span><span class="n">typeOfE1</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e1</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">typeOfE2</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">e2</span>
+<span class="err">  </span><span class="k">match</span><span class="err"> </span><span class="n">op</span><span class="err"> </span><span class="k">with</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">ConditionalOr</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">ConditionalAnd</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="k">match</span><span class="err"> </span><span class="n">typeOfE1</span><span class="p">,</span><span class="err"> </span><span class="n">typeOfE2</span><span class="err"> </span><span class="k">with</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Bool</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="o">},</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Bool</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="p">}</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">_</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">operatorCannotBeApplied</span><span class="err"> </span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE1</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">    </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Bool</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Equal</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">NotEqual</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="k">match</span><span class="err"> </span><span class="n">typeOfE1</span><span class="p">,</span><span class="err"> </span><span class="n">typeOfE2</span><span class="err"> </span><span class="k">with</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">a</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="o">},</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">b</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="p">}</span><span class="err"> </span><span class="k">when</span><span class="err"> </span><span class="n">a</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">b</span><span class="err"> </span><span class="p">&amp;&amp;</span><span class="err"> </span><span class="n">a</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="nc">Void</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="bp">()</span>
+  <span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="p">_</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">operatorCannotBeApplied</span><span class="err"> </span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE1</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">  </span>  <span class="n">scalarType</span><span class="err"> </span><span class="nc">Bool</span>
+  <span class="p">|</span><span class="err"> </span><span class="nc">LessEqual</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Less</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">GreaterEqual</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Greater</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">  </span>  <span class="k">match</span><span class="err"> </span><span class="n">typeOfE1</span><span class="p">,</span><span class="err"> </span><span class="n">typeOfE2</span><span class="err"> </span><span class="k">with</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Int</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="o">},</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Int</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="p">}</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Float</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="o">},</span><span class="err"> </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="nc">Float</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">false</span><span class="p">;</span><span class="err"> </span><span class="p">}</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">    </span>  <span class="bp">()</span>
+<span class="err">    </span><span class="p">|</span><span class="err"> </span><span class="p">_</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">operatorCannotBeApplied</span><span class="err"> </span><span class="p">(</span><span class="n">op</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE1</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">typeOfE2</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">    </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Bool</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">Add</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Subtract</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Multiply</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Divide</span><span class="err"> </span><span class="p">|</span><span class="err"> </span><span class="nc">Modulus</span><span class="err"> </span><span class="p">-&gt;</span>
+<span class="err">    </span><span class="n">typeOfE1</span>
+</code></pre>
+</div>
+
+<p>F#’s pattern matching again comes to the rescue (exercise for the reader: how much code would this take in C#?). Armed with a knowledge of how binary expressions work in C, hopefully this function makes sense. As an example, for the <code class="highlighter-rouge">Ast.Equal</code> (i.e. <code class="highlighter-rouge">==</code>), we make sure that both sides are scalar, both sides are the same type, and that type is not <code class="highlighter-rouge">Ast.Void</code>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">UnaryExpression</span><span class="o">(_,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="p">-</span><span class="mi">1</span>
+  <span class="n">scanExpression</span><span class="err"> </span><span class="n">e</span>
+<span class="p">|</span><span class="err"> </span><span class="nc">IdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">i</span>
+  <span class="n">symbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span><span class="err"> </span><span class="n">i</span>
+<span class="p">|</span><span class="err"> </span><span class="nc">ArrayIdentifierExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">i</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+  <span class="n">checkArrayIndexType</span><span class="err"> </span><span class="n">e</span>
+  <span class="n">scalarType</span><span class="err"> </span><span class="p">(</span><span class="n">symbolTable</span><span class="p">.</span><span class="nc">GetIdentifierTypeSpec</span><span class="err"> </span><span class="n">i</span><span class="o">).</span><span class="nc">Type</span>
+</code></pre>
+</div>
+
+<p>We use the symbol table to lookup variable types. This is why we needed to make the symbol table use referential equality; if we keyed on a string, then the same variable name in various different scopes would resolve to the same type, which would be wrong. In Mini-C (and C), you can declare multiple variables with the same name, in different scopes.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">FunctionCallExpression</span><span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="err"> </span><span class="n">a</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">myFunc</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"a"</span><span class="p">)</span>
+  <span class="k">if</span><span class="err"> </span><span class="n">not</span><span class="err"> </span><span class="p">(</span><span class="n">functionTable</span><span class="p">.</span><span class="nc">ContainsKey</span><span class="err"> </span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="k">then</span>
+<span class="err">  </span>  <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">nameDoesNotExist</span><span class="err"> </span><span class="n">i</span><span class="p">)</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">calledFunction</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">functionTable</span><span class="o">.[</span><span class="n">i</span><span class="p">]</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">parameterTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">calledFunction</span><span class="p">.</span><span class="nc">ParameterTypes</span>
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">length</span><span class="err"> </span><span class="n">a</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">length</span><span class="err"> </span><span class="n">parameterTypes</span><span class="err"> </span><span class="k">then</span>
+<span class="err">  </span>  <span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">wrongNumberOfArguments</span><span class="err"> </span><span class="n">i</span><span class="err"> </span><span class="p">(</span><span class="nn">List</span><span class="p">.</span><span class="n">length</span><span class="err"> </span><span class="n">parameterTypes</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="nn">List</span><span class="p">.</span><span class="n">length</span><span class="err"> </span><span class="n">a</span><span class="o">))</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">argumentTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">a</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">map</span><span class="err"> </span><span class="n">scanExpression</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">checkTypesMatch</span><span class="err"> </span><span class="n">index</span><span class="err"> </span><span class="n">l</span><span class="err"> </span><span class="n">r</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span>  <span class="k">if</span><span class="err"> </span><span class="n">l</span><span class="err"> </span><span class="o">&lt;&gt;</span><span class="err"> </span><span class="n">r</span><span class="err"> </span><span class="k">then</span><span class="err"> </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">invalidArguments</span><span class="err"> </span><span class="n">i</span><span class="err"> </span><span class="p">(</span><span class="n">index</span><span class="err"> </span><span class="o">+</span><span class="err"> </span><span class="mi">1</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">l</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="p">)</span><span class="err"> </span><span class="p">(</span><span class="n">r</span><span class="p">.</span><span class="nc">ToString</span><span class="bp">()</span><span class="o">))</span>
+<span class="err">  </span><span class="nn">List</span><span class="p">.</span><span class="n">iteri2</span><span class="err"> </span><span class="n">checkTypesMatch</span><span class="err"> </span><span class="n">argumentTypes</span><span class="err"> </span><span class="n">parameterTypes</span>
+  <span class="n">scalarType</span><span class="err"> </span><span class="n">calledFunction</span><span class="p">.</span><span class="nc">ReturnType</span>
+</code></pre>
+</div>
+
+<p>Function calls are more interresting. We check:</p>
+
+<ul>
+  <li>that the function exists</li>
+  <li>that the number and type of the arguments in the function call match the number and type of the parameters in the function declaration</li>
+</ul>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="p">|</span><span class="err"> </span><span class="nc">ArraySizeExpression</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="n">myArray</span><span class="p">.</span><span class="n">size</span>
+<span class="err">  </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Int</span>
+<span class="p">|</span><span class="err"> </span><span class="nc">LiteralExpression</span><span class="p">(</span><span class="n">l</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="mi">1</span>
+  <span class="k">match</span><span class="err"> </span><span class="n">l</span><span class="err"> </span><span class="k">with</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">BoolLiteral</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="err">  </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Bool</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">IntLiteral</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="err">   </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Int</span>
+<span class="err">  </span><span class="p">|</span><span class="err"> </span><span class="nc">FloatLiteral</span><span class="p">(</span><span class="n">f</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span><span class="err"> </span><span class="n">scalarType</span><span class="err"> </span><span class="nc">Float</span>
+<span class="p">|</span><span class="err"> </span><span class="nc">ArrayAllocationExpression</span><span class="p">(</span><span class="n">t</span><span class="p">,</span><span class="err"> </span><span class="n">e</span><span class="p">)</span><span class="err"> </span><span class="p">-&gt;</span> <span class="o">//</span> <span class="n">e</span><span class="p">.</span><span class="n">g</span><span class="p">.</span> <span class="k">new</span> <span class="kt">float</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span>
+<span class="err">  </span><span class="n">checkArrayIndexType</span><span class="err"> </span><span class="n">e</span>
+<span class="err">  </span><span class="p">{</span><span class="err"> </span><span class="nc">Type</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">t</span><span class="p">;</span><span class="err"> </span><span class="nc">IsArray</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="bp">true</span><span class="err"> </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">LiteralExpression</code>s are another of the leaves of the tree - instead of recursing, we return concrete scalar types.</p>
+
+<p>Now we can finish writing the <code class="highlighter-rouge">scanExpression</code> function:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">)</span><span class="err"> </span><span class="k">as</span><span class="err"> </span><span class="n">self</span><span class="err"> </span><span class="p">=</span>
+  <span class="err">…</span>
+  <span class="ow">and</span><span class="err"> </span><span class="n">scanFunctionDeclaration</span><span class="err"> </span><span class="p">(</span><span class="n">functionReturnType</span><span class="p">,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="o">_,</span><span class="err"> </span><span class="n">compoundStatement</span><span class="p">)</span><span class="err"> </span><span class="p">=</span>
+    <span class="err">…</span>
+    <span class="ow">and</span><span class="err"> </span><span class="n">scanExpression</span><span class="err"> </span><span class="n">expression</span><span class="err"> </span><span class="p">=</span>
+      <span class="err">…    </span>  
+      <span class="n">self</span><span class="p">.</span><span class="nc">Add</span><span class="p">(</span><span class="n">expression</span><span class="p">,</span><span class="err"> </span><span class="n">expressionType</span><span class="p">)</span>
+
+<span class="err">   </span>  <span class="err"> </span><span class="n">expressionType</span> 
+</code></pre>
+</div>
+
+<p>And finally, we initialize the expression types table by calling <code class="highlighter-rouge">scanDeclaration</code> with the top-level program:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">do</span><span class="err"> </span><span class="n">program</span><span class="err"> </span><span class="o">|&gt;</span><span class="err"> </span><span class="nn">List</span><span class="p">.</span><span class="n">iter</span><span class="err"> </span><span class="n">scanDeclaration</span> 
+</code></pre>
+</div>
+
+<h3 id="wrapping-up">Wrapping up</h3>
+
+<p>We’re almost there! We’re going to send some of the results of this semantic analysis to the next compiler stage. Let’s declare a record for that purpose:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span><span class="err"> </span><span class="nc">SemanticAnalysisResult</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">SymbolTable</span><span class="err">     </span><span class="p">:</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">ExpressionTypes</span><span class="err"> </span><span class="p">:</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>And last but not least, we’ll define the entry point to this whole semantic analysis stage:</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">let</span><span class="err"> </span><span class="n">analyze</span><span class="err"> </span><span class="n">program</span><span class="err"> </span><span class="p">=</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">symbolTable</span><span class="err">   </span><span class="p">=</span><span class="err"> </span><span class="k">new</span><span class="err"> </span><span class="nc">SymbolTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">functionTable</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="k">new</span><span class="err"> </span><span class="nc">FunctionTable</span><span class="p">(</span><span class="n">program</span><span class="p">)</span>
+
+<span class="err">  </span><span class="k">if</span><span class="err"> </span><span class="n">not</span><span class="err"> </span><span class="p">(</span><span class="n">functionTable</span><span class="p">.</span><span class="nc">ContainsKey</span><span class="err"> </span><span class="s2">"main"</span><span class="p">)</span><span class="err"> </span><span class="k">then</span>
+<span class="err">    </span><span class="k">raise</span><span class="err"> </span><span class="p">(</span><span class="n">missingEntryPoint</span><span class="bp">()</span><span class="p">)</span>
+
+<span class="err">  </span><span class="k">let</span><span class="err"> </span><span class="n">expressionTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="k">new</span><span class="err"> </span><span class="nc">ExpressionTypeDictionary</span><span class="p">(</span><span class="n">program</span><span class="p">,</span><span class="err"> </span><span class="n">functionTable</span><span class="p">,</span><span class="err"> </span><span class="n">symbolTable</span><span class="p">)</span>
+
+<span class="err">  </span><span class="p">{</span>
+<span class="err">    </span><span class="nc">SymbolTable</span><span class="err">     </span><span class="p">=</span><span class="err"> </span><span class="n">symbolTable</span><span class="p">;</span>
+<span class="err">    </span><span class="nc">ExpressionTypes</span><span class="err"> </span><span class="p">=</span><span class="err"> </span><span class="n">expressionTypes</span><span class="p">;</span>
+<span class="err">  </span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Now we’re starting to get somewhere. In addition to the AST, we’ve now got a symbol table, containing the type and scope of every variable used in the program. And we’ve got an expression types table, containing the type of every expression in the program. We’re almost ready to generate some output. But instead of going straight from what we have now to writing out MSIL, we’ll build up an intermediate representation. The intermediate representation will map very closely to MSIL, but will make it easier to build up the output in-memory, before writing out our final executable file.</p>
+
+<p>Until <a href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">next time</a>!</p>
+
+<p>(If you have any feedback about either the content or style of this series, please let me know in the comments!)</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/08/23/writing-a-minic-to-msil-compiler-in-fsharp-part-4-building-the-intermediate-representation">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

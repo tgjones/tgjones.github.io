@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Cross-platform C# and F# in 2015 - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Cross-platform C# and F# in 2015</h1>
+
+    <div class="post-date">
+        <time datetime="2015-09-19T15:44:00+00:00">19 September 2015</time>
+    </div>
+
+    
+
+    <p>C# and (<a href="https://github.com/Microsoft/visualfsharp/issues/544">lest we forget</a>) F# are great choices for cross-platform development. Long gone are the days when .NET meant Windows-only - and in reality those days hardly existed at all, thanks to <a href="http://www.mono-project.com">Mono</a>’s early appearance on the scene.</p>
+
+<p>Given how many platforms you can now target with .NET languages, I want to try to enumerate <em>some</em> of them. This won’t be an exhaustive list, but hopefully it’s a good representative sample of the mainstream options. (And sorry, VB.NET fans, for not including your language in the title of this blog post. VB.NET just isn’t as well supported as C# or F# when it comes to other platforms.)</p>
+
+<p>If you spot something missing, leave a comment and I’ll update the post.</p>
+
+<p>To be clear: I have no opinion about whether you <em>should</em> use C# or F# for every program on every platform. That depends on many, many factors. This is simply about what is possible. (And just for the record, you probably shouldn’t…)</p>
+
+<h2 id="windows">Windows</h2>
+
+<ul>
+  <li>
+    <p><a href="https://en.wikipedia.org/wiki/.NET_Framework">.NET Framework</a> - Every Windows release since Windows 98 and Windows NT 4.0 has supported some version of .NET. This is the “normal” way of running .NET apps - your C#, F#, or VB.NET code is compiled to MSIL, which is then executed on the Common Language Runtime (CLR). Historically, there have been multiple versions of the .NET Framework, one for Windows Desktop, one for Windows Store, one for Windows Phone, and so on.</p>
+  </li>
+  <li>
+    <p><a href="http://blogs.msdn.com/b/dotnet/archive/2014/12/04/introducing-net-core.aspx">.NET Core</a> - this is a new implementation of .NET (including a new runtime, <a href="https://github.com/dotnet/coreclr">CoreCLR</a>). Eventually, .NET Core is intended to become the <a href="https://xkcd.com/927/">standard</a> version of .NET. .NET Core will run on Windows, OS X, and Linux.</p>
+  </li>
+  <li>
+    <p><a href="http://blogs.msdn.com/b/dotnet/archive/2014/04/02/announcing-net-native-preview.aspx">.NET Native</a> - another compilation target for .NET applications, which, as the name suggests, does static compilation of .NET. <strong>Update</strong>: as noted by Onur in the comments, .NET Native is currently only supported for C# and VB.NET, which means you can only use those languages to write Windows 10 UWPs.</p>
+  </li>
+</ul>
+
+<h2 id="os-x">OS X</h2>
+
+<ul>
+  <li>
+    <p>Mono does, and .NET Core will, allow you to run .NET programs on OS X. For example, <a href="http://docs.asp.net/en/latest/getting-started/installing-on-mac.html#install-the-net-execution-environment-dnx">ASP.NET 5 will run on either Mono or .NET Core on OS X</a>.</p>
+  </li>
+  <li>
+    <p><a href="https://xamarin.com/platform#desktop">Xamarin.Mac</a> is a set of bindings to the APIs required for OS X GUI application development. Unlike its predecessor, <a href="http://www.mono-project.com/docs/tools+libraries/libraries/monomac/">MonoMac</a>, it also allows you to bundle the Mono framework, so you can publish apps to the Mac App Store.</p>
+  </li>
+</ul>
+
+<h2 id="linux">Linux</h2>
+
+<ul>
+  <li><a href="http://www.mono-project.com/">Mono</a> runs your .NET applications on Linux. In the future, .NET Core will do this too. There are a number of <a href="http://www.mono-project.com/docs/gui/">.NET bindings for GUI toolkits</a>. Running on Linux opens up a wide world of possibilities, including running .NET apps on Raspberry Pi.</li>
+</ul>
+
+<h2 id="ios">iOS</h2>
+
+<ul>
+  <li>
+    <p><a href="https://xamarin.com/platform#ios">Xamarin.iOS</a> is both a set of bindings for iOS APIs, and an ahead-of-time (AOT) compiler that compiles C# and F# code directly to ARM assembly code. It is the de-facto method of getting your .NET code to run on iOS devices.</p>
+  </li>
+  <li>
+    <p><a href="http://www.elementscompiler.com/elements/hydrogene/">RemObjects C#</a> allows you to run C# apps on iOS, I haven’t used it myself, and I’m not sure how it works, but I assume it must also use some sort of AOT compiler.</p>
+  </li>
+</ul>
+
+<h2 id="android">Android</h2>
+
+<ul>
+  <li>
+    <p><a href="https://xamarin.com/platform#android">Xamarin.Android</a> is a set of .NET bindings for Android APIs, and a <a href="http://tirania.org/blog/archive/2011/Apr-06.html">packaging of the Mono VM that runs alongside the Dalvik VM</a>.</p>
+  </li>
+  <li>
+    <p><a href="http://www.elementscompiler.com/elements/hydrogene/">RemObjects C#</a> allows you to run C# apps on Android. Unlike Xamarin.Android, <a href="http://docs.elementscompiler.com/Platforms/Java/">it apparently compiles your C# code to Java bytecode</a>.</p>
+  </li>
+</ul>
+
+<h2 id="javascript">JavaScript</h2>
+
+<ul>
+  <li>
+    <p><a href="http://www.jsil.org">JSIL</a> translates MSIL to Javascript, which means it works (in theory, at least) with any .NET language, including F#.</p>
+  </li>
+  <li>
+    <p>C#-to-JavaScript include <a href="http://duoco.de">DuoCode</a>, <a href="http://bridge.net">Bridge.NET</a>, and <a href="http://sharpkit.net">SharpKit</a>.</p>
+  </li>
+  <li>
+    <p><strong>Update</strong>: Reed Copsey reminded me in the comments about two F#-to-JavaScript offerings: <a href="http://funscript.info/">FunScript</a>, which is “F# to Javascript with type providers”, and <a href="http://websharper.com/">WebSharper</a>.</p>
+  </li>
+</ul>
+
+<h2 id="webassembly">WebAssembly</h2>
+
+<ul>
+  <li><a href="https://github.com/WebAssembly/ilwasm">ilwasm</a> is early in development, but it’s one to keep an eye on. It promises to compile MSIL to <a href="https://brendaneich.com/2015/06/from-asm-js-to-webassembly/">WebAssembly</a>.</li>
+</ul>
+
+<h2 id="playstation-4">PlayStation 4</h2>
+
+<ul>
+  <li><a href="http://tirania.org/blog/archive/2014/Apr-14.html">Mono runs on the PS4</a>, and <a href="http://www.monogame.net/2014/03/23/monogame-for-playstation-4/">MonoGame takes full advantage of that</a>.</li>
+</ul>
+
+<h2 id="honourable-mentions">Honourable mentions</h2>
+
+<ul>
+  <li><a href="https://unity3d.com">Unity3D</a> differs from the others in this list, because it’s not a platform. But it deserves a mention because it enables C# game scripts to be used on <a href="https://unity3d.com/unity/multiplatform">many platforms</a>. Historically, this C# support has been based on Mono. Unity are now developing <a href="http://blogs.unity3d.com/2014/05/20/the-future-of-scripting-in-unity/">IL2CPP</a>, which looks like an interesting new direction.</li>
+  <li><a href="http://www.netmf.com/">.NET Micro Framework</a> allows the use of a small version of .NET in small devices, including (in the past) Microsoft’s SPOT watches.</li>
+</ul>
+
+<h2 id="legacy">Legacy</h2>
+
+<ul>
+  <li>Xbox 360 - <a href="https://en.wikipedia.org/wiki/Microsoft_XNA">XNA</a> allowed games, written in C#, to run on Xbox 360 consoles (and Zunes - anybody remember those?). XNA was <a href="http://www.polygon.com/2013/1/31/3939230/microsoft-has-no-plans-for-future-versions-of-xna-software">sadly discontinued</a>, but <a href="http://darkgenesis.zenithmoon.com/xna-is-no-more-as-the-phoenix-rises-from-the-ashes/">MonoGame has picked up the mantle</a>, and <a href="http://www.monogame.net/about/">supports many more platforms than XNA ever did</a>.</li>
+  <li>Silverlight - a technically magnificent product, but one that perhaps arrived a few years too late. You could write Silverlight apps in .NET languages, and have those apps run in (some) browsers.</li>
+</ul>
+
+<h2 id="future">Future</h2>
+
+<p>More platforms and compilation targets are on the way:</p>
+
+<ul>
+  <li><a href="https://www.dotnetfoundation.org/blog/announcing-llilc-llvm-for-dotnet">LLILC</a> is a new LLVM-based compiler for .NET. <a href="https://github.com/dotnet/llilc">LLILC</a> “includes a set of cross-platform .NET code generation tools that enables compilation of MSIL byte code to LLVM supported platforms.” This is a very promising project, and definitely one to watch.</li>
+  <li>watchOS 2 and tvOS - Xamarin have already announced upcoming support for both <a href="https://blog.xamarin.com/watchos-2-preview-and-updates/">watchOS 2</a> and <a href="https://blog.xamarin.com/now-playing-ios9-up-next-tvos/">tvOS</a>.</li>
+  <li>Xbox One - ironically, while it is possible to write PS4 games using C# today, you can’t do that on Microsoft’s Xbox One. It has been confirmed that Windows 10 apps, including .NET apps, will be able to run on the Xbox One, after a future system update. But it’s still not clear .NET will be allowed in the <a href="http://wccftech.com/xbox-one-architecture-explained-runs-windows-8-virtually-indistinguishable/">game-specific partition</a>.</li>
+</ul>
+
+<p>C# has come a long way since its introduction in 2000. F#, likewise, has been getting a lot of cross-platform love since it appeared in 2005. I’m excited to see what the next decade holds.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2015/09/05/comparing-api-footprints-of-direct3d-12-11-10-and-9">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2015/09/20/gemini-v0.6-released">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Getting started with JetBrains Nitra - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Getting started with JetBrains Nitra</h1>
+
+    <div class="post-date">
+        <time datetime="2014-11-24T05:52:00+00:00">24 November 2014</time>
+    </div>
+
+    
+
+    <blockquote>
+  <p>If you’re more interested in using the HLSL parser that I built for this blog post, and less interested in how I built it, then <a href="https://github.com/tgjones/hlsl-parser-nitra">head over to the HlslParser GitHub repository</a>.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong>I used Nitra for the first time 3 days ago. I might be and probably am wrong about some of the details. If anyone notices any errors, please let me know in the comments and I’ll update the post. Thanks!</strong></p>
+</blockquote>
+
+<p>Computer languages and parsers are <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">an area</a> <a href="/blog/archive/2010/10/25/introducing-dotliquid-the-secure-open-source-template-engine">of great interest</a> <a href="/blog/archive/2010/11/13/introducing-stitchup-generating-shaders-from-hlsl-shader-fragments">for me</a>. So when I <a href="http://blog.jetbrains.com/blog/2013/11/12/an-introduction-to-nitra/">first heard about</a> the <a href="https://github.com/JetBrains/Nitra">Nitra</a> project from JetBrains, I was intrigued. Over the last weekend, I finally found some time to use Nitra to write a parser for Microsoft’s <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/bb509561%28v=vs.85%29.aspx">High Level Shading Language (HLSL)</a>. In this post, I will describe my experience with Nitra and how to get started with it, and show a little of what it can do.</p>
+
+<p>But first, if you’re wondering whether to keep reading: this whole post is about computer language parsing. Hopefully you find that as fascinating as I do.</p>
+
+<h2 id="what-is-nitra">What is Nitra?</h2>
+
+<p>A code snippet is worth a thousand words, as they say, so I’ll start with a snippet from a Nitra grammar file:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">syntax</span> <span class="n">module</span> <span class="n">HlslGrammar</span>
+<span class="p">{</span>
+  <span class="p">[</span><span class="n">StartRule</span><span class="p">]</span>
+  <span class="n">syntax</span> <span class="n">CompilationUnit</span> <span class="p">=</span> <span class="n">TopLevelDeclaration</span><span class="p">*</span> <span class="p">!</span><span class="n">Any</span><span class="p">;</span>
+
+  <span class="n">syntax</span> <span class="n">TopLevelDeclaration</span>
+  <span class="p">{</span>
+    <span class="p">|</span> <span class="n">Class</span>                  <span class="p">=</span> <span class="s">"class"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">sm</span> <span class="s">":"</span> <span class="n">sm</span> <span class="n">Interface</span><span class="p">=</span><span class="n">Name</span> <span class="n">inl</span> <span class="s">"{"</span> <span class="n">ClassMemberDeclaration</span><span class="p">*</span> <span class="n">d</span> <span class="s">"}"</span> <span class="s">";"</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">ClassMethodDefinition</span>  <span class="p">=</span> <span class="n">FunctionType</span> <span class="n">sm</span> <span class="n">ClassName</span><span class="p">=</span><span class="n">Name</span> <span class="s">"::"</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">FunctionParams</span><span class="p">?</span> <span class="s">")"</span> <span class="n">Block</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">CBuffer</span>                <span class="p">=</span> <span class="s">"cbuffer"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">RegisterAllocation</span><span class="p">?</span> <span class="n">nl</span> <span class="s">"{"</span> <span class="nf">inl</span> <span class="p">(</span><span class="n">VariableDeclaration</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">)+</span> <span class="n">d</span> <span class="s">"}"</span> <span class="s">";"</span><span class="p">?</span> <span class="n">nl</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">FunctionDefinition</span>     <span class="p">=</span> <span class="n">Attribute</span><span class="p">*</span> <span class="n">FunctionType</span> <span class="n">sm</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">FunctionParams</span><span class="p">?</span> <span class="s">")"</span> <span class="p">(</span><span class="n">sm</span> <span class="s">":"</span> <span class="n">sm</span> <span class="n">Semantic</span><span class="p">=</span><span class="n">Identifier</span><span class="p">)?</span> <span class="n">outline_begin_before</span> <span class="n">Block</span> <span class="n">outline_end_before</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">FunctionDeclaration</span>    <span class="p">=</span> <span class="n">Attribute</span><span class="p">*</span> <span class="n">FunctionType</span> <span class="n">sm</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">FunctionParams</span><span class="p">?</span> <span class="s">")"</span> <span class="p">(</span><span class="n">sm</span> <span class="s">":"</span> <span class="n">sm</span> <span class="n">Semantic</span><span class="p">=</span><span class="n">Identifier</span><span class="p">)?</span> <span class="s">";"</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">GeometryShader</span>         <span class="p">=</span> <span class="n">Attribute</span><span class="p">*</span> <span class="s">"void"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">GeometryShaderPrimitiveType</span> <span class="n">sm</span> <span class="n">PrimitiveType</span><span class="p">=</span><span class="n">Type</span> <span class="n">InputName</span><span class="p">=</span><span class="n">Name</span> <span class="s">"["</span> <span class="n">NumElements</span><span class="p">=</span><span class="n">IntegerLiteral</span> <span class="s">"]"</span> <span class="s">","</span> <span class="n">sm</span> <span class="s">"inout"</span> <span class="n">StreamOutputObject</span> <span class="s">")"</span> <span class="n">Block</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">Interface</span>              <span class="p">=</span> <span class="s">"interface"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">inl</span> <span class="s">"{"</span> <span class="n">InterfaceMethodDeclaration</span><span class="p">*</span> <span class="n">d</span> <span class="s">"}"</span> <span class="s">";"</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">SamplerState</span>           <span class="p">=</span> <span class="s">"SamplerState"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">RegisterAllocation</span><span class="p">?</span> <span class="n">SamplerStateBody</span><span class="p">?</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">SamplerComparisonState</span> <span class="p">=</span> <span class="s">"SamplerComparisonState"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">RegisterAllocation</span><span class="p">?</span> <span class="n">SamplerComparisonStateBody</span><span class="p">?</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">Struct</span>                 <span class="p">=</span> <span class="s">"struct"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">nl</span> <span class="s">"{"</span> <span class="nf">inl</span> <span class="p">(</span><span class="n">VariableDeclaration</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">)+</span> <span class="n">d</span> <span class="s">"}"</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+    <span class="p">|</span> <span class="n">Variable</span>               <span class="p">=</span> <span class="n">VariableDeclaration</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+  <span class="p">}</span>
+
+  <span class="c1">// ...
+</span><span class="p">}</span>
+</code></pre>
+</div>
+
+<p>(I’ll go into more detail on Nitra’s grammar syntax a bit later on.)</p>
+
+<p>So what is Nitra? Here’s what JetBrains said in their <a href="http://blog.jetbrains.com/blog/2014/05/27/nitra-goes-open-source/">announcement about Nitra going open source</a>:</p>
+
+<blockquote>
+  <p>Nitra is a language for describing grammars, and the abstract syntax trees to represent them. It is also a build tool to compile the grammars into parsers, and generate the classes required to represent and navigate the AST. And it’s also a set of language services that use the grammar to provide automatic syntax highlighting, outlining and brace matching.</p>
+</blockquote>
+
+<p>Nitra provides (or in some cases will provide, when it’s officially released) a number of advantages over standard parser generators. It is a parser generator, but it also:</p>
+
+<ul>
+  <li>allows you to extend existing languages using a natural and elegant syntax, and</li>
+  <li>provides tooling integrated into Visual Studio to perform syntax highlighting, code folding, static analysis and refactoring (so far, only syntax highlighting and code folding have been implemented)</li>
+</ul>
+
+<p>The <a href="http://en.wikipedia.org/wiki/Don%27t_repeat_yourself">DRYness</a> implied by that last point appeals to me; you can define a grammar once, and Nitra will build a parser and VS-integrated tooling for you. I don’t know whether the Nitra team plan to provide tooling for other IDEs and text editors; that would be awesome.</p>
+
+<p>Right now, Nitra generates a parser from a language grammar, and provides syntax highlighting and code folding in Visual Studio based on that grammar, but that’s about it. However, they have an <a href="https://confluence.jetbrains.com/display/Nitra/Roadmap">ambitious roadmap</a>, which includes such things as:</p>
+
+<ul>
+  <li>Implement (semi)automatic VS/ReSharper support</li>
+  <li>Implement project and solutions support</li>
+  <li>Support Nitra driven language files in VS solutions/projects</li>
+  <li>Generation of executable images</li>
+</ul>
+
+<p>JetBrains’ investment in Nitra makes sense; most of JetBrains’ products relate in some way to parsing, compiling, refactoring, or in some other way understanding code. They need a tool like Nitra to help them keep moving forwards quickly. But it’s great for the rest of us that they have made Nitra an open source project. If you’ve got any language ideas that you want to play with, give Nitra a try. You can even use the <a href="https://github.com/JetBrains/Nitra/tree/master/Grammars/CSharp/CSharp.Grammar/CSharp">C# grammar</a> as a starting point (if that’s your thing).</p>
+
+<p>For me, I’m just fascinated by compilers and computer languages. (Yes, that makes me great at parties.) I do have some language ideas that I plan to try out using Nitra, but for now, this is just for fun.</p>
+
+<p>Nitra is not, of course, the only parser toolkit in town. To name just a few others: <a href="http://www.antlr.org/">ANTLR</a>, <a href="https://irony.codeplex.com/">Irony</a>, <a href="https://github.com/sprache/Sprache">Sprache</a>, <a href="http://fsprojects.github.io/FsLexYacc/">FsLex/FsYacc</a>, <a href="http://dervall.github.io/Piglet/">Piglet</a>, <a href="http://www.quanttec.com/fparsec/">FParsec</a>. I’ve tried some of them, but I don’t have enough experience with any of them to do a comparison.</p>
+
+<h2 id="installation">Installation</h2>
+
+<p>You can find <a href="https://confluence.jetbrains.com/display/Nitra/Install">the official installation instructions</a> on the Nitra site, but I’ll repeat them here for clarity.</p>
+
+<p>Before you start, you need to have a recent version of Visual Studio installed. (The recently released <a href="http://www.visualstudio.com/en-us/news/vs2013-community-vs.aspx">Visual Studio 2013 Community</a> will work fine.)</p>
+
+<ol>
+  <li>
+    <p>Install Nemerle. <a href="http://nemerle.org/Downloads">Grab the Nemerle installer here</a>. At the time of writing (November 2014), the current version is v1.2.404.0, and I installed that into Visual Studio 2013. (Nemerle is a whole topic to itself; it’s a really interesting language that I would love to see getting more attention. It’s a prerequisite for Nitra because Nitra is built in the Nemerle language.)</p>
+  </li>
+  <li>
+    <p>Install Nitra. At the time of writing, <a href="http://nemerle.org/nitra-builds/Nitra.Setup.msi">you can download the Nitra installer here</a>, but I guess that URL may change in the future.</p>
+  </li>
+</ol>
+
+<p>That’s it for installation. Now, you can go ahead and create a Nitra project.</p>
+
+<p>(I ran into an issue immediately after creating a Nitra project, where compiler errors were referring to an old version of the grammar I was working on. I restarted Visual Studio, and didn’t encounter the problem again.)</p>
+
+<h2 id="creating-a-nitra-project">Creating a Nitra project</h2>
+
+<p>Open Visual Studio, and go to File &gt; New Project. On the left, expand Nemerle and select Nitra. You should see something like this:</p>
+
+<p><img src="/assets/posts/create-nitra-project.png" alt="" /></p>
+
+<p>Choose <strong>Empty Parser Library</strong>, type in a project name, and click OK. That will create a new Nitra project, with a mostly empty syntax module. I renamed the syntax module file to <code class="highlighter-rouge">HlslGrammar.nitra</code>.</p>
+
+<p>In the Nitra install directory (<code class="highlighter-rouge">C:\Program Files (x86)\JetBrains\Nitra</code>), you’ll find <code class="highlighter-rouge">Nitra.Visualizer.exe</code>, a GUI tool that’s supposed to help you build Nitra grammars somewhat interactively. But I didn’t have much luck with it - I tried it with the sample C# grammar and test suite, and it kept crashing. I assume that’s just because Nitra is still in development.</p>
+
+<p>Anyway, I prefer the combination of Visual Studio / ReSharper / NUnit. So I created a new project - <code class="highlighter-rouge">HlslParser.Tests</code> - and added the NUnit package from NuGet. I don’t want to tell you how to write your tests, but this test method worked well for me (<a href="https://github.com/tgjones/hlsl-parser-nitra/blob/master/src/HlslParser.Tests/HlslParserTests.cs">source here</a>):</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="na">[TestCaseSource("GetTestShaders")]</span>
+<span class="k">public</span> <span class="k">void</span> <span class="nf">CanParseShader</span><span class="p">(</span><span class="kt">string</span> <span class="n">testFile</span><span class="p">,</span> <span class="kt">string</span> <span class="n">knownGoodFile</span><span class="p">)</span>
+<span class="p">{</span>
+  <span class="kt">var</span> <span class="n">sourceCode</span> <span class="p">=</span> <span class="n">File</span><span class="p">.</span><span class="nf">ReadAllText</span><span class="p">(</span><span class="n">testFile</span><span class="p">);</span>
+
+  <span class="c1">// Parse test code.
+</span>  <span class="kt">var</span> <span class="n">sourceSnapshot</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">SourceSnapshot</span><span class="p">(</span><span class="n">sourceCode</span><span class="p">);</span>
+  <span class="kt">var</span> <span class="n">parserHost</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">ParserHost</span><span class="p">();</span>
+  <span class="kt">var</span> <span class="n">compilationUnit</span> <span class="p">=</span> <span class="n">HlslGrammar</span><span class="p">.</span><span class="nf">CompilationUnit</span><span class="p">(</span><span class="n">sourceSnapshot</span><span class="p">,</span> <span class="n">parserHost</span><span class="p">);</span>
+
+  <span class="c1">// Check for parse errors.
+</span>  <span class="k">if</span> <span class="p">(!</span><span class="n">compilationUnit</span><span class="p">.</span><span class="n">IsSuccess</span><span class="p">)</span>
+  <span class="p">{</span>
+    <span class="k">throw</span> <span class="k">new</span> <span class="nf">Exception</span><span class="p">(</span><span class="kt">string</span><span class="p">.</span><span class="nf">Join</span><span class="p">(</span><span class="n">Environment</span><span class="p">.</span><span class="n">NewLine</span><span class="p">,</span>
+      <span class="n">compilationUnit</span><span class="p">.</span><span class="nf">GetErrors</span><span class="p">().</span><span class="nf">Select</span><span class="p">(</span><span class="n">x</span> <span class="p">=&gt;</span> <span class="kt">string</span><span class="p">.</span><span class="nf">Format</span><span class="p">(</span><span class="s">"Line {0}, Col {1}: {2}{3}{4}"</span><span class="p">,</span>
+      <span class="n">x</span><span class="p">.</span><span class="n">Location</span><span class="p">.</span><span class="n">StartLineColumn</span><span class="p">.</span><span class="n">Line</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">Location</span><span class="p">.</span><span class="n">StartLineColumn</span><span class="p">.</span><span class="n">Column</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">Message</span><span class="p">,</span>
+      <span class="n">Environment</span><span class="p">.</span><span class="n">NewLine</span><span class="p">,</span> <span class="n">x</span><span class="p">.</span><span class="n">Location</span><span class="p">.</span><span class="n">Source</span><span class="p">.</span><span class="nf">GetSourceLine</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">Location</span><span class="p">.</span><span class="n">StartPos</span><span class="p">).</span><span class="nf">GetText</span><span class="p">()))));</span>
+  <span class="p">}</span>
+
+  <span class="n">Assert</span><span class="p">.</span><span class="nf">That</span><span class="p">(</span><span class="n">compilationUnit</span><span class="p">.</span><span class="n">IsSuccess</span><span class="p">,</span> <span class="n">Is</span><span class="p">.</span><span class="n">True</span><span class="p">);</span>
+
+  <span class="c1">// Get pretty-printed version of parse tree.
+</span>  <span class="kt">var</span> <span class="n">parseTree</span> <span class="p">=</span> <span class="n">compilationUnit</span><span class="p">.</span><span class="nf">CreateParseTree</span><span class="p">();</span>
+  <span class="kt">var</span> <span class="n">parsedCode</span> <span class="p">=</span> <span class="n">parseTree</span><span class="p">.</span><span class="nf">ToString</span><span class="p">();</span>
+
+  <span class="c1">// Compare pretty-printed parse tree with known good version
+</span>  <span class="c1">// (if known good version exists).
+</span>  <span class="k">if</span> <span class="p">(</span><span class="n">File</span><span class="p">.</span><span class="nf">Exists</span><span class="p">(</span><span class="n">knownGoodFile</span><span class="p">))</span>
+  <span class="p">{</span>
+    <span class="kt">var</span> <span class="n">knownGoodCode</span> <span class="p">=</span> <span class="n">File</span><span class="p">.</span><span class="nf">ReadAllText</span><span class="p">(</span><span class="n">knownGoodFile</span><span class="p">);</span>
+    <span class="n">Assert</span><span class="p">.</span><span class="nf">That</span><span class="p">(</span><span class="n">parsedCode</span><span class="p">,</span> <span class="n">Is</span><span class="p">.</span><span class="nf">EqualTo</span><span class="p">(</span><span class="n">knownGoodCode</span><span class="p">));</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="k">private</span> <span class="k">static</span> <span class="n">IEnumerable</span><span class="p">&lt;</span><span class="n">TestCaseData</span><span class="p">&gt;</span> <span class="nf">GetTestShaders</span><span class="p">()</span>
+<span class="p">{</span>
+  <span class="k">return</span> <span class="n">Directory</span><span class="p">.</span><span class="nf">GetFiles</span><span class="p">(</span><span class="s">"Shaders"</span><span class="p">,</span> <span class="s">"*.hlsl"</span><span class="p">,</span> <span class="n">SearchOption</span><span class="p">.</span><span class="n">AllDirectories</span><span class="p">)</span>
+    <span class="p">.</span><span class="nf">Select</span><span class="p">(</span><span class="n">x</span> <span class="p">=&gt;</span> <span class="k">new</span> <span class="nf">TestCaseData</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">Path</span><span class="p">.</span><span class="nf">ChangeExtension</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="s">".knowngood"</span><span class="p">)));</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>There are a few things going on there:</p>
+
+<ul>
+  <li>
+    <p>I’m using NUnit’s <code class="highlighter-rouge">TestCaseSource</code> attribute, to dynamically build a set of tests based on the return value from the <code class="highlighter-rouge">GetTestShaders()</code> method. <code class="highlighter-rouge">GetTestShaders()</code>, in turn, looks for all the <code class="highlighter-rouge">.hlsl</code> files in the <code class="highlighter-rouge">Shaders</code> folder, and returns them, along with a <code class="highlighter-rouge">.knowngood</code> version of the each file, which may or may not exist.</p>
+  </li>
+  <li>
+    <p>In <code class="highlighter-rouge">CanParseShader</code>, I read the test file into a <code class="highlighter-rouge">sourceCode</code> string, and then build two Nitra objects. <code class="highlighter-rouge">sourceSnapshot</code> is how Nitra represents source code, and <code class="highlighter-rouge">parserHost</code> stores some parser-specific configuration options. Then I call <code class="highlighter-rouge">HlslGrammar.CompilationUnit</code>, which corresponds to the “start rule” in my Nitra grammar - I’ll explain start rules shortly.</p>
+  </li>
+  <li>
+    <p>If parsing failed, I extract the location in the source file and the surrounding code, so that I can show myself a helpful error message in the test runner console.</p>
+  </li>
+  <li>
+    <p>If parsing succeeded, I create the <code class="highlighter-rouge">parseTree</code> object, which is essentially the Abstract Syntax Tree (AST). This is the object you need if you want to do something useful with the code you’ve just parsed.</p>
+  </li>
+  <li>
+    <p>For the purposes of this test, all I do with the AST is call <code class="highlighter-rouge">ToString()</code> on it - this internally uses Nitra’s pretty printing feature to spit the AST back out in a form very similar to the original code. We’ll see later how you can include pretty printing directives directly in your grammar. This pretty printing feature is, I think, only really useful for tests like these - it’s easier to compare with a stringified version of the AST than the full AST itself.</p>
+  </li>
+  <li>
+    <p>Finally, if there a <code class="highlighter-rouge">.knowngood</code> version of the source <code class="highlighter-rouge">.hlsl</code> file, then I compare the pretty printed version of the AST with the <code class="highlighter-rouge">.knowngood</code> version, and check that they match. I only wrote <code class="highlighter-rouge">.knowngood</code> versions of a few of the test files, because I’m lazy. <a href="https://github.com/tgjones/hlsl-parser-nitra/blob/master/src/HlslParser.Tests/Shaders/FxDis/test.knowngood">You can see one here</a> - note that there’s less whitespace, and there are no comments. Considering it’s produced from Nitra’s AST, and considering I had to do very little to make it work, it’s a nice feature.</p>
+  </li>
+</ul>
+
+<p>Like I said, you can develop a Nitra grammar any way you want - but I found it helpful to build a <a href="https://github.com/tgjones/hlsl-parser-nitra/tree/master/src/HlslParser.Tests/Shaders">test suite of source code files</a>, and run them after each change to the grammar. (Actually, I started with one test file, and gradually uncommented more and more of it as I built the grammar out.)</p>
+
+<p>One thing you’ll find if you’re constantly rebuilding your Nitra grammar and running tests, is that it’s not fast. For my HLSL grammar on my 2-year-old computer, it takes ~20 seconds to compile. There’s obviously a lot going on to convert a grammar into a parser and a set of AST classes, so perhaps this is unavoidable. Other parser generators have non-zero build times too. But any performance improvements in this area would be very noticeable.</p>
+
+<h2 id="building-a-nitra-grammar">Building a Nitra grammar</h2>
+
+<p>To explore Nitra, I decided to use it to build a parser for <a href="http://msdn.microsoft.com/en-us/library/windows/desktop/bb509561%28v=vs.85%29.aspx">Microsoft’s High Level Shading Language (HLSL)</a>, capable of parsing Shader Model 5.0 shaders. It actually turned out to be a pretty reasonable parser in its own right; I might keep developing it, especially when future versions of Nitra are released that make HLSL code completion a possibility.</p>
+
+<p>If you want a simpler example to try out yourself, have a look at the <a href="https://github.com/JetBrains/Nitra/blob/master/Grammars/Samples/Calculator/Sample.Calc/CalcGrammar.nitra">Calculator example</a> in Nitra’s GitHub repo.</p>
+
+<p>The <a href="https://confluence.jetbrains.com/display/Nitra/Syntax">syntax reference</a> on the Nitra website is a very useful resource. You’ll definitely need to refer to it when you’re starting out with Nitra.</p>
+
+<p>Nitra grammars are defined in one or more syntax modules. Here is a syntax module:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="k">namespace</span> <span class="nn">HlslParser</span>
+<span class="p">{</span>
+  <span class="n">syntax</span> <span class="n">module</span> <span class="n">HlslGrammar</span>
+  <span class="p">{</span>
+    <span class="k">using</span> <span class="nn">CStyleComments</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">Identifiers</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">Outline</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">PrettyPrint</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">StandardSpanClasses</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">TokenNames</span><span class="p">;</span>
+    <span class="k">using</span> <span class="nn">Whitespaces</span><span class="p">;</span>
+
+    <span class="p">[</span><span class="n">StartRule</span><span class="p">]</span>
+    <span class="n">syntax</span> <span class="n">CompilationUnit</span> <span class="p">=</span> <span class="n">TopLevelDeclaration</span><span class="p">*</span> <span class="p">!</span><span class="n">Any</span><span class="p">;</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Nitra’s grammar syntax is highly reminiscent of <a href="http://en.wikipedia.org/wiki/Backus%E2%80%93Naur_Form">BNF</a>.</p>
+
+<p>It’s obviously not C# code, but it should still feel familiar to anyone who’s programmed in C#. The syntax module is enclosed in a <code class="highlighter-rouge">namespace</code>, and it contains multiple <code class="highlighter-rouge">using</code> statements. Those <code class="highlighter-rouge">using</code>s pull in syntax modules defined in <code class="highlighter-rouge">Nitra.Core</code>. If you’re building a C-like language, then these modules save you having to repeat all the standard stuff - C-style comments, identifier rules, whitespace rules, etc. Since Nitra itself is open source, you can <a href="https://github.com/JetBrains/Nitra/tree/master/Nitra/Nitra.Core">browse the source code for these syntax modules on GitHub</a>.</p>
+
+<p>You can also import your own syntax modules, if you want to split your language grammar into multiple files.</p>
+
+<p>Then comes the first rule: <code class="highlighter-rouge">CompilationUnit</code>. It’s decorated with the <code class="highlighter-rouge">[StartRule]</code> attribute. This is like the <code class="highlighter-rouge">Main</code> method in a .NET console application - it tells Nitra where parsing should begin. The start rule forms the name of the method you should call when you want to parse something. In this case,  it’s <code class="highlighter-rouge">HlslParser.HlslGrammar.CompilationUnit(...)</code>.</p>
+
+<h3 id="simple-rules">Simple rules</h3>
+
+<p>Let’s look at how the <code class="highlighter-rouge">CompilationUnit</code> rule is defined:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">syntax</span> <span class="n">CompilationUnit</span> <span class="p">=</span> <span class="n">TopLevelDeclaration</span><span class="p">*</span> <span class="p">!</span><span class="n">Any</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>Nitra calls this rule a <a href="https://confluence.jetbrains.com/display/Nitra/SimpleRule">simple rule</a>. The asterisk after <code class="highlighter-rouge">TopLevelDeclaration</code> means “zero or more of the preceding element”. <code class="highlighter-rouge">Any</code> is defined in the <code class="highlighter-rouge">Whitespaces</code> module, and means “literally any character”. The <code class="highlighter-rouge">!</code> preceding it is Nitra’s <a href="https://confluence.jetbrains.com/display/Nitra/RuleExpression.Not">Not predicate</a>, and in this case, it ensures that there are no extra characters following the end of the program.</p>
+
+<p>Nitra generates a set of AST classes based on the syntax rules in your grammar. Inside these classes, it generates properties named after the components of each syntax rule. For example, Nitra will generate a <code class="highlighter-rouge">CompilationUnit</code> class, with a <code class="highlighter-rouge">TopLevelDeclarations</code> property. If you like, you can also set explicit names for AST properties - we’ll see an example of that soon.</p>
+
+<h3 id="extensible-rules">Extensible rules</h3>
+
+<p>Let’s look at (a simplified version of) the <code class="highlighter-rouge">TopLevelDeclaration</code> rule:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">syntax</span> <span class="n">TopLevelDeclaration</span>
+<span class="p">{</span>
+  <span class="p">|</span> <span class="n">FunctionDefinition</span>  <span class="p">=</span> <span class="n">Attribute</span><span class="p">*</span> <span class="n">FunctionType</span> <span class="n">sm</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">FunctionParams</span><span class="p">?</span> <span class="s">")"</span> <span class="p">(</span><span class="n">sm</span> <span class="s">":"</span> <span class="n">sm</span> <span class="n">Semantic</span><span class="p">=</span><span class="n">Identifier</span><span class="p">)?</span> <span class="n">outline_begin_before</span> <span class="n">Block</span> <span class="n">outline_end_before</span><span class="p">;</span>
+  <span class="p">|</span> <span class="n">FunctionDeclaration</span> <span class="p">=</span> <span class="n">Attribute</span><span class="p">*</span> <span class="n">FunctionType</span> <span class="n">sm</span> <span class="n">Name</span> <span class="s">"("</span> <span class="n">FunctionParams</span><span class="p">?</span> <span class="s">")"</span> <span class="p">(</span><span class="n">sm</span> <span class="s">":"</span> <span class="n">sm</span> <span class="n">Semantic</span><span class="p">=</span><span class="n">Identifier</span><span class="p">)?</span> <span class="s">";"</span><span class="p">;</span>
+  <span class="p">|</span> <span class="n">Struct</span>              <span class="p">=</span> <span class="s">"struct"</span> <span class="n">sm</span> <span class="n">Name</span> <span class="n">nl</span> <span class="s">"{"</span> <span class="nf">inl</span> <span class="p">(</span><span class="n">VariableDeclaration</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">)+</span> <span class="n">d</span> <span class="s">"}"</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+  <span class="p">|</span> <span class="n">Variable</span>            <span class="p">=</span> <span class="n">VariableDeclaration</span> <span class="s">";"</span> <span class="n">nl</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>This is what Nitra calls an <a href="https://confluence.jetbrains.com/display/Nitra/ExtensibleRule">extensible rule</a>. You can <a href="https://confluence.jetbrains.com/display/Nitra/ExtendSyntax">extend</a> this type of rule in a separate syntax module, even one defined in another assembly.</p>
+
+<p>Each of the items inside the extensible rule are called options. Look at the <code class="highlighter-rouge">FunctionDefinition</code> option. It’s designed to match a function definition of this form:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">float4</span> <span class="n">MyPixelShader</span><span class="p">(</span><span class="n">float4</span> <span class="n">t0</span> <span class="o">:</span> <span class="n">TEXCOORD0</span><span class="p">,</span> <span class="n">float4</span> <span class="n">t1</span> <span class="o">:</span> <span class="n">TEXCOORD1</span><span class="p">)</span> <span class="o">:</span> <span class="n">SV_Target</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="n">float4</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>Still focusing on the <code class="highlighter-rouge">FunctionDefinition</code> option, there are a few things to note:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">Semantic=Identifier</code> tells Nitra what the corresponding property name in the AST class should be. Without that, Nitra would name it <code class="highlighter-rouge">Identifier2</code> (or something like that; I haven’t actually checked).</li>
+  <li>Interspersed throughout these grammar rules are “pretty printing” declarations. These are defined in the <a href="https://github.com/JetBrains/Nitra/blob/master/Nitra/Nitra.Core/PrettyPrint.nitra">PrettyPrinting</a> core module, and are only used when converting from the AST back to code, usually for automated testing purposes. Specifically:
+    <ul>
+      <li><code class="highlighter-rouge">sm</code> = space marker. Tells Nitra to leave a space between elements when pretty printing.</li>
+      <li><code class="highlighter-rouge">nl</code> = newline.</li>
+      <li><code class="highlighter-rouge">i</code> = increase indent.</li>
+      <li><code class="highlighter-rouge">d</code> = decrease indent.</li>
+      <li><code class="highlighter-rouge">inl</code> = increase indent and newline.</li>
+    </ul>
+  </li>
+  <li>You can also see outlining related declarations - <code class="highlighter-rouge">outline_begin_before</code> and <code class="highlighter-rouge">outline_begin_end</code>. These are defined in the <a href="https://github.com/JetBrains/Nitra/blob/master/Nitra/Nitra.Core/Outline.nitra">Outline</a> core module, and are used by Nitra’s Visual Studio extension to implement code folding in the editor.</li>
+</ul>
+
+<p>As an aside - once or twice, I ran into <code class="highlighter-rouge">StackOverflowException</code> at runtime. This turned out to be related to a mistake I’d made in the grammar, which meant it was infinitely recursive. Ideally, Nitra could detect this at compile-time, but for now, it’s something to watch out for.</p>
+
+<p>Separately, I also encountered odd runtime errors that turned out to be caused by too-deep nesting. For example:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="p">|</span> <span class="n">Switch</span> <span class="p">=</span> <span class="n">Attribute</span><span class="p">?</span> <span class="s">"switch"</span> <span class="n">sm</span> <span class="s">"("</span> <span class="n">Expression</span> <span class="s">")"</span> <span class="n">nl</span> <span class="s">"{"</span> <span class="nf">inl</span> <span class="p">(</span><span class="n">SwitchLabel</span><span class="p">+</span> <span class="n">i</span> <span class="n">Statement</span><span class="p">+</span> <span class="n">d</span><span class="p">)*</span> <span class="n">d</span> <span class="s">"}"</span> <span class="n">nl</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>resulted in this runtime exception:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>Nemerle.Core.AssertionException : assertion ``rawTreePtr &gt; 0'' failed in file Internal\ParseResult\ParseResult.n, line 268
+</code></pre>
+</div>
+
+<p>If instead I broke that subrule out into its own rule, like this:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">syntax</span> <span class="n">SwitchSection</span> <span class="p">=</span> <span class="n">SwitchLabel</span><span class="p">+</span> <span class="n">i</span> <span class="n">Statement</span><span class="p">+</span> <span class="n">d</span><span class="p">;</span>
+<span class="p">...</span>
+<span class="p">|</span> <span class="n">Switch</span> <span class="p">=</span> <span class="n">Attribute</span><span class="p">?</span> <span class="s">"switch"</span> <span class="n">sm</span> <span class="s">"("</span> <span class="n">Expression</span> <span class="s">")"</span> <span class="n">nl</span> <span class="s">"{"</span> <span class="n">inl</span> <span class="n">SwitchSection</span><span class="p">*</span> <span class="n">d</span> <span class="s">"}"</span> <span class="n">nl</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>… then everything worked. I think this should be a compile-time, not runtime, error.</p>
+
+<h3 id="regex-rules">Regex rules</h3>
+
+<p>From what I can tell, simple rules and extensible rules are the most used in Nitra syntax. But there are other types of rules as well. One type that’s often used for more atomic rules is the <a href="https://confluence.jetbrains.com/display/Nitra/RegexRule">regex rule</a>.</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">regex</span> <span class="n">ScalarType</span> <span class="p">=</span> <span class="s">"bool"</span> <span class="p">|</span> <span class="s">"int"</span> <span class="p">|</span> <span class="s">"uint"</span> <span class="p">|</span> <span class="s">"dword"</span> <span class="p">|</span> <span class="s">"half"</span> <span class="p">|</span> <span class="s">"float"</span> <span class="p">|</span> <span class="s">"double"</span> <span class="p">|</span> <span class="s">"unsigned int"</span><span class="p">;</span>
+<span class="n">regex</span> <span class="n">VectorType</span> <span class="p">=</span> <span class="n">ScalarType</span> <span class="p">[</span><span class="sc">'1'</span><span class="p">..</span><span class="sc">'4'</span><span class="p">];</span>
+<span class="n">regex</span> <span class="n">MatrixType</span> <span class="p">=</span> <span class="n">ScalarType</span> <span class="p">[</span><span class="sc">'1'</span><span class="p">..</span><span class="sc">'4'</span><span class="p">]</span> <span class="s">"x"</span> <span class="p">[</span><span class="sc">'1'</span><span class="p">..</span><span class="sc">'4'</span><span class="p">];</span>
+
+<span class="n">regex</span> <span class="n">BooleanLiteral</span> <span class="p">=</span> <span class="s">"true"</span> <span class="p">|</span> <span class="s">"false"</span><span class="p">;</span>
+
+<span class="n">regex</span> <span class="n">DecimalDigit</span> <span class="p">=</span> <span class="p">[</span><span class="sc">'0'</span><span class="p">..</span><span class="sc">'9'</span><span class="p">];</span>
+<span class="n">regex</span> <span class="n">HexDigit</span> <span class="p">=</span> <span class="p">[</span><span class="sc">'0'</span><span class="p">..</span><span class="sc">'9'</span><span class="p">,</span> <span class="sc">'a'</span><span class="p">..</span><span class="sc">'f'</span><span class="p">,</span> <span class="sc">'A'</span><span class="p">..</span><span class="sc">'F'</span><span class="p">];</span>
+<span class="n">regex</span> <span class="n">DecimalIntegerLiteral</span> <span class="p">=</span> <span class="n">DecimalDigit</span><span class="p">+;</span>
+<span class="n">regex</span> <span class="n">HexadecimalIntegerLiteral</span> <span class="p">=</span> <span class="p">(</span><span class="s">"0x"</span> <span class="p">|</span> <span class="s">"0X"</span><span class="p">)</span> <span class="n">HexDigit</span><span class="p">+;</span>
+
+<span class="na">[SpanClass(Number)]</span>
+<span class="n">regex</span> <span class="n">IntegerLiteral</span> <span class="p">=</span> <span class="n">HexadecimalIntegerLiteral</span> <span class="p">|</span> <span class="n">DecimalIntegerLiteral</span><span class="p">;</span>
+</code></pre>
+</div>
+
+<p>No AST classes are generated for regex rules. Instead, you only get access to the raw text through whatever rule contains it.</p>
+
+<p>Note the <code class="highlighter-rouge">SpanClass</code> attribute on the <code class="highlighter-rouge">IntegerLiteral</code> rule. That hint is supplied to Nitra’s Visual Studio extension when doing syntax highlighting in the editor. However, for me at least, <code class="highlighter-rouge">SpanClass</code> attributes on regex rules don’t seem to work, even though Nitra’s own samples use them. I’m not sure if this is still in development, or you’re just not supposed to use them on regex rules.</p>
+
+<h3 id="extending-tokens">Extending tokens</h3>
+
+<p>I mentioned earlier that extensible rules can, as the name suggests, be extended. Here’s an example - in fact, you’ll find yourself doing this particular one in pretty much every Nitra grammar you write:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">extend</span> <span class="n">token</span> <span class="n">IgnoreToken</span>
+<span class="p">{</span>
+  <span class="p">|</span> <span class="p">[</span><span class="nf">SpanClass</span><span class="p">(</span><span class="n">Comment</span><span class="p">),</span> <span class="n">ExplicitSpaces</span><span class="p">]</span> <span class="n">SingleLineComment</span><span class="p">;</span>
+  <span class="p">|</span> <span class="p">[</span><span class="nf">SpanClass</span><span class="p">(</span><span class="n">Comment</span><span class="p">),</span> <span class="n">ExplicitSpaces</span><span class="p">]</span> <span class="n">MultiLineComment</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p><code class="highlighter-rouge">SingleLineComment</code> and <code class="highlighter-rouge">MultiLineComment</code> are <a href="https://github.com/JetBrains/Nitra/blob/master/Nitra/Nitra.Core/CStyleComments.nitra#L5">defined here</a>. We’re using a shorthand feature - if an option name in an extensible rule matches another rule name, then you don’t need to write <code class="highlighter-rouge">| TheRuleName = TheRuleName;</code>. You can just write <code class="highlighter-rouge">| TheRuleName;</code>.</p>
+
+<p>The base <code class="highlighter-rouge">IgnoreToken</code> is <a href="https://github.com/JetBrains/Nitra/blob/master/Nitra/Nitra.Core/Whitespaces.nitra#L16">defined</a> like this:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">token</span> <span class="n">IgnoreToken</span>
+<span class="p">{</span>
+  <span class="p">|</span> <span class="n">SpaceToken</span> <span class="p">=</span> <span class="n">Spaces</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<p>This extension has the effect of adding <code class="highlighter-rouge">SingleLineComment</code> and <code class="highlighter-rouge">MultiLineComment</code> options to the existing <code class="highlighter-rouge">SpaceToken</code> option.</p>
+
+<p>This is a powerful mechanism - for example, you could start with the <a href="https://github.com/JetBrains/Nitra/tree/master/Grammars/CSharp/CSharp.Grammar/CSharp">C# grammar</a>, and extend it with one or two of your own rules, without having to redefine the whole language just to get to that point (<a href="https://social.msdn.microsoft.com/Forums/vstudio/en-US/8e930e49-cc3d-4434-9a94-0dc7ff98d2ed/metaprogramming-and-parser-extensibility-in-c-and-roslyn?forum=roslyn">looking at you</a>, Roslyn).</p>
+
+<p>There’s a lot more to Nitra syntax, but hopefully that gives you an overview of what’s available. You can peruse the <a href="https://github.com/tgjones/hlsl-parser-nitra/blob/master/src/HlslParser/HlslGrammar.nitra">full HLSL grammar</a> on my GitHub repo for more in-depth examples.</p>
+
+<h2 id="syntax-highlighting-and-code-folding">Syntax highlighting and code folding</h2>
+
+<p>Once you’ve written your grammar, you can integrate it into Visual Studio. Specifically, you can get syntax highlighting and code folding in the standard Visual Studio editor, for your own language. (There are more VS features planned for the future.)</p>
+
+<p>To do that, you need to:</p>
+
+<ol>
+  <li>Compile your Nitra project, and find the resulting DLL.</li>
+  <li>(Optional) Copy the DLL into <code class="highlighter-rouge">C:\Program Files (x86)\JetBrains\Nitra</code>.</li>
+  <li>Edit <code class="highlighter-rouge">C:\Program Files (x86)\JetBrains\Nitra\NitraGlobalConfig.xml</code>.</li>
+  <li>Add a new <code class="highlighter-rouge">Language</code> to the <code class="highlighter-rouge">Languages</code> element. For example:</li>
+</ol>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>&lt;Language Name="HLSL" FileExtensions=".nhlsl" Grammar="HlslParser.HlslGrammar" StartRule="CompilationUnit"&gt;
+  &lt;Module&gt;&lt;![CDATA[$NitraPath\HlslParser.dll]]&gt;&lt;/Module&gt;
+&lt;/Language&gt;
+</code></pre>
+</div>
+
+<p>And then restart Visual Studio.</p>
+
+<p>I used the <code class="highlighter-rouge">.nhlsl</code> extension, so I didn’t mess with Visual Studio’s built-in <code class="highlighter-rouge">.hlsl</code> syntax highlighting. Now when I open a <code class="highlighter-rouge">.nhlsl</code> file, I see syntax highlighting and code folding. Pretty cool! (As I mentioned earlier, syntax highlighting isn’t working for regex rules, so it’s not quite as “highlighted” as it should be.)</p>
+
+<p><img src="/assets/posts/nitra-syntax-highlighting.png" alt="" /></p>
+
+<p>Even better - and this is something that even Visual Studio’s HLSL editor doesn’t offer - I get <strong>real-time</strong> parse errors highlighted and included in the error list. To be clear - this is real-time, just like ReSharper’s parse errors. You don’t need to compile to see these errors.</p>
+
+<p><img src="/assets/posts/nitra-parse-errors.png" alt="" /></p>
+
+<p>It will be so much cooler once it supports code completion…</p>
+
+<p>I hope that there will be an easy to distribute your own grammars to other people’s computers - editing an XML file isn’t ideal in the long term.</p>
+
+<h2 id="next-steps">Next steps</h2>
+
+<p>So, you’ve written your Nitra grammar, and seen some basic Visual Studio integration - now what? You probably want to do something with your language, such as, you know, compile it.</p>
+
+<p>Nitra is still in development, and so far, it only really offers a parser generator, as well as a couple of VS integration points. The back-end parts of the compiler will come later.</p>
+
+<p>As I described earlier, you can invoke the parser by calling your start rule method. Calling <code class="highlighter-rouge">CreateParseTree</code> on the object you get back will give you the AST. You can cast the AST object to the type of your start rule, and then navigate through the tree from there, like this:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="kt">var</span> <span class="n">parseTree</span> <span class="p">=</span> <span class="p">(</span><span class="n">HlslGrammarParseTree</span><span class="p">.</span><span class="n">CompilationUnit</span><span class="p">)</span> <span class="n">compilationUnit</span><span class="p">.</span><span class="nf">CreateParseTree</span><span class="p">();</span>
+<span class="kt">var</span> <span class="n">firstDeclaration</span> <span class="p">=</span> <span class="n">parseTree</span><span class="p">.</span><span class="n">TopLevelDeclarations</span><span class="p">[</span><span class="m">0</span><span class="p">];</span>
+</code></pre>
+</div>
+
+<p>You’ll need to do a lot of casting if you go down that road.</p>
+
+<p>Or you can write a class that inherits from <code class="highlighter-rouge">ParseTreeVisitor</code>, and pass it to the <code class="highlighter-rouge">Accept</code> method on your AST.</p>
+
+<p>Finally, you can write <a href="https://confluence.jetbrains.com/display/Nitra/RuleMethod">rule methods</a> directly in your grammar, and these will be added as methods to your AST. The <a href="https://github.com/JetBrains/Nitra/blob/master/Grammars/Samples/Calculator/Sample.Calc/CalcGrammar.nitra">calculator sample</a> does this. I think this is fine for simple parsers, but for more complex languages, this would quickly get out of hand.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Nitra is already an interesting project, and a good way to get a parser up and running. But <a href="https://confluence.jetbrains.com/display/Nitra/Milestone+2">Milestone 2</a> on Nitra’s roadmap includes some important features, including a type system and better IDE support. If I really wanted to write a language using Nitra, I’d wait till those features are fully baked before starting. I don’t know how the type system will work, but if it’s as well integrated as other features like syntax highlighting and code folding, then it should be nice to work with.</p>
+
+<p>It would be great if Nitra opens up language development for more people - what if you could define per-project C# language extensions? Obviously, that could easily be abused, but used wisely, it could solve a lot of common pain points (WPF dependency properties / <code class="highlighter-rouge">INotifyPropertyChanged</code> implementations spring to mind).</p>
+
+<p>I’m going to be keeping an eye on Nitra - it’s an exciting project, and I’m looking forward to seeing how it turns out.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/10/20/the-matrix-inverted">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/12/28/make-santa-jump-game-in-fsharp-using-monogame">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

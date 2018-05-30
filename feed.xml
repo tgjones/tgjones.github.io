@@ -1,0 +1,1519 @@
+<?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xml" href="http://timjones.io/feed.xslt.xml"?><feed xmlns="http://www.w3.org/2005/Atom"><generator uri="http://jekyllrb.com" version="3.4.3">Jekyll</generator><link href="http://timjones.io/feed.xml" rel="self" type="application/atom+xml" /><link href="http://timjones.io/" rel="alternate" type="text/html" /><updated>2018-05-30T07:53:03+00:00</updated><id>http://timjones.io//</id><title type="html">timjones.io</title><subtitle>Blog and open source projects by Tim Jones.</subtitle><author><name>Tim Jones</name><email>tim@timjones.io</email></author><entry><title type="html">Introducing Shader Playground</title><link href="http://timjones.io/blog/archive/2018/05/19/introducing-shader-playground" rel="alternate" type="text/html" title="Introducing Shader Playground" /><published>2018-05-19T05:00:00+00:00</published><updated>2018-05-19T05:00:00+00:00</updated><id>http://timjones.io/blog/archive/2018/05/19/introducing-shader-playground</id><content type="html" xml:base="http://timjones.io/blog/archive/2018/05/19/introducing-shader-playground">&lt;p&gt;&lt;strong&gt;TL/DR: I’ve made a new website called &lt;a href=&quot;http://shader-playground.timjones.io&quot;&gt;Shader Playground&lt;/a&gt; that is sort of like &lt;a href=&quot;https://godbolt.org/&quot;&gt;Compiler Explorer&lt;/a&gt; but for shading languages. You can compile HLSL and GLSL using &lt;code class=&quot;highlighter-rouge&quot;&gt;fxc.exe&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;dxc.exe&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;glslangValidator.exe&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;spirv-cross.exe&lt;/code&gt;, and &lt;code class=&quot;highlighter-rouge&quot;&gt;mali-sc.exe&lt;/code&gt;. You can see the compiler output and disassembly. You can chain multiple shader compilers together to transpile one language to another. You can share permalinks to shaders.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-1600x1167.png&quot; alt=&quot;Screenshot of Shader Playground website&quot; srcset=&quot;/assets/resized/shader-playground-400x292.png 400w,/assets/resized/shader-playground-800x583.png 800w,/assets/resized/shader-playground-1200x875.png 1200w,/assets/resized/shader-playground-1600x1167.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;http://shader-playground.timjones.io&quot;&gt;Shader Playground&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;As you may know, I am very interested in shaders and shading languages (&lt;a href=&quot;/blog/archive/2010/12/30/stitchup-in-action&quot;&gt;exhibit A&lt;/a&gt;, &lt;a href=&quot;/blog/archive/2014/01/07/introducing-hlslunit-unit-tests-for-your-hlsl-shader-code&quot;&gt;exhibit B&lt;/a&gt;, &lt;a href=&quot;/blog/archive/2014/11/24/getting-started-with-jetbrains-nitra&quot;&gt;exhibit C&lt;/a&gt;, &lt;a href=&quot;/blog/archive/2015/09/02/parsing-direct3d-shader-bytecode&quot;&gt;exhibit D&lt;/a&gt;, &lt;a href=&quot;/blog/archive/2015/10/06/introducing-hlsl-tools-for-visual-studio&quot;&gt;exhibit E&lt;/a&gt;). I frequently want to test little bits of shader syntax to see what the compiler does. That was why I made the &lt;a href=&quot;/blog/archive/2017/02/11/try-hlsl-online&quot;&gt;Try HLSL&lt;/a&gt; website, first for myself and then I put it online last year. It was really very simple - type or paste HLSL code on the left, choose whether to compile with the old (&lt;code class=&quot;highlighter-rouge&quot;&gt;fxc.exe&lt;/code&gt;) or new (&lt;code class=&quot;highlighter-rouge&quot;&gt;dxc.exe&lt;/code&gt;) HLSL compilers, and see the disassembly (or compiler errors) on the right. It’s been quite popular - I don’t have stats on it, but &lt;a href=&quot;https://twitter.com/_tim_jones_/status/984034078788870144&quot;&gt;my recent tweet&lt;/a&gt; about it was RT’d quite a bit, so I think this is something that people find useful.&lt;/p&gt;
+
+&lt;p&gt;However, the Try HLSL website was always a bit limited. It only worked with HLSL, and it only worked with Microsoft’s two HLSL compilers. Given the diversity of today’s shader landscape (GLSL, SPIR-V, Metal, etc.), I wanted to make it better. So I did.&lt;/p&gt;
+
+&lt;p&gt;Let me first list the features:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;strong&gt;Multiple input languages&lt;/strong&gt; (HLSL and GLSL, with the potential for more in the future)&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;Multiple compilers&lt;/strong&gt;:
+    &lt;ul&gt;
+      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;fxc.exe&lt;/code&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;dxc.exe&lt;/code&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;glslangValidator.exe&lt;/code&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;spirv-cross.exe&lt;/code&gt;&lt;/li&gt;
+      &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;mali-sc.exe&lt;/code&gt;&lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;Compiler chaining&lt;/strong&gt;: create multiple compilation steps, so you can pipe HLSL to SPIR-V to Metal, for example.&lt;/li&gt;
+  &lt;li&gt;&lt;strong&gt;Permalinks&lt;/strong&gt;: share links to a specific “playground”, with input code and all the compilation steps saved.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Now I’ll go into more detail on some of these.&lt;/p&gt;
+
+&lt;h2 id=&quot;compilers&quot;&gt;Compilers&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-compiler-options-400x436.png&quot; alt=&quot;Screenshot of compiler dropdown&quot; srcset=&quot;/assets/resized/shader-playground-compiler-options-400x436.png 400w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The old Try HLSL site only supported Microsoft’s old and new HLSL compilers, so with Shader Playground I wanted to expand that. You can now access the following compilers. The exact ones shown in the dropdown will depend on the input language you have selected.&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://msdn.microsoft.com/en-us/library/windows/desktop/bb232919(v=vs.85).aspx&quot;&gt;FXC&lt;/a&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;fxc.exe&lt;/code&gt;, Microsoft’s legacy HLSL compiler&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/Microsoft/DirectXShaderCompiler&quot;&gt;DXC&lt;/a&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;dxc.exe&lt;/code&gt;, Microsoft’s new open-source HLSL compiler&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/KhronosGroup/glslang&quot;&gt;glslang&lt;/a&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;glslangValidator.exe&lt;/code&gt;, Khronos’s reference GLSL compiler that also now has an HLSL frontend&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/KhronosGroup/SPIRV-Cross&quot;&gt;SPIRV-Cross&lt;/a&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;spirv-cross.exe&lt;/code&gt;, Khronos’s tool for disassembling SPIR-V back into high level languages (GLSL, HLSL, Metal, C++)&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://developer.arm.com/products/software-development-tools/graphics-development-tools/mali-offline-compiler&quot;&gt;Mali offline compiler&lt;/a&gt; - &lt;code class=&quot;highlighter-rouge&quot;&gt;mali-sc.exe&lt;/code&gt;, ARM’s offline compiler tool&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;compiler-chaining&quot;&gt;Compiler chaining&lt;/h2&gt;
+
+&lt;p&gt;When a compiler outputs a language (or binary format) that can be fed into another compiler, you get an “Add Compiler” button. Click this, and you’ll be able to chain together up to 5 compilers. Here’s an example of compiling HLSL using DXC, outputting SPIR-V, piping that into SPIRV-Cross, and outputting Metal:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-compiler-chaining-1600x1296.png&quot; alt=&quot;Screenshot of compiler chaining&quot; srcset=&quot;/assets/resized/shader-playground-compiler-chaining-400x324.png 400w,/assets/resized/shader-playground-compiler-chaining-800x648.png 800w,/assets/resized/shader-playground-compiler-chaining-1200x972.png 1200w,/assets/resized/shader-playground-compiler-chaining-1600x1296.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;You get the idea. Here are the current compilers with their input and output languages. I plan to add more to this list:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;FXC
+    &lt;ul&gt;
+      &lt;li&gt;Inputs:
+        &lt;ul&gt;
+          &lt;li&gt;HLSL&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+      &lt;li&gt;Outputs:
+        &lt;ul&gt;
+          &lt;li&gt;DXBC&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;DXC
+    &lt;ul&gt;
+      &lt;li&gt;Inputs:
+        &lt;ul&gt;
+          &lt;li&gt;HLSL&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+      &lt;li&gt;Outputs:
+        &lt;ul&gt;
+          &lt;li&gt;DXIL&lt;/li&gt;
+          &lt;li&gt;SPIR-V&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;glslangValidator
+    &lt;ul&gt;
+      &lt;li&gt;Inputs:
+        &lt;ul&gt;
+          &lt;li&gt;GLSL&lt;/li&gt;
+          &lt;li&gt;HLSL&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+      &lt;li&gt;Outputs:
+        &lt;ul&gt;
+          &lt;li&gt;SPIR-V&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;SPIRV-Cross
+    &lt;ul&gt;
+      &lt;li&gt;Inputs:
+        &lt;ul&gt;
+          &lt;li&gt;SPIR-V&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+      &lt;li&gt;Outputs:
+        &lt;ul&gt;
+          &lt;li&gt;GLSL&lt;/li&gt;
+          &lt;li&gt;Metal&lt;/li&gt;
+          &lt;li&gt;HLSL&lt;/li&gt;
+          &lt;li&gt;C++&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+  &lt;li&gt;Mali offline compiler
+    &lt;ul&gt;
+      &lt;li&gt;Inputs:
+        &lt;ul&gt;
+          &lt;li&gt;GLSL&lt;/li&gt;
+          &lt;li&gt;SPIR-V&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+      &lt;li&gt;Outputs:
+        &lt;ul&gt;
+          &lt;li&gt;[None]&lt;/li&gt;
+        &lt;/ul&gt;
+      &lt;/li&gt;
+    &lt;/ul&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;You can use any valid combination of these, although right now that basically means using SPIRV-Cross somewhere in the chain.&lt;/p&gt;
+
+&lt;p&gt;Some compilers have multiple outputs. When using DXC or glslang, for example, you can view the abstract syntax tree (AST) from the compiler:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-output-ast-1600x561.png&quot; alt=&quot;Screenshot of AST output&quot; srcset=&quot;/assets/resized/shader-playground-output-ast-400x140.png 400w,/assets/resized/shader-playground-output-ast-800x281.png 800w,/assets/resized/shader-playground-output-ast-1200x421.png 1200w,/assets/resized/shader-playground-output-ast-1600x561.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;With all compilers you can view the compiler output as well as the disassembly.&lt;/p&gt;
+
+&lt;h2 id=&quot;permalinks&quot;&gt;Permalinks&lt;/h2&gt;
+
+&lt;p&gt;Want to share a link to a shader? Once you’ve got everything setup (with whatever input code and compilers and parameters you want), click the “Share Permalink” button at the top-right:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-permalink-400x222.png&quot; alt=&quot;Screenshot of Share Permalink button&quot; srcset=&quot;/assets/resized/shader-playground-permalink-400x222.png 400w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;That will open a dialog, and after a short wait you’ll get a URL that you can copy:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/shader-playground-permalink-dialog-1200x363.png&quot; alt=&quot;Screenshot of Share Permalink dialog&quot; srcset=&quot;/assets/resized/shader-playground-permalink-dialog-400x121.png 400w,/assets/resized/shader-playground-permalink-dialog-800x242.png 800w,/assets/resized/shader-playground-permalink-dialog-1200x363.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;how-it-works&quot;&gt;How it works&lt;/h2&gt;
+
+&lt;p&gt;I wrote this site in C#, using ASP.NET Core. &lt;a href=&quot;https://github.com/tgjones/shader-playground&quot;&gt;The source code is up on GitHub&lt;/a&gt;. It’s hosted in Azure as an App Service (not on the free plan, for reasons, so if it gets popular I might start a Patreon…). In most cases I’m calling out to the backend shader compilers using &lt;code class=&quot;highlighter-rouge&quot;&gt;Process.Start(...)&lt;/code&gt;, which is a bit scary because compiler options that you select on the site are passed as command line parameters to the backend compilers. I’m validating the input as best I can, and there’s a timeout on running the process, but still… please don’t break it.&lt;/p&gt;
+
+&lt;p&gt;I’m using GitHub Gists as the “database” for permalinks. There’s a rate limit on the GitHub API that could theoretically be hit, but I think it will be fine. If it’s not I’ll have to think of something else.&lt;/p&gt;
+
+&lt;h2 id=&quot;future&quot;&gt;Future&lt;/h2&gt;
+
+&lt;p&gt;Next, I plan to add more compilers:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/GPUOpen-Tools/RGA&quot;&gt;Radeon GPU Analyzer (RGA)&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/Unity-Technologies/HLSLcc&quot;&gt;HLSLcc&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://community.imgtec.com/developers/powervr/tools/pvrshadereditor/&quot;&gt;PowerVR&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/aras-p/glsl-optimizer&quot;&gt;GLSL optimizer&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/aras-p/hlsl2glslfork&quot;&gt;hlsl2glslfork&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/Thekla/hlslparser&quot;&gt;HLSLParser&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/shader-slang/slang&quot;&gt;Slang&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;If you have a particular compiler that you’d like me to prioritise adding, please let me know.&lt;/p&gt;
+
+&lt;p&gt;Or if you want to dig in yourself, the whole Shader Playground website is &lt;a href=&quot;https://github.com/tgjones/shader-playground&quot;&gt;open source and on GitHub&lt;/a&gt;. Contributions or feature suggestions are welcome! Bug reports are less welcome but still appreciated :)&lt;/p&gt;
+
+&lt;p&gt;And a grab bag of other things I’m thinking about:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;I’d also like to support multiple versions per compiler, so for example for &lt;code class=&quot;highlighter-rouge&quot;&gt;dxc.exe&lt;/code&gt;, you’d be able to compare the outputs of multiple versions of that compiler, as it develops.&lt;/li&gt;
+  &lt;li&gt;I’d like to add support for Unity shaders, but &lt;a href=&quot;https://twitter.com/_tim_jones_/status/993813451276369921&quot;&gt;it’s not at all straightforward&lt;/a&gt;, if it’s possible at all.&lt;/li&gt;
+  &lt;li&gt;The mobile version of the site is functional, but not ideal. My web dev knowledge is a bit out of date these days, so I need to brush up on flexbox in order to get things working how I want.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;If you want an offline version of Shader Playground, I highly recommend looking at Josh Barczak’s &lt;a href=&quot;https://github.com/jbarczak/Pyramid&quot;&gt;Pyramid Shader Analyzer&lt;/a&gt;. I got a lot of inspiration from that project, so thank you Josh.&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="shaders" /><category term="HLSL" /><category term="GLSL" /><category term="SPIR-V" /><summary type="html">Introducing a new shader playground website, supporting compilation and transpilation of HLSL and GLSL</summary></entry><entry><title type="html">Parsing Command &amp;amp; Conquer: Generals replay files</title><link href="http://timjones.io/blog/archive/2018/03/06/parsing-command-and-conquer-generals-replay-files" rel="alternate" type="text/html" title="Parsing Command &amp; Conquer: Generals replay files" /><published>2018-03-06T12:00:00+00:00</published><updated>2018-03-06T12:00:00+00:00</updated><id>http://timjones.io/blog/archive/2018/03/06/parsing-command-and-conquer-generals-replay-files</id><content type="html" xml:base="http://timjones.io/blog/archive/2018/03/06/parsing-command-and-conquer-generals-replay-files">&lt;p&gt;&lt;strong&gt;TL/DR: In this post we’ll examine C&amp;amp;C Generals replay (.rep) files in detail, figure out how they work, and then look at a very early implementation of a replay viewer that I’ve added to &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt;.&lt;/strong&gt;&lt;/p&gt;
+
+&lt;p&gt;Have you ever saved a replay from [insert your favourite video game here], and wondered exactly what the replay file contains? I don’t know how many people will answer “yes” to that question, but I’m one of them. For efficiency and IP-protection reasons, replay files are usually stored in a binary format, so if you open one of them in Notepad, all you’ll see are a bunch of garbled characters. It’s often a long road from there, to fully understanding and being able to parse one of these files.&lt;/p&gt;
+
+&lt;p&gt;One of the features I hope to support in &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt; is being able to use replay files from the original Command &amp;amp; Conquer: Generals and Zero Hour games. Since no official description of Generals’ replay file format has been published, I have to do it the hard way, and figure out the file format… but fortunately, I’m not the first to want to do this.&lt;/p&gt;
+
+&lt;p&gt;I should note here that replay files vary wildly between games, so what applies to one specific RTS game won’t apply directly to other games, but the general principles should be similar, at least across RTS games.&lt;/p&gt;
+
+&lt;p&gt;Before we get into the details, let’s start with the fun part: creating a replay file in the first place.&lt;/p&gt;
+
+&lt;h2 id=&quot;creating-a-replay-file&quot;&gt;Creating a replay file&lt;/h2&gt;
+
+&lt;p&gt;Let’s load C&amp;amp;C Generals, and play a quick skirmish game. For the purposes of this blog post, I want to keep the replay file &lt;em&gt;really&lt;/em&gt; simple, so all I’ll do is start a single-player skirmish game, build one building, and exit. Here’s what that looks like:&lt;/p&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/Nv0NdiYz1fA&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Here’s the replay file that Generals saved for that game:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;/assets/posts/simple-generals-replay.rep&quot;&gt;simple-generals-replay.rep&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;first-look&quot;&gt;First look&lt;/h2&gt;
+
+&lt;p&gt;If we open that replay file in VSCode using the excellent &lt;a href=&quot;https://marketplace.visualstudio.com/items?itemName=slevesque.vscode-hexdump&quot;&gt;hexdump&lt;/a&gt; extension, we’ll see this:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/generals-replay-hex-800x795.png&quot; alt=&quot;Hex view of C&amp;amp;C Generals replay file&quot; srcset=&quot;/assets/resized/generals-replay-hex-400x398.png 400w,/assets/resized/generals-replay-hex-800x795.png 800w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;You can immediately see some human-readable text there. That’s always nice to see, when you’re parsing an unknown binary format.&lt;/p&gt;
+
+&lt;p&gt;It was at this point, when I first looked at Generals’ replay files, that I wondered whether anybody else had figured out the file format before. So I Googled and found &lt;a href=&quot;https://github.com/louisdx/cnc-replayreaders&quot;&gt;the cnc-replayreaders repo on GitHub&lt;/a&gt;, which contains at least &lt;em&gt;some&lt;/em&gt; work on parsing replay files for many SAGE games, including, happily, C&amp;amp;C Generals. Without this information, proceeding further would have been much harder. &lt;a href=&quot;https://github.com/louisdx/cnc-replayreaders/blob/master/ccgzhreader.cpp&quot;&gt;Here’s the C++ code for a prototype version of a Generals replay parser&lt;/a&gt;. There’s even a &lt;a href=&quot;https://github.com/louisdx/cnc-replayreaders/blob/master/eareplay.html&quot;&gt;document with the beginnings of a spec for these replay files&lt;/a&gt;. This is great stuff! Many thanks to &lt;a href=&quot;https://github.com/louisdx&quot;&gt;louisdx&lt;/a&gt;, who I believe also goes by the name &lt;a href=&quot;https://www.gamereplays.org/community/index.php?s=82acbb27d5c639b8dc4210422352778b&amp;amp;showuser=122871&quot;&gt;R Schneider on gamereplays.org&lt;/a&gt;. I’ll duplicate the Generals part of it here:&lt;/p&gt;
+
+&lt;blockquote&gt;
+  &lt;h3 id=&quot;generals-zero-hour-battle-for-middle-earth-rise-of-the-witch-king&quot;&gt;Generals, Zero Hour, Battle for Middle Earth, Rise of the Witch King&lt;/h3&gt;
+  &lt;p&gt;The replay format of the games &lt;em&gt;Generals&lt;/em&gt;, &lt;em&gt;Zero Hour&lt;/em&gt;, &lt;em&gt;Battle for Middle Earth&lt;/em&gt;, &lt;em&gt;Battle for Middle Earth 2&lt;/em&gt;, and its expansion &lt;em&gt;Rise of the Witch King&lt;/em&gt; is considerably simpler than that of the later games. Most notably, the chunks do not have length information, so one must know their sizes by other means. Also, there is no footer, just a final chunk.&lt;/p&gt;
+  &lt;h4 id=&quot;header&quot;&gt;Header&lt;/h4&gt;
+  &lt;p&gt;The size &lt;code class=&quot;highlighter-rouge&quot;&gt;u1&lt;/code&gt; is 12 for &lt;em&gt;Generals&lt;/em&gt; and &lt;em&gt;Zero Hour&lt;/em&gt;, and 21 in the BfME games; &lt;code class=&quot;highlighter-rouge&quot;&gt;u2&lt;/code&gt; is 8 in CCG/ZH and 13 in the BfME games; &lt;code class=&quot;highlighter-rouge&quot;&gt;u3&lt;/code&gt; is 4 except in BfME2, where it is 6.&lt;/p&gt;
+  &lt;div class=&quot;language-c highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;str_magic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;/&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;     &lt;span class=&quot;c1&quot;&gt;// == &quot;GENREP&quot;, &quot;BFMEREPL&quot; or &quot;BFME2RPL&quot;
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;timestamp_begin&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;timestamp_end&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;unknown1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;u1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;tb_str&lt;/span&gt;           &lt;span class=&quot;n&quot;&gt;str_filename&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;tb_ch&lt;/span&gt;            &lt;span class=&quot;n&quot;&gt;date_time&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;mi&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;       &lt;span class=&quot;c1&quot;&gt;// as in TW/KW
+&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;tb_str&lt;/span&gt;           &lt;span class=&quot;n&quot;&gt;str_version&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;tb_str&lt;/span&gt;           &lt;span class=&quot;n&quot;&gt;str_build_date&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint16_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;version_minor&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint16_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;version_major&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;magic_hash&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;u2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;char&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;header&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[];&lt;/span&gt;           &lt;span class=&quot;c1&quot;&gt;// null-terminated!
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;uint16_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;unknown2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;unkonwn3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;u3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+  &lt;/div&gt;
+  &lt;p&gt;&lt;strong&gt;Remarks.&lt;/strong&gt; The two timestamps appear to indicate the real-world start and end time of the game. The &lt;code class=&quot;highlighter-rouge&quot;&gt;header&lt;/code&gt; is of the same format as the later games.&lt;/p&gt;
+  &lt;h4 id=&quot;the-replay-body&quot;&gt;The replay body&lt;/h4&gt;
+  &lt;p&gt;The replay body consists of a sequence of &lt;em&gt;chunks&lt;/em&gt;. Each chunk is of the following form:&lt;/p&gt;
+  &lt;div class=&quot;language-c highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;time_code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;chunk_code&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;uint32_t&lt;/span&gt;         &lt;span class=&quot;n&quot;&gt;number&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;         &lt;span class=&quot;c1&quot;&gt;// Player number?
+&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;number_of_commands&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;struct&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;cmd&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;nargs&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;signature&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;number_of_commands&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;byte&lt;/span&gt;             &lt;span class=&quot;n&quot;&gt;arguments&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[];&lt;/span&gt;    &lt;span class=&quot;c1&quot;&gt;// variable!
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+  &lt;/div&gt;
+  &lt;p&gt;In the simplest case, &lt;code class=&quot;highlighter-rouge&quot;&gt;number_of_commands&lt;/code&gt; is zero and &lt;code class=&quot;highlighter-rouge&quot;&gt;signature&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;arguments&lt;/code&gt; are empty. Otherwise, there are &lt;code class=&quot;highlighter-rouge&quot;&gt;number_of_commands&lt;/code&gt; many pairs of bytes {&lt;code class=&quot;highlighter-rouge&quot;&gt;cmd&lt;/code&gt;,&lt;code class=&quot;highlighter-rouge&quot;&gt;nargs&lt;/code&gt;}, where &lt;code class=&quot;highlighter-rouge&quot;&gt;cmd&lt;/code&gt; refers to one of about ten commands and &lt;code class=&quot;highlighter-rouge&quot;&gt;nargs&lt;/code&gt; is the number of arguments. The size of an argument depends on the command type. Finally, &lt;code class=&quot;highlighter-rouge&quot;&gt;arguments&lt;/code&gt;  consists of all the arguments of all the commands, simply one after the other.
+The meaning of the chunk codes is unknown in general. Only a handful of values seem to occur, all in the range 0x300 - 0x500, and 0x1B, 0x1D. Many codes only ever seem to appear with a fixed, specific signature of commands.
+These are the known commands and their argument sizes.&lt;/p&gt;
+
+  &lt;table&gt;
+    &lt;thead&gt;
+      &lt;tr&gt;
+        &lt;th&gt;command&lt;/th&gt;
+        &lt;th&gt;argument size (bytes)&lt;/th&gt;
+        &lt;th&gt;Description/Notes&lt;/th&gt;
+      &lt;/tr&gt;
+    &lt;/thead&gt;
+    &lt;tbody&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x00&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x01&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x02&lt;/td&gt;
+        &lt;td&gt;1&lt;/td&gt;
+        &lt;td&gt;?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x03&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x04&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x06&lt;/td&gt;
+        &lt;td&gt;12&lt;/td&gt;
+        &lt;td&gt;3 uint32_t’s? 1 long double?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x07&lt;/td&gt;
+        &lt;td&gt;12&lt;/td&gt;
+        &lt;td&gt;3 uint32_t’s? 1 long double?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x08&lt;/td&gt;
+        &lt;td&gt;16&lt;/td&gt;
+        &lt;td&gt;4 uint32_t’s?&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x09&lt;/td&gt;
+        &lt;td&gt;4/16&lt;/td&gt;
+        &lt;td&gt;4 bytes in BFME2, 16 otherwise&lt;/td&gt;
+      &lt;/tr&gt;
+      &lt;tr&gt;
+        &lt;td&gt;0x0A&lt;/td&gt;
+        &lt;td&gt;4&lt;/td&gt;
+        &lt;td&gt;4 uint32_t’s?&lt;/td&gt;
+      &lt;/tr&gt;
+    &lt;/tbody&gt;
+  &lt;/table&gt;
+
+  &lt;p&gt;There is no footer. The final chunk has &lt;code class=&quot;highlighter-rouge&quot;&gt;number_of_commands&lt;/code&gt; set to zero, and it appears to have command code 0x1B or 0x1D.&lt;/p&gt;
+&lt;/blockquote&gt;
+
+&lt;h2 id=&quot;parsing-the-header&quot;&gt;Parsing the header&lt;/h2&gt;
+
+&lt;p&gt;Armed with that information, let’s get started with parsing the header. I’ll use C# here, because that’s what we’re using in the &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/tree/master/src/OpenSage.Game/Data/Rep&quot;&gt;OpenSAGE&lt;/a&gt; project, but really any language that gives you the ability to read from a byte stream will work.&lt;/p&gt;
+
+&lt;p&gt;Before we can parse anything, we need to open a &lt;code class=&quot;highlighter-rouge&quot;&gt;BinaryReader&lt;/code&gt; for the replay file:&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;using&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stream&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;File&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;OpenRead&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;simple-generals-replay.rep&quot;&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;using&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;BinaryReader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stream&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Encoding&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Unicode&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// TODO: Parse header
+&lt;/span&gt;    &lt;span class=&quot;c1&quot;&gt;// TODO: Parse body
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Now we can parse the header, based on the description above. I’ve commented most lines with the actual values from our sample replay file.&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;string&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;magic&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;using&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;asciiReader&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;BinaryReader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;stream&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Encoding&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ASCII&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;))&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;magic&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;asciiReader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadFixedLengthString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;GENREP&quot;
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;origin&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;DateTime&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;1970&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;DateTimeKind&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Utc&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;DateTime&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;readTimestamp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BinaryReader&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;origin&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;AddSeconds&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;());&lt;/span&gt;
+
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;timestampBegin&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ReadTimestamp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;2018-03-05 1:28:17 UTC&quot;
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;timestampEnd&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;ReadTimestamp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt;   &lt;span class=&quot;c1&quot;&gt;// &quot;2018-03-05 1:28:42 UTC&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;numTimecodes&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;577&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unknown1&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadBytes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;12&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Sometimes all zeros, and sometimes not
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;filename&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadNullTerminatedString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;Last Replay&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;dateTime&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ReplayTimestamp&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;Parse&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;2018-03-05 21:28:17.402 Monday&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;version&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadNullTerminatedString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;Version 1.7&quot;
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;buildDate&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadNullTerminatedString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;Sep  6 2012 09:43:29&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;versionMinor&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// 7
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;versionMajor&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// 1
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;magicHash&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadBytes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;m&quot;&gt;8&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// 236, 122, 38, 27, 251, 102, 39, 119
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;metadata&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadNullTerminatedAsciiString&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;M=07maps/desert fury;MC=83506418;MS=214497;SD=625705968;C=100;S=HDESKTOP-9V9469L,0,0,TT,-1,2,-1,-1,1:CH,-1,-1,-1,-1:X:X:X:X:X:X:;&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unknown2&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt16&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;48&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unknown3&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;1&quot;
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unknown4&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;2&quot;
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;unknown5&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;0&quot;
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;gameSpeed&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// &quot;30&quot;
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;So, the header spec in the &lt;a href=&quot;https://github.com/louisdx/cnc-replayreaders/blob/master/eareplay.html&quot;&gt;cnc-replayreaders project&lt;/a&gt; looks pretty accurate. I’ve worked out that one of the unknowns is the game speed. I don’t know about the others, but by comparing enough replays with known game states, it should be possible to work them out.&lt;/p&gt;
+
+&lt;p&gt;This already gives us quite a lot of interesting data, such as the map, player details, start and end times, and even the date that the version of Generals that I’m using was compiled (September 6th 2012, apparently).&lt;/p&gt;
+
+&lt;p&gt;This is all very well, but what I’m really interested in is the actual replay data.&lt;/p&gt;
+
+&lt;h2 id=&quot;parsing-the-body&quot;&gt;Parsing the body&lt;/h2&gt;
+
+&lt;p&gt;There are many ways game replay data can be saved. If there aren’t too many “things” in the world to keep track of, you could store the entire state of the world at every timestep. For RTS games with potentially hundreds or thousands of units, this wouldn’t scale - and so these games usually only save player inputs, and use those inputs to recreate the entire simulation. (This is also why you often can’t rewind replays; you’d have to start from the beginning again, and simulate every frame up to the one you’re interested in, in order to get the correct state for that frame.)&lt;/p&gt;
+
+&lt;p&gt;Knowing that, what I’m expecting to see in the body of the replay file is a sequence of commands (or “orders”, as I’ve chosen to call them), roughly corresponding to the actions I performed in the game. For example, “select unit” and “create power plant”. Each of those orders would have arguments relevant to the order type. For example, “select unit” would have some sort of identifier to store which unit was selected.&lt;/p&gt;
+
+&lt;p&gt;There may be (and in fact, are) some orders that weren’t triggered by me, such as an “end game” order - anything that the game can’t recreate by itself needs to be saved in the replay file.&lt;/p&gt;
+
+&lt;p&gt;Fortunately for us, the cnc-replayreaders spec appears to match this concept, so we’re on the right track. It looks like a “chunk” is probably a single order, and every order has 0 or more arguments.&lt;/p&gt;
+
+&lt;p&gt;The body of a replay file is composed of &lt;code class=&quot;highlighter-rouge&quot;&gt;n&lt;/code&gt; chunks. There’s no way to know how many chunks there are from the header - after reading the header, you just have to keep reading chunks until you get to the end of the file. Like this:&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BaseStream&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Position&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;BaseStream&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Length&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// TODO: Parse chunk
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Let’s look at the basic structure of a chunk. Then we can impose that structure onto our sample replay file and see what we get.&lt;/p&gt;
+
+&lt;p&gt;Let’s use the description quoted above, and convert it into the code to parse a chunk header:&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;timecode&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// 0-based timecode
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;orderType&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ReadUInt32AsEnum&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;OrderType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// See below
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;number&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// 0-based index of this chunk
+&lt;/span&gt;
+&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;numUniqueArgumentTypes&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadByte&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// Number of unique argument types
+&lt;/span&gt;
+&lt;span class=&quot;c1&quot;&gt;// Pairs of {argument type, count}.
+&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentCounts&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;count&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;numUniqueArgumentTypes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;numUniqueArgumentTypes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;++)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;c1&quot;&gt;// Read the number of arguments for this argument type.
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;argumentCounts&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;]&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ReadByteAsEnum&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;&amp;gt;(),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadByte&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;());&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// TODO: Read argument data
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;We don’t know what &lt;code class=&quot;highlighter-rouge&quot;&gt;orderType&lt;/code&gt; means yet; we’ll have to look at the chunks, once we’ve parsed them, and make some guesses. We’ll do that below.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;argumentCounts&lt;/code&gt; stores the number of arguments &lt;em&gt;for each argument type&lt;/em&gt;. So there might be 2 integer arguments, 1 boolean argument, and 1 float argument, for example. We can calculate the total number of arguments by summing the counts of each argument type.&lt;/p&gt;
+
+&lt;p&gt;Our first order of business is working out how many bytes each argument value uses, because without knowing that, we don’t know where the next chunk starts.&lt;/p&gt;
+
+&lt;p&gt;There’s nothing in the chunk header that directly tells us how big the argument data array is. We need to derive it from the number and type of arguments. I worked out the argument types from looking at a few replay files in a hex viewer and making some educated guesses. This fills in the gaps in the table of commands that I quoted above. Here’s what I’ve found so far, although I’m sure there are more:&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;enum&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Integer&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;       &lt;span class=&quot;c1&quot;&gt;// int32 (4 bytes)
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;1&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;         &lt;span class=&quot;c1&quot;&gt;// float32 (4 bytes)
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;Boolean&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;2&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;       &lt;span class=&quot;c1&quot;&gt;// bool (1 byte)
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;ObjectId&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;      &lt;span class=&quot;c1&quot;&gt;// uint32 (4 bytes)
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;Position&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;6&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;,&lt;/span&gt;      &lt;span class=&quot;c1&quot;&gt;// float32 * 3 (12 bytes)
+&lt;/span&gt;    &lt;span class=&quot;n&quot;&gt;ScreenPosition&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;7&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// int32 * 2 (8 bytes)
+&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Now we can write the code to parse order arguments. Note that, to keep things simple, I’m not doing anything with the parsed variables, but &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/blob/6887852b18b51c08359b7cc03634a4e02218741f/src/OpenSage.Game/Data/Rep/ReplayChunk.cs#L37&quot;&gt;in the real code&lt;/a&gt; I do.&lt;/p&gt;
+
+&lt;div class=&quot;language-csharp highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;numUniqueArgumentTypes&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;++)&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;ref&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentCount&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;ref&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentCounts&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;[&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;i&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;];&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentType&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentCount&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;argumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;m&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;&amp;lt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;argumentCount&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;count&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;j&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;++)&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;switch&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;argumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;)&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Integer&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;i&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Float&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;f&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadSingle&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Boolean&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;b&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadBooleanChecked&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ObjectId&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;oi&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadUInt32&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Position&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;p&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadVector3&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;OrderArgumentType&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ScreenPosition&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;kt&quot;&gt;var&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;sp&lt;/span&gt; &lt;span class=&quot;p&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;reader&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;nf&quot;&gt;ReadPoint2D&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;;&lt;/span&gt;
+
+            &lt;span class=&quot;k&quot;&gt;default&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;:&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;throw&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;InvalidOperationException&lt;/span&gt;&lt;span class=&quot;p&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;p&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Armed with all that code, we can finally parse our sample replay file. Let’s do that, and write out all the replay chunks from our sample replay file. I’ve trimmed it down, because the replay file contains 733 lines - i.e. 733 orders - most of which are duplicate &lt;code class=&quot;highlighter-rouge&quot;&gt;1092&lt;/code&gt; orders. I’ve marked the trimmed lines with “…”.&lt;/p&gt;
+
+&lt;table&gt;
+  &lt;thead&gt;
+    &lt;tr&gt;
+      &lt;th&gt;Timecode&lt;/th&gt;
+      &lt;th&gt;OrderType&lt;/th&gt;
+      &lt;th&gt;Number&lt;/th&gt;
+      &lt;th&gt;Arg 1&lt;/th&gt;
+      &lt;th&gt;Arg 2&lt;/th&gt;
+      &lt;th&gt;Arg 3&lt;/th&gt;
+      &lt;th&gt;Arg 4&lt;/th&gt;
+      &lt;th&gt;Arg 5&lt;/th&gt;
+      &lt;th&gt;Arg 6&lt;/th&gt;
+    &lt;/tr&gt;
+  &lt;/thead&gt;
+  &lt;tbody&gt;
+    &lt;tr&gt;
+      &lt;td&gt;0&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;0&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;0, 0, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.490186&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;0, 0&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;1&lt;/td&gt;
+      &lt;td&gt;1095&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:431591478&lt;/td&gt;
+      &lt;td&gt;Boolean:False&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;1&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;174, 521&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:16&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;174, 521&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;96&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 322&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;97&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;98&lt;/td&gt;
+      &lt;td&gt;1003&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Boolean:True&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;98&lt;/td&gt;
+      &lt;td&gt;1001&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Boolean:True&lt;/td&gt;
+      &lt;td&gt;ObjectId:469&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;98&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;99&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;100&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;101&lt;/td&gt;
+      &lt;td&gt;1095&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:1160876625&lt;/td&gt;
+      &lt;td&gt;Boolean:False&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;101&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;102&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;470, 324&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;199&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 292&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;200&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 292&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;201&lt;/td&gt;
+      &lt;td&gt;1095&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:-1950611085&lt;/td&gt;
+      &lt;td&gt;Boolean:False&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;201&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 292&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;202&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 292&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;214&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 294&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;215&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:10&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 294&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;216&lt;/td&gt;
+      &lt;td&gt;1049&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:774&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;553.6661, 1923.072, 140&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:-0.7853982&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;216&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 294&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;217&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 294&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;218&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;600, 294&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;299&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;558, 297&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;300&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;543, 301&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;301&lt;/td&gt;
+      &lt;td&gt;1095&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:752532121&lt;/td&gt;
+      &lt;td&gt;Boolean:False&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;301&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;528, 304&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;302&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;517, 306&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;353&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;403, 215&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;354&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;403, 215&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;355&lt;/td&gt;
+      &lt;td&gt;1003&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Boolean:True&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;355&lt;/td&gt;
+      &lt;td&gt;1001&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Boolean:True&lt;/td&gt;
+      &lt;td&gt;ObjectId:468&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;355&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;403, 215&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;356&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:13&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;403, 215&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;399&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;265, 509&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;400&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;265, 511&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;401&lt;/td&gt;
+      &lt;td&gt;1095&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Integer:1629276425&lt;/td&gt;
+      &lt;td&gt;Boolean:False&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;401&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;265, 511&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;402&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;265, 511&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;…&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;475&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;214, 493&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;475&lt;/td&gt;
+      &lt;td&gt;1092&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt;Position:&amp;lt;443.9366, 1997.808, 0&amp;gt;&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:0&lt;/td&gt;
+      &lt;td&gt;Float:1.278409&lt;/td&gt;
+      &lt;td&gt;Integer:2&lt;/td&gt;
+      &lt;td&gt;ScreenPosition:&amp;lt;214, 493&amp;gt;&lt;/td&gt;
+    &lt;/tr&gt;
+    &lt;tr&gt;
+      &lt;td&gt;475&lt;/td&gt;
+      &lt;td&gt;27&lt;/td&gt;
+      &lt;td&gt;2&lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+      &lt;td&gt; &lt;/td&gt;
+    &lt;/tr&gt;
+  &lt;/tbody&gt;
+&lt;/table&gt;
+
+&lt;p&gt;Let’s try to figure out what each order type means:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;1092&lt;/code&gt;: It’s not obvious in the trimmed version, but this order type appears the most times, &lt;em&gt;by far&lt;/em&gt;. We see it has 6 arguments: a 3D position, 3 floats, 1 integer, and 1 2D position. If you load the map we used in World Builder (the Generals editing tool), you’ll find that the 3D position in these orders corresponds with the map point at the centre of the screen. So it’s very likely that &lt;code class=&quot;highlighter-rouge&quot;&gt;1092&lt;/code&gt; is some sort of &lt;strong&gt;set camera position&lt;/strong&gt; order. It’s weird that Generals saves one of these for each timecode, even when the camera hasn’t moved; the replay file would be much smaller if it only saved this order when the camera moved. The non-zero float argument might be field-of-view, and I don’t yet know what the other arguments mean.&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;1095&lt;/code&gt;: This appears exactly every 100 timecodes. It has 1 integer and 1 boolean argument. Based on what I know about how RTS games do lockstep networking, and seeing that the integer argument value varies wildly, I guess this is a &lt;strong&gt;checksum&lt;/strong&gt; order, which instructs the game engine to check that its internal world representation is in sync with other network players. In this case, there are no network players, but for simplicity the game engine probably runs this code anyway. Incidentally, it’s when this value doesn’t match the game’s computed state that you get the dreaded “game has detected a mismatch” error.
+&lt;img src=&quot;http://s27.postimg.org/53n0jh8kz/print_erro_generals.png&quot; alt=&quot;&quot; /&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;1003&lt;/code&gt;, immediately followed by &lt;code class=&quot;highlighter-rouge&quot;&gt;1001&lt;/code&gt;: This timecode corresponds to when I selected the dozer. So &lt;code class=&quot;highlighter-rouge&quot;&gt;1003&lt;/code&gt; is probably &lt;strong&gt;clear selection&lt;/strong&gt;, and &lt;code class=&quot;highlighter-rouge&quot;&gt;1001&lt;/code&gt; is probably &lt;strong&gt;set selection&lt;/strong&gt;. &lt;code class=&quot;highlighter-rouge&quot;&gt;1001&lt;/code&gt; has an &lt;code class=&quot;highlighter-rouge&quot;&gt;ObjectId&lt;/code&gt; argument, which would be the ID of the object that should be selected. &lt;a href=&quot;https://github.com/qibbi&quot;&gt;Jana Mohn&lt;/a&gt; helped me figure out that this is a runtime ID, with the index based on all the objects that have been loaded for the current map. As with many other aspects of replay files, only if the engine loads exactly the same things in exactly the same order, will it be able to successfully play a replay and get the same result.&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;1049&lt;/code&gt;: This has 1 integer, 1 3D position, and 1 float argument. The timecode corresponds to when I told the dozer to build a power plant, so this is probably a &lt;strong&gt;build object&lt;/strong&gt; order. The integer argument is some kind of ID representing the object to build - and with experimentation, I have discovered that it’s an index into an array of all the &lt;code class=&quot;highlighter-rouge&quot;&gt;Object&lt;/code&gt; definitions after they’ve been loaded from .ini files. The 3D position argument is where to build it, and the float argument is the angle at which to place the building.&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;27&lt;/code&gt;: This is always the last order in a replay file, so it’s some sort of &lt;strong&gt;end game&lt;/strong&gt; order.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;And that’s it, for this simple replay file. Only 6 unique order types. Obviously in a full game, there would be many more order types, but this blog post is long enough already.&lt;/p&gt;
+
+&lt;h2 id=&quot;in-action&quot;&gt;In action&lt;/h2&gt;
+
+&lt;p&gt;As I mentioned at the beginning, my motivation for parsing Generals replay files is being to play them in OpenSAGE. So, I implemented just enough in OpenSAGE to be able to parse and “play” this simple replay file, and here is the result. It’s obviously extremely unfinished, but hopefully you can see the connection with the original replay. You can also see our work on the main menu, replay menu, map rendering, etc…&lt;/p&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/XNP_DfLrVQw&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The code for “playing” a replay iterates through the chunks, with the appropriate timing, and executes each chunk’s order - for example, creating a building or setting the camera’s position. There’s a huge amount still to do. There are some mysteries that will have to be solved, such as the random number generator (RNG) used by Generals, so there are no guarantees that we’ll really be able to do it - but if I worried too much about that, I wouldn’t have started OpenSAGE in the first place. On the bright side, much of the code for running through a replay will carry over, as-is, to actually playing single-player and multi-player games.&lt;/p&gt;
+
+&lt;h2 id=&quot;the-end&quot;&gt;The end&lt;/h2&gt;
+
+&lt;p&gt;Hopefully that gives a rough picture of how one goes about parsing a binary file format where you know roughly what it should contain, but you don’t know the exact structure. Again, many thanks to louisdx for the &lt;a href=&quot;https://github.com/louisdx/cnc-replayreaders&quot;&gt;cnc-replayreaders project&lt;/a&gt;. If I wasn’t able to build on that existing knowledge, this would have been a lot more difficult.&lt;/p&gt;
+
+&lt;p&gt;Parsing of Generals .rep replay files &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/tree/master/src/OpenSage.Game/Data/Rep&quot;&gt;is implemented in OpenSAGE here&lt;/a&gt;. If you’re interested, you can browse the full code to see details I left out in this blog post.&lt;/p&gt;
+
+&lt;p&gt;If you’re interested in what we’re doing in OpenSAGE, &lt;a href=&quot;https://discord.gg/G2FhZUT&quot;&gt;join our Discord server&lt;/a&gt; and chat to us, we’re quite friendly!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">Examining the binary format used by saved replay files in Command &amp; Conquer: Generals</summary></entry><entry><title type="html">OpenSAGE Dev Diary #6 (2018-02-10) - and 1st release!</title><link href="http://timjones.io/blog/archive/2018/02/10/opensage-dev-diary-6-and-first-release" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #6 (2018-02-10) - and 1st release!" /><published>2018-02-10T10:00:00+00:00</published><updated>2018-02-10T10:00:00+00:00</updated><id>http://timjones.io/blog/archive/2018/02/10/opensage-dev-diary-6-and-first-release</id><content type="html" xml:base="http://timjones.io/blog/archive/2018/02/10/opensage-dev-diary-6-and-first-release">&lt;p&gt;&lt;em&gt;OpenSAGE is an open-source re-implementation of the &lt;a href=&quot;https://en.wikipedia.org/wiki/SAGE_(game_engine)&quot;&gt;SAGE game engine&lt;/a&gt;. It is not affiliated with EA in any way. SAGE was the game engine used in C&amp;amp;C Generals, C&amp;amp;C Generals Zero Hour, Battle for Middle-earth and its sequels, C&amp;amp;C 3 and its sequel, and Red Alert 3 and its sequel. I’ve been working on OpenSAGE for 6 months, and made some good progress, so I’ve started this series of blog posts to talk about what is happening in the project each week. You can also star or watch the &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE GitHub repo&lt;/a&gt; for a more real-time view of things.&lt;/em&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;an-anniversary&quot;&gt;An anniversary&lt;/h2&gt;
+
+&lt;p&gt;15 years ago today - on February 10th, 2003 - one of my favourite games, &lt;a href=&quot;https://en.wikipedia.org/wiki/Command_%26_Conquer:_Generals&quot;&gt;Command &amp;amp; Conquer: Generals&lt;/a&gt;, was released. I was at university at the time. I don’t remember if I bought it on launch day, or a few days after, but I do remember being excited to bring the game
+home from the shop (because that was a thing we did in those days) and play it. I’d been a big fan of the Westwood era of C&amp;amp;C games, but the screenshots on the back
+of this box looked like something different and exciting.&lt;/p&gt;
+
+&lt;p&gt;Long story short, I ploughed a vast number of hours into C&amp;amp;C Generals, and its sequel released later that year, Zero Hour. I was never a particularly good player,
+but that didn’t matter to me. I remember epic LAN games with two of my then-housemates, where the tide of war would ebb and flow to the accompaniment of commentary shouted between rooms.&lt;/p&gt;
+
+&lt;p&gt;So today, 15 years later, seems like an appropriate day for the first OpenSAGE release.&lt;/p&gt;
+
+&lt;h2 id=&quot;release-20180210&quot;&gt;Release 20180210&lt;/h2&gt;
+
+&lt;p&gt;The very first release of OpenSAGE - catchily named 20180210 - is now available for download. &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/releases/tag/release-20180210&quot;&gt;Grab it here&lt;/a&gt;!&lt;/p&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/pFLK_DQXzp0&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;p&gt;First, some caveats. This is a &lt;em&gt;very&lt;/em&gt; early preview, representing the current state of the OpenSAGE project. It is nowhere near playable. There are number of lower-level elements in place - model rendering, map rendering, some menus - and these work quite well already. But we haven’t yet started on gameplay.&lt;/p&gt;
+
+&lt;p&gt;This first release contains two separate applications: a “Data Viewer” and a “Launcher”. The launcher is shown in the video above. The video shows basically everything that the launcher can currently do - which, if you look carefully, is actually quite a lot. It can load and render the shell map, load and render 3D models on the map, load and render the main menu, and handle transitions between menus.&lt;/p&gt;
+
+&lt;p&gt;The Data Viewer can preview files (including 3D models, maps, .ini files, and more) from any SAGE-based games that you have on your computer. We are using it as a development tool, but it may well be of interest to modders and anybody curious about how RTS games are built.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2018-02-10-map-viewer-1600x947.png&quot; alt=&quot;Data Viewer&quot; srcset=&quot;/assets/resized/opensage-2018-02-10-map-viewer-400x237.png 400w,/assets/resized/opensage-2018-02-10-map-viewer-800x473.png 800w,/assets/resized/opensage-2018-02-10-map-viewer-1200x710.png 1200w,/assets/resized/opensage-2018-02-10-map-viewer-1600x947.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;It’s probably not worth logging issues on GitHub yet, because it’s so early in development. Nothing works, except for the stuff that does. But if you’re pretty sure that you’ve found a bug in something that &lt;em&gt;should&lt;/em&gt; work, then feel free to &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/issues&quot;&gt;log an issue&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-since-the-last-dev-diary&quot;&gt;Progress since the last dev diary&lt;/h2&gt;
+
+&lt;p&gt;A huge amount has happened to OpenSAGE since the &lt;a href=&quot;/blog/archive/2018/01/07/opensage-dev-diary-5&quot;&gt;the previous dev diary&lt;/a&gt;:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;I implemented cloud shadows and macrotextures in the terrain renderer. These are quite subtle effects, but obvious when they’re removed. Unlike the original Generals game, OpenSAGE’s cloud shadows apply to objects too!&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/_QM3T_zU66E&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/feliwir&quot;&gt;Stephan&lt;/a&gt; did a lot of great work on the ActionScript interpreter that lies at the heart of the APT runtime. APT is the GUI framework used in BFME and later games. The main menu from BFME II now loads and partially runs, although there’s plenty left to do:&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/Lo1iqrUP6GQ&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/paavohuhtala&quot;&gt;Paavo&lt;/a&gt; snuck in an Export feature to the Data Viewer at the last minute:&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2018-02-10-data-viewer-export-400x327.png&quot; alt=&quot;Data Viewer export&quot; srcset=&quot;/assets/resized/opensage-2018-02-10-data-viewer-export-400x327.png 400w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;We’ve also made many lower-level changes:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Moved from a custom rendering backend to &lt;a href=&quot;https://github.com/mellinoe/veldrid&quot;&gt;Veldrid&lt;/a&gt;. This will allow us to make OpenSAGE cross-platform.&lt;/li&gt;
+  &lt;li&gt;Moved windowing to SDL2 - also with the aim of making OpenSAGE cross-platform.&lt;/li&gt;
+  &lt;li&gt;Fixed some memory leaks in the Data Viewer.&lt;/li&gt;
+  &lt;li&gt;Refactored the scene structure to make more sense.&lt;/li&gt;
+  &lt;li&gt;Paavo implemented object collision. This can be seen when viewing a map in the Data Viewer - if you click on an object, it will shrink, which is an amusing but obviously temporary way to test the collision system.&lt;/li&gt;
+  &lt;li&gt;Paavo optimised particle systems, such that they don’t allocate any memory on the heap in their per-frame update.&lt;/li&gt;
+  &lt;li&gt;Paavo created separate C# projects for each SAGE game. This will help us keep game-specific code out of the core engine.&lt;/li&gt;
+  &lt;li&gt;Paavo rewrote the map scripting system, and implemented many more script actions and conditions.&lt;/li&gt;
+  &lt;li&gt;Paavo implemented more .wnd callbacks, which means more of the main menu works.&lt;/li&gt;
+  &lt;li&gt;Added initial support for the .manifest / .relo / .imp / .bin file system used in C&amp;amp;C3 and above.&lt;/li&gt;
+  &lt;li&gt;Parsed the .map format for C&amp;amp;C3, RA3, and C&amp;amp;C4.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;onwards&quot;&gt;Onwards…&lt;/h2&gt;
+
+&lt;p&gt;I hope you’ll &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/releases/tag/release-20180210&quot;&gt;give OpenSAGE a try&lt;/a&gt; - if you do, please let me know your thoughts and feedback in the comments below.&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">What's been happening this week in OpenSAGE</summary></entry><entry><title type="html">OpenSAGE Dev Diary #5 (2018-01-07)</title><link href="http://timjones.io/blog/archive/2018/01/07/opensage-dev-diary-5" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #5 (2018-01-07)" /><published>2018-01-07T15:00:00+00:00</published><updated>2018-01-07T15:00:00+00:00</updated><id>http://timjones.io/blog/archive/2018/01/07/opensage-dev-diary-5</id><content type="html" xml:base="http://timjones.io/blog/archive/2018/01/07/opensage-dev-diary-5">&lt;p&gt;&lt;em&gt;OpenSAGE is an open-source re-implementation of the &lt;a href=&quot;https://en.wikipedia.org/wiki/SAGE_(game_engine)&quot;&gt;SAGE game engine&lt;/a&gt;. SAGE was the game engine used in C&amp;amp;C Generals, C&amp;amp;C Generals Zero Hour, Battle for Middle-earth and its sequels, C&amp;amp;C 3 and its sequel, and Red Alert 3 and its sequel. I’ve been working on OpenSAGE for 6 months, and made some good progress, so I’ve started this series of blog posts to talk about what is happening in the project each week. You can also star or watch the &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE GitHub repo&lt;/a&gt; for a more real-time view of things.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;Following on from &lt;a href=&quot;/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24&quot;&gt;the previous post&lt;/a&gt;, here is what’s been happening this week in &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-this-week&quot;&gt;Progress this week&lt;/h2&gt;
+
+&lt;p&gt;The last two weeks have been exciting ones for the OpenSAGE project. For the first time, as much has been done by other contributors as by me, which marks an exciting turning point for the project.&lt;/p&gt;
+
+&lt;p&gt;This week’s contributors (other than me):&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/feliwir&quot;&gt;Stephan Vedder&lt;/a&gt;&lt;/li&gt;
+  &lt;li&gt;&lt;a href=&quot;https://github.com/paavohuhtala&quot;&gt;Paavo Huhtala&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;In the last two weeks:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/13&quot;&gt;fixed parsing of floating-point values in .ini files for locales with decimal separators other than “.”&lt;/a&gt;, and &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/24&quot;&gt;fixed a related issue&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/14&quot;&gt;fixed .wnd controls that have a null header template&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/commit/61994bee78f963a40eb4fea2c86c8113ceef78ab&quot;&gt;simplified the render pipeline&lt;/a&gt;, because it was getting unnecessarily complex.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/15&quot;&gt;added support for the Origin version of Zero Hour’s registry key&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/16&quot;&gt;created an Xunit test discoverer to allow skipping of tests that depend on games that aren’t currently installed&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I parsed BFME I and BFME II &lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt; files. It turned out there were lots of new and modified chunks for these games: &lt;code class=&quot;highlighter-rouge&quot;&gt;CameraAnimationList&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;EnvironmentData&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;LibraryMapLists&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;MPPositionList&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;NamedCameras&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;PolygonTriggers&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;PostEffectsChunk&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;RiverAreas&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;SkyboxSettings&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;StandingWaterAreas&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;StandingWaveAreas&lt;/code&gt;, and &lt;code class=&quot;highlighter-rouge&quot;&gt;Teams&lt;/code&gt;. There aren’t any existing specifications for these chunks so I had to figure them out by hand. BFME scripts have a few new fields, like &lt;code class=&quot;highlighter-rouge&quot;&gt;Enabled&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;Inverted&lt;/code&gt; and some related to sequential scripts. There’s a problem with terrain tile texture blending in BFME maps that I still need to fix, as you can see this in screenshot:&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2018-01-08-bfmeii-map-1600x967.png&quot; alt=&quot;BFME II map&quot; srcset=&quot;/assets/resized/opensage-2018-01-08-bfmeii-map-400x242.png 400w,/assets/resized/opensage-2018-01-08-bfmeii-map-800x483.png 800w,/assets/resized/opensage-2018-01-08-bfmeii-map-1200x725.png 1200w,/assets/resized/opensage-2018-01-08-bfmeii-map-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Stephan &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/20&quot;&gt;fixed .dds and .tga previews in the Data Viewer&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/21&quot;&gt;fixed a crash in the Data Viewer that occurred when switching between different assets&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/23&quot;&gt;fixed a bug in the Z positioning of some map objects&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/29&quot;&gt;fixed / implemented a number of things related to loading campaign maps&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Stephan &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/28&quot;&gt;implemented a viewer for .ru files&lt;/a&gt;. &lt;code class=&quot;highlighter-rouge&quot;&gt;.ru&lt;/code&gt; files store the raw geometry for APT UI screens, and this was a major stepping stone to the APT implementation that Stephan is continuing to work on.&lt;/p&gt;
+
+    &lt;p&gt;&lt;img src=&quot;https://user-images.githubusercontent.com/2104576/34483227-520a9f2c-efbd-11e7-89d7-fd295c731d7a.png&quot; alt=&quot;Screenshot of .ru viewer&quot; /&gt;&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I parsed more BFME &lt;code class=&quot;highlighter-rouge&quot;&gt;.ini&lt;/code&gt; files. These are obviously not required for Generals, but I find it helpful to get a detailed overview of  other SAGE games, so I can better design some of the engine abstractions.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Stephan &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/38&quot;&gt;updated the Xunit NuGet package&lt;/a&gt; - a small but nice bit of maintenance that makes tests run more reliably.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Paavo &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/35&quot;&gt;added a project for the game executable&lt;/a&gt;. This is the start of something that will eventually be &lt;em&gt;the&lt;/em&gt; way to play games using OpenSAGE. For now, it launches the Generals main menu with the background scene (“shell map”) underneath.&lt;/p&gt;
+
+    &lt;blockquote class=&quot;twitter-video&quot; data-lang=&quot;en&quot;&gt;&lt;p lang=&quot;en&quot; dir=&quot;ltr&quot;&gt;Something pretty experimental... &lt;a href=&quot;https://twitter.com/hashtag/OpenSAGE?src=hash&amp;amp;ref_src=twsrc%5Etfw&quot;&gt;#OpenSAGE&lt;/a&gt; &lt;a href=&quot;https://t.co/6IOaAWTbLY&quot;&gt;pic.twitter.com/6IOaAWTbLY&lt;/a&gt;&lt;/p&gt;&amp;mdash; Paavo Huhtala (@paavohtl) &lt;a href=&quot;https://twitter.com/paavohtl/status/948352514814038016?ref_src=twsrc%5Etfw&quot;&gt;January 3, 2018&lt;/a&gt;&lt;/blockquote&gt;
+    &lt;script async=&quot;&quot; src=&quot;https://platform.twitter.com/widgets.js&quot; charset=&quot;utf-8&quot;&gt;&lt;/script&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I started a refactoring of OpenSAGE’s scene framework. Up to now I have been using a simplified version of Unity’s &lt;code class=&quot;highlighter-rouge&quot;&gt;GameObject&lt;/code&gt; / &lt;code class=&quot;highlighter-rouge&quot;&gt;Component&lt;/code&gt; model, but this doesn’t really match how SAGE originally worked. So I’m changing things about a bit, in order to provide a simpler and more stable foundation going forwards.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;In non-development news, we now have an &lt;a href=&quot;https://discord.gg/G2FhZUT&quot;&gt;OpenSAGE Discord server&lt;/a&gt;. Follow that invitation link to join. We’re already having lots of lively discussions, so if you’re at all interested in SAGE games or the OpenSAGE project, please join us.&lt;/p&gt;
+
+&lt;p&gt;I also found a mention of OpenSAGE on a &lt;a href=&quot;http://www.cncseries.ru/opensage/&quot;&gt;Russian C&amp;amp;C website&lt;/a&gt;, which is pretty cool. Considering how little effort I’ve put into spreading the word, it’s nice to see that people are hearing about it.&lt;/p&gt;
+
+&lt;p&gt;That’s all for this time - until next week!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">What's been happening this week in OpenSAGE</summary></entry><entry><title type="html">OpenSAGE Dev Diary #4 (2017-12-24)</title><link href="http://timjones.io/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #4 (2017-12-24)" /><published>2017-12-24T11:00:00+00:00</published><updated>2017-12-24T11:00:00+00:00</updated><id>http://timjones.io/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24">&lt;p&gt;&lt;em&gt;OpenSAGE is an open-source re-implementation of the &lt;a href=&quot;https://en.wikipedia.org/wiki/SAGE_(game_engine)&quot;&gt;SAGE game engine&lt;/a&gt;. SAGE was the game engine used in C&amp;amp;C Generals, C&amp;amp;C Generals Zero Hour, Battle for Middle-earth and its sequels, C&amp;amp;C 3 and its sequel, and Red Alert 3 and its sequel. I’ve been working on OpenSAGE for 6 months, and made some good progress, so I’ve started this series of blog posts to talk about what is happening in the project each week. You can also star or watch the &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE GitHub repo&lt;/a&gt; for a more real-time view of things.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;Following on from &lt;a href=&quot;/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17&quot;&gt;last week’s post&lt;/a&gt;, here is what’s been happening this week in &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-this-week&quot;&gt;Progress this week&lt;/h2&gt;
+
+&lt;div class=&quot;video-responsive&quot;&gt;
+    &lt;iframe width=&quot;560&quot; height=&quot;315&quot; src=&quot;https://www.youtube.com/embed/ZcH15Eeh8Ng&quot; frameborder=&quot;0&quot; gesture=&quot;media&quot; allow=&quot;encrypted-media&quot; allowfullscreen=&quot;&quot;&gt;&lt;/iframe&gt;
+&lt;/div&gt;
+
+&lt;p&gt;This week in OpenSAGE:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;I’ve worked on UI rendering, in particular the main menu. The main menu now responds to mouse input, and you can click buttons. C&amp;amp;C Generals &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; files use a callback system, and those callbacks are implemented in engine code, so I’m having to guess at their implementations just from observing behaviour in the running game. For example, when you first see the main menu, only the logo is visible, but then after any mouse (or keyboard) input, the border and buttons animate in. As far as I can tell that is done in the &lt;code class=&quot;highlighter-rouge&quot;&gt;MainMenuInput&lt;/code&gt; callback. Every UI element (or “window” as they’re called in &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; files) has an input callback and a system callback. If it’s not specified in the &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; file, then the engine appears to use default callbacks based on window type (button, textbox, etc.). The input callback receives mouse and keyboard messages, and turns them into “system” messages like “the skirmish button was pressed”, and these system messages are passed to the system callback. One of the system callbacks is &lt;code class=&quot;highlighter-rouge&quot;&gt;PassMessagesToParentSystem&lt;/code&gt;, which passes any messages to the system callback of the parent window. In most &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; files I’ve looked at so far, eventually at the top level, the &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; defines a system callback that actually does something. The design seems heavily inspired by win32 window messages, but it’s not the same.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;&lt;a href=&quot;https://github.com/feliwir&quot;&gt;Stephan Vedder&lt;/a&gt; submitted another great &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/12&quot;&gt;pull request&lt;/a&gt;, this time adding initial support for the &lt;code class=&quot;highlighter-rouge&quot;&gt;.apt&lt;/code&gt; format, used to define UI screens in Battle for Middle-earth (BFME) and later SAGE games.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Just a short update this week. Until next time!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">What's been happening this week in OpenSAGE</summary></entry><entry><title type="html">OpenSAGE Dev Diary #3 (2017-12-17)</title><link href="http://timjones.io/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #3 (2017-12-17)" /><published>2017-12-17T11:00:00+00:00</published><updated>2017-12-17T11:00:00+00:00</updated><id>http://timjones.io/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17">&lt;p&gt;&lt;em&gt;OpenSAGE is an open-source re-implementation of the &lt;a href=&quot;https://en.wikipedia.org/wiki/SAGE_(game_engine)&quot;&gt;SAGE game engine&lt;/a&gt;. SAGE was the game engine used in C&amp;amp;C Generals, C&amp;amp;C Generals Zero Hour, Battle for Middle-earth and its sequels, C&amp;amp;C 3 and its sequel, and Red Alert 3 and its sequel. I’ve been working on OpenSAGE for 6 months, and made some good progress, so I’ve started this series of blog posts to talk about what is happening in the project each week. You can also star or watch the &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE GitHub repo&lt;/a&gt; for a more real-time view of things.&lt;/em&gt;&lt;/p&gt;
+
+&lt;p&gt;Following on from &lt;a href=&quot;/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10&quot;&gt;last week’s post&lt;/a&gt;, here is what’s been happening this week in &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt;.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-this-week&quot;&gt;Progress this week&lt;/h2&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png&quot; alt=&quot;GUI - Main Menu&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-gui-main-menu-400x237.png 400w,/assets/resized/opensage-2017-12-17-gui-main-menu-800x474.png 800w,/assets/resized/opensage-2017-12-17-gui-main-menu-1200x711.png 1200w,/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;This week in OpenSAGE:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;I’ve finished porting the data viewer from WPF to &lt;a href=&quot;https://github.com/picoe/Eto&quot;&gt;Eto.Forms&lt;/a&gt;. I haven’t really introduced what the data viewer is, so I’ll do that below. I want OpenSAGE to be a cross-platform project (it’s Windows-only right now), and I’d like the data viewer to at least be on whatever desktop platforms OpenSAGE supports, if not mobile. Xamarin Forms was an option, but on Windows it only supports UWP (a WPF port of Xamarin Forms is in the works, apparently, but not ready yet). UWP is no good for OpenSAGE because of the way it handles file system permissions. So for the data viewer, I wanted a cross-platform UI framework that runs on at least WPF, macOS, and Linux. Eto.Forms ticks those boxes. Having used it for a couple of weeks, I’m really impressed with how easy it is to get up and running. I want to thank &lt;a href=&quot;https://twitter.com/cwensley&quot;&gt;Curtis Wensley&lt;/a&gt; for making and maintaining such an awesome framework. I built a &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/blob/master/src/OpenSage.DataViewer.Windows/Controls/GameControlHandler.cs&quot;&gt;custom control&lt;/a&gt; to render 3D content, and it couldn’t have been easier to integrate with Eto.Forms.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I’ve made progress on rendering the various GUI screens from C&amp;amp;C Generals. Thankfully the GUI screens (main menu, options screen, game loading screen, game setup screen, etc.) are defined in parse-able data files, not hardcoded in the game’s binary. This week I have implemented text rendering (using DirectWrite) - quite a critical feature for GUI screens… I’ll talk more about GUI rendering below.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I merged a &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/pull/11&quot;&gt;pull request&lt;/a&gt; from &lt;a href=&quot;https://github.com/feliwir&quot;&gt;Stephan Vedder&lt;/a&gt; that added support for &lt;code class=&quot;highlighter-rouge&quot;&gt;.const&lt;/code&gt; files. &lt;code class=&quot;highlighter-rouge&quot;&gt;.const&lt;/code&gt; files were used in Battle for Middle-earth (BFME) and later SAGE games, as part of the Flash-based UI system. This is a whole new area that I haven’t done any work on myself, so it’s exciting to see it starting to appear in OpenSAGE - thanks Stephan!&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;I have started to setup a &lt;a href=&quot;https://en.wikipedia.org/wiki/Continuous_integration&quot;&gt;CI&lt;/a&gt; build. Normally I’d setup an AppVeyor build and be done with it, but my requirements for OpenSAGE are a bit different. Most of OpenSAGE’s &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/tree/master/src/OpenSage.Game.Tests&quot;&gt;tests&lt;/a&gt; use the actual data files from SAGE game installations. For copyright reasons, I can’t upload those data files anywhere. So I’ve settled on &lt;a href=&quot;https://www.visualstudio.com/vso/&quot;&gt;Visual Studio Team Services&lt;/a&gt;, which lets me use a private build agent to do the builds. I’ve got a computer running at home, with all the SAGE games installed, that will be a private build agent and run the OpenSAGE test suite whenever it’s instructed to by VSTS. I’m still setting this up, so for now the build badge in the GitHub readme shows a failing build.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;data-viewer&quot;&gt;Data viewer&lt;/h2&gt;
+
+&lt;p&gt;When I started working on OpenSAGE, I realised it would be good to have a way to preview the results of the file format parsers that I was working on. At that time I was working on a &lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt; parser. &lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt; files in Generals can contain both multi-player maps and single-player missions; they contain the terrain data as well as scripts needed for multi-player or single-player games. Since I didn’t yet have an in-game UI, I built a simple WPF app with two panels: on the left, a list of files contained in the Generals folder, and on the right, a preview of the selected file. I built previewers for the main file formats as I figured out them out: &lt;code class=&quot;highlighter-rouge&quot;&gt;.w3d&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;.ini&lt;/code&gt;, etc.&lt;/p&gt;
+
+&lt;p&gt;Once OpenSAGE is far enough along in development that it’s possible to start a game from the in-game UI, the data viewer will become less important, but still a helpful way to view individual files. For now, there is no “game” executable, so the data viewer is all there is.&lt;/p&gt;
+
+&lt;p&gt;This week I finished porting the data viewer from WPF to Eto.Forms, so that it can work on macOS and Linux. I haven’t yet implemented rendering backends for either of those platforms, but at least I’ve removed one of the obstacles.&lt;/p&gt;
+
+&lt;p&gt;Here are screenshots with representative examples of all the file types that the OpenSAGE Data Viewer knows how to handle:&lt;/p&gt;
+
+&lt;h3 id=&quot;w3d&quot;&gt;.w3d&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.w3d&lt;/code&gt; files were used in C&amp;amp;C Generals and subsequent SAGE games to store 3D models. C&amp;amp;C 3 and later games used an evolution of this format, called &lt;code class=&quot;highlighter-rouge&quot;&gt;.w3x&lt;/code&gt;, which is kind of the same thing but XML-based.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-w3d-1200x957.png&quot; alt=&quot;W3D Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-w3d-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-w3d-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-w3d-1200x957.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;map&quot;&gt;.map&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt; files store the single-player and multi-player missions, including terrain data and scripts. The &lt;code class=&quot;highlighter-rouge&quot;&gt;.map&lt;/code&gt; viewer lets you change the time of day, which affects lighting.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-map-1600x967.png&quot; alt=&quot;Map Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-map-400x242.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-map-800x483.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-map-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-data-viewer-map-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;dds-and-tga&quot;&gt;.dds and .tga&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.dds&lt;/code&gt; files were used to store 3D model textures, and &lt;code class=&quot;highlighter-rouge&quot;&gt;.tga&lt;/code&gt; files were used for terrain and UI textures.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-dds-1200x957.png&quot; alt=&quot;DDS Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-dds-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-dds-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-dds-1200x957.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;csf&quot;&gt;.csf&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.csf&lt;/code&gt; - compiled string files - stored the translated strings.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-csf-1200x957.png&quot; alt=&quot;CSF Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-csf-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-csf-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-csf-1200x957.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;const&quot;&gt;.const&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.const&lt;/code&gt; files store constant value definitions for use in the &lt;code class=&quot;highlighter-rouge&quot;&gt;.apt&lt;/code&gt; UI framework.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-const-1200x957.png&quot; alt=&quot;Const Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-const-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-const-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-const-1200x957.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h3 id=&quot;ini&quot;&gt;.ini&lt;/h3&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.ini&lt;/code&gt; files were used in Generals and subsequent SAGE games to store almost everything about the game, except for what was stored in other file types. My &lt;code class=&quot;highlighter-rouge&quot;&gt;.ini&lt;/code&gt; viewer currently only displays object definitions and particle systems.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-data-viewer-ini-1200x957.png&quot; alt=&quot;Const Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-data-viewer-ini-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-ini-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-ini-1200x957.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;gui-rendering&quot;&gt;GUI rendering&lt;/h2&gt;
+
+&lt;p&gt;Last week I mentioned the &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; format used for UI screens in C&amp;amp;C Generals. This week I’ve been working on rendering more parts of it, including text. Here’s the current state of the main menu (defined in &lt;code class=&quot;highlighter-rouge&quot;&gt;MainMenu.wnd&lt;/code&gt;):&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png&quot; alt=&quot;GUI - Main Menu&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-gui-main-menu-400x237.png 400w,/assets/resized/opensage-2017-12-17-gui-main-menu-800x474.png 800w,/assets/resized/opensage-2017-12-17-gui-main-menu-1200x711.png 1200w,/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Some UI elements are visible that should be hidden - I still need to look at why that’s so. Buttons respond to mouse hover now, but they don’t yet do anything when clicked.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-gui-options-1600x967.png&quot; alt=&quot;GUI - Options&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-gui-options-400x242.png 400w,/assets/resized/opensage-2017-12-17-gui-options-800x483.png 800w,/assets/resized/opensage-2017-12-17-gui-options-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-gui-options-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;This is the Options menu. There’s much more to do here. I need to implement textboxes, checkboxes, and comboboxes.&lt;/p&gt;
+
+&lt;p&gt;And here’s one we all like to see - the victory screen. Yes, even that was defined in a &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; file, not hardcoded.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-17-gui-victorious-1600x967.png&quot; alt=&quot;GUI - Victorious&quot; srcset=&quot;/assets/resized/opensage-2017-12-17-gui-victorious-400x242.png 400w,/assets/resized/opensage-2017-12-17-gui-victorious-800x483.png 800w,/assets/resized/opensage-2017-12-17-gui-victorious-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-gui-victorious-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; viewer has the UI hierarchy in a tree view on the left - you can select a UI element and it will be highlighted on the right.&lt;/p&gt;
+
+&lt;p&gt;That’s all for this week - see you next time!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">What's been happening this week in OpenSAGE</summary></entry><entry><title type="html">OpenSAGE Dev Diary #2 (2017-12-10)</title><link href="http://timjones.io/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #2 (2017-12-10)" /><published>2017-12-10T11:00:00+00:00</published><updated>2017-12-10T11:00:00+00:00</updated><id>http://timjones.io/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10">&lt;p&gt;Following on from &lt;a href=&quot;/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03&quot;&gt;last week’s post&lt;/a&gt;, here is what’s been happening this week in OpenSAGE.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-this-week&quot;&gt;Progress this week&lt;/h2&gt;
+
+&lt;p&gt;This week, I have:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;
+    &lt;p&gt;Implemented a new build system for shaders. Previously, shaders were compiled (at build time) using the &lt;a href=&quot;https://www.nuget.org/packages/Microsoft.HLSL.CSharpVB/&quot;&gt;Microsoft.HLSL.CSharpVB MSBuild targets&lt;/a&gt; from NuGet. This had a couple of limitations: first, the method this NuGet package used to find &lt;code class=&quot;highlighter-rouge&quot;&gt;fxc.exe&lt;/code&gt; &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/issues/8&quot;&gt;didn’t work&lt;/a&gt; with recent Windows Kits. Second, vertex and pixel shaders had to be in separate files, which didn’t fit well with the runtime Effect system I’ve been building. The new shader build system uses a custom MSBuild &lt;code class=&quot;highlighter-rouge&quot;&gt;.targets&lt;/code&gt; file and a custom C# MSBuild &lt;code class=&quot;highlighter-rouge&quot;&gt;Task&lt;/code&gt; to compile all the &lt;code class=&quot;highlighter-rouge&quot;&gt;.fx&lt;/code&gt; files found in the OpenSage.Game project, and embed the resulting bytecode as embedded resources. &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE/tree/master/build&quot;&gt;Source code here&lt;/a&gt;.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Started implementing a GUI renderer. More details on GUI rendering below.&lt;/p&gt;
+  &lt;/li&gt;
+  &lt;li&gt;
+    &lt;p&gt;Started porting the existing Data Viewer application from WPF to &lt;a href=&quot;https://github.com/picoe/Eto&quot;&gt;Eto.Forms&lt;/a&gt;, a cross-platform UI framework that, like Xamarin Forms, uses native widgets on each platform. I plan to bring OpenSAGE to the Mac soon, and this is an important preparatory step.&lt;/p&gt;
+  &lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&quot;gui-rendering&quot;&gt;GUI rendering&lt;/h2&gt;
+
+&lt;p&gt;In C&amp;amp;C Generals, almost all the UI (i.e. everything except for the 3D bits) is defined in &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; files. This includes the main menu, the options screen, the multiplayer game setup screen, even the command bar at the bottom of the screen during gameplay.&lt;/p&gt;
+
+&lt;p&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; are plain-text files that look like this:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;FILE_VERSION = 2;
+STARTLAYOUTBLOCK
+  LAYOUTINIT = &quot;[None]&quot;;
+  LAYOUTUPDATE = &quot;[None]&quot;;
+  LAYOUTSHUTDOWN = &quot;[None]&quot;;
+ENDLAYOUTBLOCK
+WINDOW
+  WINDOWTYPE = USER;
+  SCREENRECT = UPPERLEFT: 0 0,
+               BOTTOMRIGHT: 800 600,
+               CREATIONRESOLUTION: 800 600;
+  NAME = &quot;TheName&quot;;
+  STATUS = ENABLED+IMAGE;
+  STYLE = USER;
+  SYSTEMCALLBACK = &quot;[None]&quot;;
+  INPUTCALLBACK = &quot;[None]&quot;;
+  TOOLTIPCALLBACK = &quot;[None]&quot;;
+  DRAWCALLBACK = &quot;[None]&quot;;
+  FONT = NAME: &quot;Times New Roman&quot;, SIZE: 14, BOLD: 0;
+  HEADERTEMPLATE = &quot;[None]&quot;;
+  TOOLTIPDELAY = -1;
+  TEXTCOLOR = ENABLED:  255 255 255 255, ENABLEDBORDER:  255 255 255 255,
+              DISABLED: 255 255 255 255, DISABLEDBORDER: 255 255 255 255,
+              HILITE:   255 255 255 255, HILITEBORDER:   255 255 255 255;
+  ENABLEDDRAWDATA = IMAGE: SomeImageName, COLOR: 0 0 128 255, BORDERCOLOR: 254 254 254 255,
+                    ...
+  DISABLEDDRAWDATA = IMAGE: NoImage, COLOR: 64 64 64 255, BORDERCOLOR: 254 254 254 255,
+                     ...
+  HILITEDRAWDATA = IMAGE: NoImage, COLOR: 128 128 255 255, BORDERCOLOR: 254 254 254 255,
+                   ...
+  CHILD
+     ... Child window
+  WINDOW
+  ENDALLCHILDREN
+END
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;A &lt;code class=&quot;highlighter-rouge&quot;&gt;WINDOW&lt;/code&gt; definition (which is really an element of a window) contains information about size, colour, background image.
+There are different window types for textboxes, listboxes, etc. Windows can have child windows, so something like the main menu
+has a large hierarchy of “windows”.&lt;/p&gt;
+
+&lt;p&gt;I couldn’t find any information about &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; files by Googling, so I had to figure it out the hard way. For example, you can see above that there are references to images (&lt;code class=&quot;highlighter-rouge&quot;&gt;ENABLEDDRAWDATA = IMAGE: SomeImageName&lt;/code&gt;). These don’t correspond directly to images on disk. Instead, there is a folder of &lt;code class=&quot;highlighter-rouge&quot;&gt;.ini&lt;/code&gt; files called MappedImages, and in there you’ll find entries like this:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;MappedImage SomeImageName
+  Texture = TheActualTexture.tga
+  TextureWidth = 1024
+  TextureHeight = 256
+  Coords = Left:0 Top:64 Right:800 Bottom:255
+  Status = NONE
+End
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;These &lt;code class=&quot;highlighter-rouge&quot;&gt;MappedImage&lt;/code&gt; entries contain the actual texture, as well as coordinates within that texture. Most GUI textures contain images for lots of GUI elements, so these coordinates provide the specific rectangle to use for a given GUI element.&lt;/p&gt;
+
+&lt;p&gt;I’ve implemented a &lt;code class=&quot;highlighter-rouge&quot;&gt;.wnd&lt;/code&gt; parser, and started on implementing a GUI renderer. Here’s where I’ve got to this week: the basic bits are in place, but I’m not yet rendering text, and there’s no mouse or keyboard input yet.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-10-gui-1600x967.png&quot; alt=&quot;OpenSAGE GUI - C&amp;amp;C Generals Main Menu&quot; srcset=&quot;/assets/resized/opensage-2017-12-10-gui-400x242.png 400w,/assets/resized/opensage-2017-12-10-gui-800x483.png 800w,/assets/resized/opensage-2017-12-10-gui-1200x725.png 1200w,/assets/resized/opensage-2017-12-10-gui-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;For reference, here is what the same screen looks like in the original game:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-10-gui-original-400x300.png&quot; alt=&quot;C&amp;amp;C Generals Main Menu&quot; srcset=&quot;/assets/resized/opensage-2017-12-10-gui-original-400x300.png 400w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Still plenty of work to do, but it’s a start.&lt;/p&gt;
+
+&lt;h2 id=&quot;next-week&quot;&gt;Next week&lt;/h2&gt;
+
+&lt;p&gt;Next, I’m planning to finish porting the Data Viewer application to Eto.Forms, and then keep going with GUI rendering.&lt;/p&gt;
+
+&lt;p&gt;See you next time!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">What's been happening this week in OpenSAGE</summary></entry><entry><title type="html">OpenSAGE Dev Diary #1 (2017-12-03)</title><link href="http://timjones.io/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03" rel="alternate" type="text/html" title="OpenSAGE Dev Diary #1 (2017-12-03)" /><published>2017-12-03T20:00:00+00:00</published><updated>2017-12-03T20:00:00+00:00</updated><id>http://timjones.io/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03">&lt;p&gt;This is the first in what I hope will be a continuing series of updates on &lt;a href=&quot;https://github.com/OpenSAGE/OpenSAGE&quot;&gt;OpenSAGE&lt;/a&gt;, my C&amp;amp;C Generals re-implementation project.&lt;/p&gt;
+
+&lt;p&gt;I’ve been working on OpenSAGE for about 6 months now. I’m still working on parsing and rendering the basic data files (3D models, maps, etc.). There isn’t yet any playable executable. Instead, there’s a “Data Viewer” application, which lists all the files found in the Generals (or Zero Hour) installation folder, and lets you view these files. I’ve found this approach helpful while writing parsers for the various file formats found in Generals. At some point, I’ll transition to working on gameplay, and start to build up a playable executable.&lt;/p&gt;
+
+&lt;p&gt;Here is what the data viewer looks like. Here I’m viewing the USA Command Center 3D model:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-03-data-viewer-1600x967.png&quot; alt=&quot;OpenSAGE Data Viewer&quot; srcset=&quot;/assets/resized/opensage-2017-12-03-data-viewer-400x242.png 400w,/assets/resized/opensage-2017-12-03-data-viewer-800x483.png 800w,/assets/resized/opensage-2017-12-03-data-viewer-1200x725.png 1200w,/assets/resized/opensage-2017-12-03-data-viewer-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;I meant to start writing about this project soon after I started it, but clearly that didn’t happen. Instead of trying to list everything I’ve done in the last 6 months, I’ll just start from a week ago, and then try to keep up-to-date from now.&lt;/p&gt;
+
+&lt;h2 id=&quot;progress-this-week&quot;&gt;Progress this week&lt;/h2&gt;
+
+&lt;p&gt;This week, I have:&lt;/p&gt;
+
+&lt;ul&gt;
+  &lt;li&gt;Switched from a D3D12 renderer to a D3D11 renderer. I started out with a Direct3D 12 renderer because I wanted to learn Direct3D 12. Having done that, I realise it’s not sensible for this particular project to require an API that only works on Windows 10. Direct3D 11 works on Windows 7 and above, and since many people are still on Windows 7, that’s a better minimum requirement. I plan to add a Metal renderer (for macOS and iOS), and possibly Vulkan (for Android), depending on how popular this project is.&lt;/li&gt;
+  &lt;li&gt;In order to render the terrain and 3D meshes, I was previously relying on a D3D12-only feature called dynamic texture indexing. This allowed me, for example when rendering a map, to put all the terrain textures in a big array and send that to the GPU, and the pixel shader could dynamically index the right texture. Dynamic texture indexing of an array of textures (i.e. &lt;code class=&quot;highlighter-rouge&quot;&gt;Texture2D[]&lt;/code&gt;) isn’t supported in D3D11, so I instead used D3D11’s closest equivalent, a texture array (&lt;code class=&quot;highlighter-rouge&quot;&gt;Texture2DArray&lt;/code&gt;).&lt;/li&gt;
+  &lt;li&gt;&lt;code class=&quot;highlighter-rouge&quot;&gt;Texture2DArray&lt;/code&gt; requires all the textures in the array to have the same size and format (unlike &lt;code class=&quot;highlighter-rouge&quot;&gt;Texture2D[]&lt;/code&gt;, where textures can have arbitrary sizes and formats). The terrain textures used in Generals maps are not all the same size. There are 4 possible sizes: 64x64, 128x128, 256x256, and 384x384. In order to put all these into a &lt;code class=&quot;highlighter-rouge&quot;&gt;Texture2DArray&lt;/code&gt;, I had to upsample the smaller textures to 384x384. Not a perfect solution, but it was the least bad option I could think of, while keeping the nice ability to render an entire terrain patch with a single draw call.&lt;/li&gt;
+  &lt;li&gt;Added a friendlier resource binding API. Previously, to set shader resources, I had to hard-code the resource slot in my C# code. Now I can use the name of the resource, as declared in HLSL, and using shader reflection I can match this to the resource slot.&lt;/li&gt;
+  &lt;li&gt;Added a stub for a Bink video parser. Currently I can parse the container format, but not yet any of the video or audio packets. Cinematic videos in Generals use the Bink video format (stored in &lt;code class=&quot;highlighter-rouge&quot;&gt;.bik&lt;/code&gt; files), and up to now I’ve had a prototype Bink viewer that uses &lt;a href=&quot;https://www.ffmpeg.org/&quot;&gt;FFmpeg&lt;/a&gt; to play them. I’m toying with the possibility of implementing a Bink parser and renderer completely in C#, to remove the FFmpeg dependency. Native dependencies cause all sorts of headaches for cross-platform deployments, so I’d like to avoid them if I can. That said, Bink is not a simple format, so it might turn out to be a bad idea to try to implement it myself.&lt;/li&gt;
+  &lt;li&gt;Fixed some memory leaks. I noticed, when shutting down the data viewer app, that Direct3D complained in the Visual Studio output window about unreleased live resources. I tracked these down to a place where I’d forgotten to dispose some D3D objects.&lt;/li&gt;
+  &lt;li&gt;Abstracted the material system to support shader materials. 3D models in Generals and Zero Hour all use vertex materials, which were built on D3D8’s fixed-function pipeline. Later SAGE games (Battle for Middle-earth II, C&amp;amp;C3, RA3) use shaders. I wanted to support both types of rendering early on, so that I don’t need to do lots of refactoring later. Model rendering can now use either &lt;code class=&quot;highlighter-rouge&quot;&gt;FixedFunctionMaterial&lt;/code&gt; (which still uses shaders, but it emulates a Generals-era fixed-function pipeline) or &lt;code class=&quot;highlighter-rouge&quot;&gt;ShaderMaterial&lt;/code&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;So, lots of refactoring and internal changes this week.&lt;/p&gt;
+
+&lt;p&gt;Next week I plan to work on the GUI. I have a prototype GUI renderer, built on WPF. I plan to rip this out and build a new one based on lower-level drawing APIs (Direct2D on Windows, and later, &lt;code class=&quot;highlighter-rouge&quot;&gt;CGContext&lt;/code&gt; on macOS and iOS). Stay tuned!&lt;/p&gt;
+
+&lt;p&gt;Although I haven’t done any work on maps this week, allow me to finish with a screenshot showing the current state of map rendering:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/opensage-2017-12-03-data-viewer-map-usa03-1600x967.png&quot; alt=&quot;OpenSAGE Data Viewer - USA03 Map&quot; srcset=&quot;/assets/resized/opensage-2017-12-03-data-viewer-map-usa03-400x242.png 400w,/assets/resized/opensage-2017-12-03-data-viewer-map-usa03-800x483.png 800w,/assets/resized/opensage-2017-12-03-data-viewer-map-usa03-1200x725.png 1200w,/assets/resized/opensage-2017-12-03-data-viewer-map-usa03-1600x967.png 1600w&quot; /&gt;&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="OpenSAGE" /><summary type="html">The first in a hopefully continuing series of updates on OpenSAGE, my C&amp;C Generals re-implementation project.</summary></entry><entry><title type="html">Syntax highlighting for HLSL and ShaderLab files on GitHub.com</title><link href="http://timjones.io/blog/archive/2017/05/05/syntax-highlighting-for-hlsl-shaderlab-files-on-github" rel="alternate" type="text/html" title="Syntax highlighting for HLSL and ShaderLab files on GitHub.com" /><published>2017-05-05T15:00:00+00:00</published><updated>2017-05-05T15:00:00+00:00</updated><id>http://timjones.io/blog/archive/2017/05/05/syntax-highlighting-for-hlsl-shaderlab-files-on-github</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/05/05/syntax-highlighting-for-hlsl-shaderlab-files-on-github">&lt;h2 id=&quot;making-the-world-prettier-one-githubcom-page-at-a-time&quot;&gt;Making the world prettier, one GitHub.com page at a time&lt;/h2&gt;
+
+&lt;p&gt;I don’t know about you, but one of the things I’ve always liked about GitHub is how nice it looks when you’re browsing code files.&lt;/p&gt;
+
+&lt;p&gt;That is, unless you’re looking at HLSL or Unity ShaderLab shaders, in which case you’re stuck with plain, non-syntax-highlighted, text. (Or in the case of ShaderLab, GitHub pretended they were GLSL files, resulting in missing highlighting for all the ShaderLab-specific parts, and poor highlighting for &lt;code class=&quot;highlighter-rouge&quot;&gt;CGPROGRAM&lt;/code&gt; blocks because Cg has more in common with HLSL than GLSL.)&lt;/p&gt;
+
+&lt;p&gt;No longer! My pull requests to &lt;a href=&quot;https://github.com/github/linguist/pull/3469&quot;&gt;add syntax highlighting to HLSL&lt;/a&gt; and &lt;a href=&quot;https://github.com/github/linguist/pull/3490&quot;&gt;ShaderLab shaders&lt;/a&gt; were merged.&lt;/p&gt;
+
+&lt;p&gt;Here are before / after screenshots of an HLSL file:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/github-hlsl-before-1600x1094.png&quot; alt=&quot;HLSL syntax highlighting on github.com - Before&quot; srcset=&quot;/assets/resized/github-hlsl-before-400x273.png 400w,/assets/resized/github-hlsl-before-800x547.png 800w,/assets/resized/github-hlsl-before-1200x820.png 1200w,/assets/resized/github-hlsl-before-1600x1094.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/github-hlsl-after-1600x1093.png&quot; alt=&quot;HLSL syntax highlighting on github.com - After&quot; srcset=&quot;/assets/resized/github-hlsl-after-400x273.png 400w,/assets/resized/github-hlsl-after-800x546.png 800w,/assets/resized/github-hlsl-after-1200x820.png 1200w,/assets/resized/github-hlsl-after-1600x1093.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;And here are before / after screenshots of &lt;a href=&quot;https://github.com/Unity-Technologies/PostProcessing/blob/9ec5df8e60806f226ed770931300f14ef4cf6638/PostProcessing/Resources/Shaders/DepthOfField.shader&quot;&gt;a ShaderLab file&lt;/a&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/github-shaderlab-before-1600x1094.png&quot; alt=&quot;ShaderLab syntax highlighting on github.com - Before&quot; srcset=&quot;/assets/resized/github-shaderlab-before-400x273.png 400w,/assets/resized/github-shaderlab-before-800x547.png 800w,/assets/resized/github-shaderlab-before-1200x820.png 1200w,/assets/resized/github-shaderlab-before-1600x1094.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/github-shaderlab-after-1600x1091.png&quot; alt=&quot;ShaderLab syntax highlighting on github.com - After&quot; srcset=&quot;/assets/resized/github-shaderlab-after-400x273.png 400w,/assets/resized/github-shaderlab-after-800x545.png 800w,/assets/resized/github-shaderlab-after-1200x818.png 1200w,/assets/resized/github-shaderlab-after-1600x1091.png 1600w&quot; /&gt;&lt;/p&gt;
+
+&lt;h2 id=&quot;shameless-plug&quot;&gt;Shameless plug&lt;/h2&gt;
+
+&lt;p&gt;If you’re still reading, chances are that you work with either HLSL or ShaderLab shaders on a regular basis. So if you don’t already use it, you might be interested in &lt;a href=&quot;https://marketplace.visualstudio.com/items?itemName=TimGJones.HLSLToolsforVisualStudio&quot;&gt;HLSL Tools for Visual Studio&lt;/a&gt;. I’ve just released v1.1, with &lt;a href=&quot;https://github.com/tgjones/HlslTools/blob/master/CHANGELOG.md&quot;&gt;many bug fixes and some nice improvements&lt;/a&gt;.&lt;/p&gt;
+
+&lt;p&gt;I’m hard at work on adding ShaderLab support, although there’s still a lot to do - keep an eye out here on my blog or on &lt;a href=&quot;https://twitter.com/_tim_jones_&quot;&gt;Twitter&lt;/a&gt; for when I have something to announce.&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="HLSL" /><category term="ShaderLab" /><category term="GitHub" /><category term="HLSL-Tools" /><summary type="html">My pull requests to add syntax highlighting to HLSL and ShaderLab files on GitHub.com were merged.</summary></entry><entry><title type="html">Xbox One XDK shader intrinsics now available in HLSL Tools for Visual Studio</title><link href="http://timjones.io/blog/archive/2017/03/21/xbox-one-xdk-shader-intrinsics-now-in-hlsl-tools" rel="alternate" type="text/html" title="Xbox One XDK shader intrinsics now available in HLSL Tools for Visual Studio" /><published>2017-03-21T22:02:00+00:00</published><updated>2017-03-21T22:02:00+00:00</updated><id>http://timjones.io/blog/archive/2017/03/21/xbox-one-xdk-shader-intrinsics-now-in-hlsl-tools</id><content type="html" xml:base="http://timjones.io/blog/archive/2017/03/21/xbox-one-xdk-shader-intrinsics-now-in-hlsl-tools">&lt;p&gt;I’m very happy to announce that the latest version of &lt;a href=&quot;https://marketplace.visualstudio.com/items?itemName=TimGJones.HLSLToolsforVisualStudio&quot;&gt;HLSL Tools for Visual Studio&lt;/a&gt; (v1.1.197 at the time of writing) includes full IntelliSense support for Xbox One XDK shader intrinsic functions.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/xdk-intrinsics-1-1200x997.png&quot; alt=&quot;&quot; srcset=&quot;/assets/resized/xdk-intrinsics-1-400x332.png 400w,/assets/resized/xdk-intrinsics-1-800x665.png 800w,/assets/resized/xdk-intrinsics-1-1200x997.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;If you don’t write games for the Xbox One, then feel free to stop reading now; but if you do, then I think you’ll find this really useful. You get statement completion, signature help, and quick info for these shader intrinsics (all but one of which is prefixed by &lt;code class=&quot;highlighter-rouge&quot;&gt;__XB_&lt;/code&gt;, so these functions won’t clutter things up for non-XDK HLSL developers).&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/resized/xdk-intrinsics-2-1200x997.png&quot; alt=&quot;&quot; srcset=&quot;/assets/resized/xdk-intrinsics-2-400x332.png 400w,/assets/resized/xdk-intrinsics-2-800x665.png 800w,/assets/resized/xdk-intrinsics-2-1200x997.png 1200w&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;If you write shaders for the Xbox One, then give &lt;a href=&quot;https://marketplace.visualstudio.com/items?itemName=TimGJones.HLSLToolsforVisualStudio&quot;&gt;HLSL Tools for Visual Studio&lt;/a&gt; a try! As always, let me know if you find any bugs. In terms of feature requests, please &lt;a href=&quot;https://github.com/tgjones/HlslTools/blob/master/CONTRIBUTING.md#note-about-the-xbox-one-xdk&quot;&gt;read this note before requesting additional intrinsics or other functionality from the XDK&lt;/a&gt; (basically, if you’ve signed an NDA for this stuff, then you’re still under that NDA).&lt;/p&gt;
+
+&lt;p&gt;I’d like to give a big shout-out to &lt;a href=&quot;https://twitter.com/adamjmiles&quot;&gt;Adam Miles&lt;/a&gt; for making this feature possible; he did almost all the hard work, including documenting the intrinsics themselves.&lt;/p&gt;
+
+&lt;p&gt;Happy coding!&lt;/p&gt;</content><author><name>Tim Jones</name><email>tim@timjones.io</email></author><category term="HLSL" /><category term="HLSL-Tools" /><summary type="html">Xbox One XDK shader intrinsics are now available in HLSL Tools for Visual Studio</summary></entry></feed>

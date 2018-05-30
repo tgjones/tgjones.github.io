@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>NDepend 4 review - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">NDepend 4 review</h1>
+
+    <div class="post-date">
+        <time datetime="2012-12-15T15:47:00+00:00">15 December 2012</time>
+    </div>
+
+    
+
+    <p><a href="http://www.ndepend.com">NDepend</a> is an analysis tool for .NET code, that provides many ways of generating and viewing code metrics. Here’s what the homepage says:</p>
+
+<blockquote>
+  <p>NDepend is a Visual Studio tool to manage complex .NET code and achieve high Code Quality. With NDepend, software quality can be measured using Code Metrics, visualized using Graphs and Treemaps, and enforced using standard and custom Rules. </p>
+</blockquote>
+
+<p>I’ll admit, when I did my first analysis session with NDepend, I was a little taken aback at the amount of detail being thrown at me. However, it didn’t take long before I appreciated the sheer depth of available information. And viewed in that light, the visual interface is actually well thought through. It’s a 4th generation product, and it shows.</p>
+
+<p>First things first: when you download NDepend, you won’t find an installer. Personally, I like the convenience of an .msi, but it’s not a big deal. I chose to copy NDepend to Program Files.</p>
+
+<p>NDepend 4 comes in two versions: standalone, and integrated with Visual Studio. Personally I prefer the standalone version – there are enough tool windows that I think it deserves its own host program.</p>
+
+<p>When you first open NDepend, you’ll be greeted by a familiar IDE-style interface.</p>
+
+<p><img src="/assets/posts/ndepend1.png" alt="NDepend interface" /></p>
+
+<h2 id="analysing-a-project">Analysing a Project</h2>
+
+<p>For the purposes of this review, I’ll be analysing <a href="http://dotliquidmarkup.org">DotLiquid</a>. It’s quite a small project, but probably large enough to have some issues that NDepend might uncover. You can analyse either a .csproj or a compiled DLL.</p>
+
+<p>After analysis, NDepend will open an HTML report in your browser:</p>
+
+<p><img src="/assets/posts/ndepend5.png" alt="HTML report" /></p>
+
+<p>You can use Visual NDepend to browse the same information as shown in the report. The rest of this review will focus on Visual NDepend.</p>
+
+<h2 id="code-query-linq">Code Query LINQ</h2>
+
+<p>One of NDepend 4’s flagship features is Code Query LINQ (CQLinq). This, as the name suggests, lets you use LINQ to query your codebase. NDepend comes with many built-in queries, and you can write your own.</p>
+
+<p>The built-in queries cover many categories, including among others:</p>
+
+<ul>
+  <li>Code Quality</li>
+  <li>Object Oriented Design</li>
+  <li>API Breaking Changes</li>
+  <li>Dead Code</li>
+  <li>Naming Conventions</li>
+</ul>
+
+<p>As an example of what CQLinq looks like, here is one of the built-in rules that suggests avoiding namespaces with few types:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="c1">// &lt;Name&gt;Avoid namespaces with few types&lt;/Name&gt;
+</span><span class="n">warnif</span> <span class="n">count</span> <span class="p">&gt;</span> <span class="m">0</span> <span class="k">from</span> <span class="n">n</span> <span class="k">in</span> <span class="n">JustMyCode</span><span class="p">.</span><span class="n">Namespaces</span> 
+<span class="k">let</span> <span class="n">types</span> <span class="p">=</span> <span class="n">n</span><span class="p">.</span><span class="n">ChildTypes</span><span class="p">.</span><span class="nf">Where</span><span class="p">(</span><span class="n">t</span> <span class="p">=&gt;</span> <span class="p">!</span><span class="n">t</span><span class="p">.</span><span class="n">IsGeneratedByCompiler</span><span class="p">)</span>
+<span class="k">where</span> 
+  <span class="n">types</span><span class="p">.</span><span class="nf">Count</span><span class="p">()</span> <span class="p">&lt;</span> <span class="m">5</span> 
+  <span class="k">orderby</span> <span class="n">types</span><span class="p">.</span><span class="nf">Count</span><span class="p">()</span> <span class="k">ascending</span>
+<span class="k">select</span> <span class="k">new</span> <span class="p">{</span> <span class="n">n</span><span class="p">,</span> <span class="n">types</span> <span class="p">}</span> 
+</code></pre>
+</div>
+
+<p>Selecting a query in the “Queries and Rules Explorer” panel will highlight (in the “Metrics” panel) the methods, types, namespaces or assemblies matched by that query. After selecting the “Quick summary of methods to refactor” query, this is what the “Metrics” panel looks like for DotLiquid:</p>
+
+<p><img src="/assets/posts/ndepend2.png" alt="Metrics panel" /></p>
+
+<h2 id="dependency-matrix">Dependency Matrix</h2>
+
+<p>The Dependency Matrix panel is more useful than it first appears. It shows you whether, and how, each part (namespace, type, method) of your project depends on other parts of your project or other libraries. For example, the <code class="highlighter-rouge">Extends</code> tag in DotLiquid depends on <code class="highlighter-rouge">IFileSystem</code>, so there is a blue 1 in that column and row to indicate that 1 member in the <code class="highlighter-rouge">Extends</code> type uses the <code class="highlighter-rouge">IFileSystem</code> type.</p>
+
+<p><img src="/assets/posts/ndepend3.png" alt="Dependency Matrix" /></p>
+
+<p>The Dependency Matrix is perhaps most useful for spotting dependencies that you didn’t expect, or that shouldn’t exist.</p>
+
+<h2 id="dependency-graph">Dependency Graph</h2>
+
+<p>The Dependency Graph panel is more straightforward - as far as I can see, it’s a graphical version of the Dependency Matrix panel, although it gives you several more display options. You can drill into each assembly, and view dependencies right down to the method level. You get a bird’s-eye view of the relative size of each assembly / type / method, as well as a graphic depiction of their inter-dependencies.</p>
+
+<p><img src="/assets/posts/ndepend4.png" alt="Dependency Graph" /></p>
+
+<h2 id="code-diff">Code Diff</h2>
+
+<p>With the DotLiquid project, we have committed to semantic versioning. NDepend can help with this – I can compare previous versions with the trunk version, and check that I haven’t accidentally broken API compatibility in a minor version bump. Here’s what it looks like – note that you can filter by added code, removed code, changed code, etc. You can even edit the CQLinq query to completely customise the filter.</p>
+
+<p><img src="/assets/posts/ndepend6.png" alt="Code Diff" /></p>
+
+<h2 id="build-server-integration">Build Server Integration</h2>
+
+<p>NDepend can be integrated with TFS, CruiseControl, FinalBuilder and TeamCity. It can also be run from the command line.</p>
+
+<h2 id="conclusion">Conclusion</h2>
+
+<p>Almost everything in NDepend’s interface is clickable, or has a tooltip. There is a huge amount of depth here. The documentation is very thorough – and, for once, it’s not full of useless MSDN-style “This gets or sets the [property name]” tidbits.</p>
+
+<p>Overall, I am impressed with NDepend 4. The only downside I can see is its complexity (and possibly, depending on your situation, its price – but I’m all for software developers charging for their hard work). If you are willing to spend some time learning how it works, and if your project warrants it, then you’ll be rewarded with some very deep code metrics. The tagline is “Make your .NET code Beautiful with NDepend.” If its code metrics help you write code that can withstand the microscopic level of detail that NDepend exposes, then “beautiful” might just be the right word.</p>
+
+<h3 id="disclaimer">Disclaimer</h3>
+
+<p>Patrick Smacchia contacted me about reviewing NDepend. I received a free licence for NDepend 4. Patrick did not express any expectation of a positive review.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2012/03/20/multi-file-item-templates-in-visual-studio-2010">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2013/06/21/gemini-aka-make-your-own-visual-studio">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

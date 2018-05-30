@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>An XNA 4.0 Content Pipeline processor for Terrain GeoMipMapping - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">An XNA 4.0 Content Pipeline processor for Terrain GeoMipMapping</h1>
+
+    <div class="post-date">
+        <time datetime="2010-11-16T01:58:00+00:00">16 November 2010</time>
+    </div>
+
+    
+
+    <h2 id="introduction">Introduction</h2>
+
+<p><a href="http://www.flipcode.com/archives/Fast_Terrain_Rendering_Using_Geometrical_MipMapping.shtml">Geomipmapping</a> was introduced by W. H. de Boer in 2000. Here’s what Wikipedia has to <a href="http://en.wikipedia.org/wiki/Geomipmapping">say about it</a>:</p>
+
+<blockquote>
+  <p>Geomipmapping or geometrical mipmapping is a real-time block-based terrain rendering algorithm developed by W.H. de Boer in 2000 that aims to reduce CPU processing time which is a common bottleneck in level of detail approaches to terrain rendering.</p>
+</blockquote>
+
+<p>If you want to have a medium to large terrain in your game, then you’ll need some kind of block-based terrain rendering algorithm, and geomipmapping is one of the easier ones to implement. I wrote an implementation several years ago. It served my purpose, but it was difficult for anybody else to integrate into their own game.</p>
+
+<p>In attempt to solve that, and make it extremely easy for anybody to use terrain geomipmapping for their XNA game, I have refactored my implementation into an XNA 4.0 Content Pipeline extension.</p>
+
+<h2 id="download">Download</h2>
+
+<p>The project is called Osiris; it’s open source; and it’s available here:</p>
+
+<ul>
+  <li><a href="https://github.com/tgjones/osiris">Osiris repository on github</a></li>
+</ul>
+
+<p>The repository includes a demo project, which is a derivation of the GeneratedGeometry and ChaseCamera samples.</p>
+
+<p>This is the properties pane for the heightmap in the demo project:</p>
+
+<p><img src="/assets/posts/geomipmapping3.jpg" alt="" /></p>
+
+<p>And here is ALL the code you need to write to add the terrain to your game. The <code class="highlighter-rouge">TerrainComponent</code> will take care of adjusting level of detail and drawing itself.</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">terrain</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">TerrainComponent</span><span class="p">(</span><span class="k">this</span><span class="p">,</span> <span class="err">`</span><span class="s">"Terrain\HeightMap"</span><span class="p">);</span>
+<span class="n">Components</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="n">terrain</span><span class="p">);</span>
+</code></pre>
+</div>
+
+<p>OK, I lied a little. The <code class="highlighter-rouge">TerrainComponent</code> expects there to be a service in the <code class="highlighter-rouge">Game.Services</code> collection which implements `ICameraService@:</p>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="k">public</span> <span class="k">interface</span> <span class="n">ICameraService</span>
+<span class="p">{</span>
+	<span class="n">Matrix</span> <span class="n">Projection</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="p">}</span>
+	<span class="n">Matrix</span> <span class="n">View</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="p">}</span>
+
+	<span class="kt">float</span> <span class="n">ProjectionNear</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="p">}</span>
+	<span class="kt">float</span> <span class="n">ProjectionTop</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="p">}</span>
+
+	<span class="n">Vector3</span> <span class="n">Position</span> <span class="p">{</span> <span class="k">get</span><span class="p">;</span> <span class="p">}</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<div class="language-csharp highlighter-rouge"><pre class="highlight"><code><span class="n">camera</span> <span class="p">=</span> <span class="k">new</span> <span class="nf">ChaseCamera</span><span class="p">();</span>
+<span class="n">Services</span><span class="p">.</span><span class="nf">AddService</span><span class="p">(</span><span class="k">typeof</span> <span class="p">(</span><span class="n">ICameraService</span><span class="p">),</span> <span class="n">camera</span><span class="p">);</span>
+</code></pre>
+</div>
+
+<p>Here are some screenshots of it in action (use B to toggle wireframe in the demo):</p>
+
+<p><img src="/assets/posts/geomipmapping1.jpg" alt="" /></p>
+
+<p><img src="/assets/posts/geomipmapping2.jpg" alt="" /></p>
+
+<h2 id="the-future">The future</h2>
+
+<p>This is a pretty basic implementation - it uses DualTextureEffect to allow a base texture and a detail texture. I have intentionally used a built-in effect so that it will work with Windows Phone 7. This is something I’d like to get running soon, as I want to try out WP7 development.</p>
+
+<p>At the moment there is no way of doing lighting calculations. You can’t use vertex normals, because geomipmapping changes which vertices are rendered from frame to frame, so lighting based on vertex normals would be “popping” constantly. I intend to calculate lighting at build-time. I’d love to get some feedback on the basic implementation first, though, before getting too far into that.</p>
+
+<p>Most of the structure is in place to do frustum culling on individual patches, but I haven’t yet written the code to actually do it.</p>
+
+<h2 id="an-aside-on-the-name">An aside on the name</h2>
+
+<p>The eagle-eyed will notice that I have previously used the name “Osiris” for <a href="/blog/archive/2008/07/29/osiris-scenegraph-development-part----introduction">another game-related project</a>. You may also notice a two year gap between that blog post and <a href="/blog/archive/2010/10/25/introducing-dotliquid-the-secure-open-source-template-engine">the next one</a>. That attempt at writing an all-encompassing scene graph pretty much wiped me out for 2 years as far as hobby development went. I got overwhelmed with the size of it and wasn’t having fun. I am now older and not much wiser, but I do know that smaller projects are more enjoyable. I’m also much more likely to finish them, given that I do this stuff in my free time, and have less and less of that. So this new appropriation of the name Osiris is the direction I’ll be going with game development - small bits of functionality that are usable by themselves, and hopefully useful to others. And hopefully the odd game…</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2010/11/13/introducing-stitchup-generating-shaders-from-hlsl-shader-fragments">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2010/11/16/terrain-geomipmapping-on-windows-phone">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

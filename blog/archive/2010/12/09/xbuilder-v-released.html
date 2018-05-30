@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>XBuilder v0.2 released - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">XBuilder v0.2 released</h1>
+
+    <div class="post-date">
+        <time datetime="2010-12-09T00:27:00+00:00">09 December 2010</time>
+    </div>
+
+    
+
+    <h2 id="cut-to-the-chase">Cut to the chase…</h2>
+
+<p>XBuilder is an extension for Visual Studio 2010 which lets you preview your XNA assets (models, effects and textures) right inside Visual Studio. I have previously blogged about XBuilder <a href="/blog/archive/2010/11/26/announcing-xbuilder-a-free--open-source-content">here</a>, <a href="/blog/archive/2010/12/01/xbuilder-updates---grid-rotation-indicator-mouse">here</a> and <a href="/blog/archive/2010/12/01/xbuilder-updates---show-normals">here</a>.</p>
+
+<p>I’ve finished work on XBuilder v0.2, and it’s available either using Visual Studio Extension Manager, or from the <a href="http://visualstudiogallery.msdn.microsoft.com/en-us/30e6bc7d-4d92-49da-ac40-adab43fd94a1">Visual Studio Gallery</a>.</p>
+
+<p>XBuilder is open source, and the code is available in the <a href="https://github.com/tgjones/xbuilder">GitHub repository</a>.</p>
+
+<h2 id="whats-new-since-v01">What’s new since v0.1?</h2>
+
+<p>Quite a lot, as it turns out… I’ve blogged about some of these features before, but I’ll include everything here anyway because, well, it pads out my blog post.</p>
+
+<ul>
+  <li>Grid</li>
+</ul>
+
+<p>You can customise the minor and major grid line spacing, as well as minor, major and axis grid colours.</p>
+
+<ul>
+  <li>Rotation indicator</li>
+</ul>
+
+<p>Click and drag this to rotate the camera. This is quite helpful for keeping track of what direction you’re looking in.</p>
+
+<p><img src="/assets/posts/xbuilder8.jpg" alt="xbuilder image" /></p>
+
+<ul>
+  <li>Mouse wheel zoom</li>
+</ul>
+
+<p>Pretty self-explanatory - when the content preview window has focus, use your mouse wheel to zoom in and out.</p>
+
+<ul>
+  <li>Preview effects.</li>
+</ul>
+
+<p>Effect preview is little more than a working prototype at the moment. You can preview effects and choose which primitive (sphere, cube, cylinder, torus, plane and of course teapot) to use to render the effect. If your effect includes parameters with semantics named <code class="highlighter-rouge">WORLDVIEWPROJECTION</code>, <code class="highlighter-rouge">WORLD</code>, <code class="highlighter-rouge">VIEW</code> or <code class="highlighter-rouge">PROJECTION</code>, XBuilder will set the matrices for you. If you use a custom <code class="highlighter-rouge">EffectProcessor</code> and your runtime effect class implements <code class="highlighter-rouge">IEffectMatrices</code>, XBuilder will set the matrices. But that’s it - I need to implement DXSAS or something similar so that other parameters, such as lighting or material related parameters, can also be set.</p>
+
+<ul>
+  <li>Uses your importer and processor settings</li>
+</ul>
+
+<p>In v0.1, the importer was auto-detected by the XNA Content Pipeline and the processor was hard-coded, with no processor parameters. For v0.2, I’ve changed this to use whatever you have setup for in your content project. This was harder than I thought.</p>
+
+<p>At first it looked easy - each file in the content project exposes an interface called <code class="highlighter-rouge">IVSBuildPropertyStorage</code>, which lets you access arbitrary MSBuild properties, such as <code class="highlighter-rouge">Importer</code> and <code class="highlighter-rouge">Processor</code>. However, you need to know the property name up-front - and for processor parameters, which have names like <code class="highlighter-rouge">ProcessorParameters_Scale</code>, this is a problem. <code class="highlighter-rouge">IVsBuildPropertyStorage</code> doesn’t offer any way of getting a list of available property names.</p>
+
+<p>My second attempt involved using the MSBuild API to open the content project file, find the relevant <code class="highlighter-rouge">ProjectItem</code> and read its properties. This worked… but only the first time you do it. MSBuild does something weird with caching opened projects in a static variable somewhere, so you can’t open a project twice. I also tried opening the content project file as a standard XML file, but both of these approaches have the same root problem - even if they worked, they rely on you saving the content project file. If you’re just tweaking processor parameter values, you don’t want to save the project every time you want to update the preview.</p>
+
+<p>My third, and successful, attempt was a bit different - I used a similar technique to what XNA uses internally. However, I didn’t want to rely on reflection, as that’s messy, so I stuck with public interfaces and types only. The end result is that XBuilder is able to pick up your processor parameter changes immediately, without you needing to save anything. You can tweak your parameter value, hit the keyboard shortcut (see below) and the preview will update.</p>
+
+<ul>
+  <li>Bounding boxes</li>
+</ul>
+
+<p>If you select this option, a bounding box will be drawn for each mesh within your model.</p>
+
+<p><img src="/assets/posts/xbuilder10.jpg" alt="" /></p>
+
+<ul>
+  <li>Solid+Wireframe shading mode</li>
+</ul>
+
+<p><img src="/assets/posts/xbuilder11.jpg" alt="" /></p>
+
+<p>Again, self-explanatory - I’m using something similar to <a href="http://www.catalinzima.com/samples/12-months-12-samples-2008/drawing-wireframes-without-z-fighting/">Catalin Zima’s technique for wireframe without z-fighting</a>. You can configure the wireframe colour and z-bias values. Note that this shading mode will only work with models that use <code class="highlighter-rouge">BasicEffect</code>.</p>
+
+<ul>
+  <li>Render normals</li>
+</ul>
+
+<p><img src="/assets/posts/xbuilder12.jpg" alt="" /></p>
+
+<p>Helpful for debugging - you can customise the length of the rendered normals as a proportion of the model bounding sphere radius.</p>
+
+<ul>
+  <li>Alpha blending</li>
+</ul>
+
+<p>If your model uses alpha blending, you’ll want to enable this option. XBuilder will render opaque mesh parts first, followed by transparent mesh parts. At the moment it doesn’t do any depth-sorting in the second pass.</p>
+
+<ul>
+  <li>Keyboard shortcut</li>
+</ul>
+
+<p>Ctrl+Shift+Alt+F10 will open the content preview window.</p>
+
+<ul>
+  <li>More configurable options</li>
+</ul>
+
+<p><img src="/assets/posts/xbuilder9.jpg" alt="" /></p>
+
+<ul>
+  <li>Available from Visual Studio Extension Manager</li>
+</ul>
+
+<p><img src="/assets/posts/xbuilder13.jpg" alt="" /></p>
+
+<p>You can download and install XBuilder right within Visual Studio Extension Manager. When new versions are released, I’ll be adding them to the gallery, so this is the route I’d recommend for installing XBuilder.</p>
+
+<h2 id="whats-next">What’s next?</h2>
+
+<p>I’m going to take a bit of a break, and perhaps actually work on a game project… when I come back to XBuilder, I am going to clean up the code (which got a bit messy while working on v0.2), and then work on the <a href="https://github.com/tgjones/xbuilder/issues">features I’ve got planned for v0.3</a>. It’s not too late to suggest features for v0.3 though - I’d really like this to become a community-driven project. (I know several people have asked for animation support - this is planned for v0.3.)</p>
+
+<p>This is really just a hobby project for me, so it lives or dies on your feedback - please let me know what you think, if it’s useful for you, what would make it useful for you, etc. If you find any bugs, please let me know <a href="https://github.com/tgjones/xbuilder/issues">here</a>.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2010/12/03/content-aware-image-resizing-for-aspnet">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2010/12/10/drawing-an-xna-model-bounding-box">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

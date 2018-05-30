@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>OpenSAGE Dev Diary #2 (2017-12-10) - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">OpenSAGE Dev Diary #2 (2017-12-10)</h1>
+
+    <div class="post-date">
+        <time datetime="2017-12-10T11:00:00+00:00">10 December 2017</time>
+    </div>
+
+    
+    <div class="post-tags">
+        <ul>
+            
+            <li><a href="/blog/tags/opensage">OpenSAGE</a></li>
+            
+        </ul>
+    </div>
+    
+
+    <p>Following on from <a href="/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03">last week’s post</a>, here is what’s been happening this week in OpenSAGE.</p>
+
+<h2 id="progress-this-week">Progress this week</h2>
+
+<p>This week, I have:</p>
+
+<ul>
+  <li>
+    <p>Implemented a new build system for shaders. Previously, shaders were compiled (at build time) using the <a href="https://www.nuget.org/packages/Microsoft.HLSL.CSharpVB/">Microsoft.HLSL.CSharpVB MSBuild targets</a> from NuGet. This had a couple of limitations: first, the method this NuGet package used to find <code class="highlighter-rouge">fxc.exe</code> <a href="https://github.com/OpenSAGE/OpenSAGE/issues/8">didn’t work</a> with recent Windows Kits. Second, vertex and pixel shaders had to be in separate files, which didn’t fit well with the runtime Effect system I’ve been building. The new shader build system uses a custom MSBuild <code class="highlighter-rouge">.targets</code> file and a custom C# MSBuild <code class="highlighter-rouge">Task</code> to compile all the <code class="highlighter-rouge">.fx</code> files found in the OpenSage.Game project, and embed the resulting bytecode as embedded resources. <a href="https://github.com/OpenSAGE/OpenSAGE/tree/master/build">Source code here</a>.</p>
+  </li>
+  <li>
+    <p>Started implementing a GUI renderer. More details on GUI rendering below.</p>
+  </li>
+  <li>
+    <p>Started porting the existing Data Viewer application from WPF to <a href="https://github.com/picoe/Eto">Eto.Forms</a>, a cross-platform UI framework that, like Xamarin Forms, uses native widgets on each platform. I plan to bring OpenSAGE to the Mac soon, and this is an important preparatory step.</p>
+  </li>
+</ul>
+
+<h2 id="gui-rendering">GUI rendering</h2>
+
+<p>In C&amp;C Generals, almost all the UI (i.e. everything except for the 3D bits) is defined in <code class="highlighter-rouge">.wnd</code> files. This includes the main menu, the options screen, the multiplayer game setup screen, even the command bar at the bottom of the screen during gameplay.</p>
+
+<p><code class="highlighter-rouge">.wnd</code> are plain-text files that look like this:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>FILE_VERSION = 2;
+STARTLAYOUTBLOCK
+  LAYOUTINIT = "[None]";
+  LAYOUTUPDATE = "[None]";
+  LAYOUTSHUTDOWN = "[None]";
+ENDLAYOUTBLOCK
+WINDOW
+  WINDOWTYPE = USER;
+  SCREENRECT = UPPERLEFT: 0 0,
+               BOTTOMRIGHT: 800 600,
+               CREATIONRESOLUTION: 800 600;
+  NAME = "TheName";
+  STATUS = ENABLED+IMAGE;
+  STYLE = USER;
+  SYSTEMCALLBACK = "[None]";
+  INPUTCALLBACK = "[None]";
+  TOOLTIPCALLBACK = "[None]";
+  DRAWCALLBACK = "[None]";
+  FONT = NAME: "Times New Roman", SIZE: 14, BOLD: 0;
+  HEADERTEMPLATE = "[None]";
+  TOOLTIPDELAY = -1;
+  TEXTCOLOR = ENABLED:  255 255 255 255, ENABLEDBORDER:  255 255 255 255,
+              DISABLED: 255 255 255 255, DISABLEDBORDER: 255 255 255 255,
+              HILITE:   255 255 255 255, HILITEBORDER:   255 255 255 255;
+  ENABLEDDRAWDATA = IMAGE: SomeImageName, COLOR: 0 0 128 255, BORDERCOLOR: 254 254 254 255,
+                    ...
+  DISABLEDDRAWDATA = IMAGE: NoImage, COLOR: 64 64 64 255, BORDERCOLOR: 254 254 254 255,
+                     ...
+  HILITEDRAWDATA = IMAGE: NoImage, COLOR: 128 128 255 255, BORDERCOLOR: 254 254 254 255,
+                   ...
+  CHILD
+     ... Child window
+  WINDOW
+  ENDALLCHILDREN
+END
+</code></pre>
+</div>
+
+<p>A <code class="highlighter-rouge">WINDOW</code> definition (which is really an element of a window) contains information about size, colour, background image.
+There are different window types for textboxes, listboxes, etc. Windows can have child windows, so something like the main menu
+has a large hierarchy of “windows”.</p>
+
+<p>I couldn’t find any information about <code class="highlighter-rouge">.wnd</code> files by Googling, so I had to figure it out the hard way. For example, you can see above that there are references to images (<code class="highlighter-rouge">ENABLEDDRAWDATA = IMAGE: SomeImageName</code>). These don’t correspond directly to images on disk. Instead, there is a folder of <code class="highlighter-rouge">.ini</code> files called MappedImages, and in there you’ll find entries like this:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>MappedImage SomeImageName
+  Texture = TheActualTexture.tga
+  TextureWidth = 1024
+  TextureHeight = 256
+  Coords = Left:0 Top:64 Right:800 Bottom:255
+  Status = NONE
+End
+</code></pre>
+</div>
+
+<p>These <code class="highlighter-rouge">MappedImage</code> entries contain the actual texture, as well as coordinates within that texture. Most GUI textures contain images for lots of GUI elements, so these coordinates provide the specific rectangle to use for a given GUI element.</p>
+
+<p>I’ve implemented a <code class="highlighter-rouge">.wnd</code> parser, and started on implementing a GUI renderer. Here’s where I’ve got to this week: the basic bits are in place, but I’m not yet rendering text, and there’s no mouse or keyboard input yet.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-10-gui-1600x967.png" alt="OpenSAGE GUI - C&amp;C Generals Main Menu" srcset="/assets/resized/opensage-2017-12-10-gui-400x242.png 400w,/assets/resized/opensage-2017-12-10-gui-800x483.png 800w,/assets/resized/opensage-2017-12-10-gui-1200x725.png 1200w,/assets/resized/opensage-2017-12-10-gui-1600x967.png 1600w" /></p>
+
+<p>For reference, here is what the same screen looks like in the original game:</p>
+
+<p><img src="/assets/resized/opensage-2017-12-10-gui-original-400x300.png" alt="C&amp;C Generals Main Menu" srcset="/assets/resized/opensage-2017-12-10-gui-original-400x300.png 400w" /></p>
+
+<p>Still plenty of work to do, but it’s a start.</p>
+
+<h2 id="next-week">Next week</h2>
+
+<p>Next, I’m planning to finish porting the Data Viewer application to Eto.Forms, and then keep going with GUI rendering.</p>
+
+<p>See you next time!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2017/12/03/opensage-dev-diary-2017-12-03">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2017/12/17/opensage-dev-diary-3-2017-12-17">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

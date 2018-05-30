@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>Writing a MiniC-to-MSIL compiler in F# - Part 1 - Defining the abstract syntax tree - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">Writing a MiniC-to-MSIL compiler in F# - Part 1 - Defining the abstract syntax tree</h1>
+
+    <div class="post-date">
+        <time datetime="2014-04-20T14:04:00+00:00">20 April 2014</time>
+    </div>
+
+    
+
+    <ul>
+  <li>This post is part of the series <a href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Writing a MiniC-to-MSIL compiler in F#</a>.</li>
+  <li>You can find the code for this series in <a href="https://github.com/tgjones/mini-c/">the Mini-C GitHub repository</a>.</li>
+</ul>
+
+<h3 id="introduction">Introduction</h3>
+
+<p>So we’re going to write a compiler - great. Let’s start by deciding on the language we want to compile. The standard way to do this is by defining a language grammar. The grammar will define precisely what source code our compiler will accept as valid input - and implicitly, what isn’t valid input.</p>
+
+<p>I chose to use a grammar I found in <a href="http://jamesvanboxtel.com/projects/minic-compiler/minic.pdf">this paper</a> (which looks like a university course assignment). It defines a language it calls Mini-C, which is a subset of C that omits macros, pointers and structs (and probably lots of other things). There’s enough in MiniC to making writing a compiler for it an interesting exercise.</p>
+
+<p>Here’s an example of Mini-C source code. By the end of this series, our compiler will be able to turn this source code into an executable .NET application:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="kt">int</span> <span class="nf">fib</span><span class="p">(</span><span class="kt">int</span> <span class="n">n</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">n</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)</span> 
+    <span class="k">return</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="k">if</span> <span class="p">(</span><span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="k">return</span> <span class="n">fib</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">+</span> <span class="n">fib</span><span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">2</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span> <span class="p">{</span>
+  <span class="k">return</span> <span class="n">fib</span><span class="p">(</span><span class="mi">10</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre>
+</div>
+
+<h3 id="the-mini-c-grammar">The Mini-C grammar</h3>
+
+<p>Enough talking. Here’s the MiniC grammar, from the <a href="http://jamesvanboxtel.com/projects/minic-compiler/minic.pdf">paper</a> I mentioned above. It consists of multiple rules. Each rule starts with the rule name, followed by an arrow, followed by one or more tokens. Capital letters indicate a literal - i.e. <code class="highlighter-rouge">BOOL</code> means the literal string “bool”.</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>program       → decl_list
+decl_list     → decl_list decl | decl
+decl          → var_decl | fun_decl
+var_decl      → type_spec IDENT  ; | type_spec IDENT [ ] ;
+type_spec     → VOID | BOOL | INT | FLOAT
+fun_decl      → type_spec IDENT ( params ) compound_stmt
+params        → param_list | VOID
+param_list    → param_list , param | param
+param         → type_spec IDENT | type_spec IDENT [ ]
+stmt_list     → stmt_list stmt | ε
+stmt          → expr_stmt | compound_stmt | if_stmt | while_stmt | 
+                return_stmt | break_stmt
+expr_stmt     → expr ; | ;
+while_stmt    → WHILE ( expr ) stmt
+compound_stmt → { local_decls stmt_list }
+local_decls   → local_decls local_decl | ε
+local_decl    → type_spec IDENT ; | type_spec IDENT [ ] ;
+if_stmt       → IF ( expr ) stmt | IF ( expr ) stmt ELSE stmt
+return_stmt   → RETURN ; | RETURN expr ;
+
+The following expressions are listed in order of increasing precedence:
+expr → IDENT = expr | IDENT [ expr ] = expr
+     → expr OR expr
+     → expr EQ expr | expr NE expr 
+     → expr LE expr | expr &lt; expr | expr GE expr  | expr &gt; expr
+     → expr AND expr
+     → expr + expr | expr - expr 
+     → expr * expr | expr / expr  | expr % expr
+     → ! expr | - expr | + expr
+     → ( expr )
+     → IDENT | IDENT [ expr ] | IDENT ( args ) | IDENT . size
+     → BOOL_LIT | INT_LIT  | FLOAT_LIT | NEW type_spec [ expr ]
+
+arg_list → arg_list , expr | expr
+args     → arg_list | ε
+</code></pre>
+</div>
+
+<p>If that makes your eyes hurt, don’t worry. Let’s break it down, taking the <code class="highlighter-rouge">var_decl</code> rule as an example:</p>
+
+<div class="highlighter-rouge"><pre class="highlight"><code>var_decl → type_spec IDENT  ; | type_spec IDENT [ ] ;
+</code></pre>
+</div>
+
+<p>And here’s a line of Mini-C code, which is valid according to the <code class="highlighter-rouge">var_decl</code> rule:</p>
+
+<div class="language-c highlighter-rouge"><pre class="highlight"><code><span class="n">bool</span> <span class="n">MyVar</span><span class="p">[];</span>
+</code></pre>
+</div>
+
+<p>The vertical bar (<code class="highlighter-rouge">|</code>) in the middle of the <code class="highlighter-rouge">var_decl</code> rule indicates an OR relationship: source code will match the rule if it looks like the left side OR the right side. Let’s look at the right side:</p>
+
+<ul>
+  <li>First we have a <code class="highlighter-rouge">type_spec</code>. The <code class="highlighter-rouge">type_spec</code> rule is defined in the grammar just below <code class="highlighter-rouge">var_decl</code>. A <code class="highlighter-rouge">type_spec</code> can be any of the following strings: <code class="highlighter-rouge">void</code>, <code class="highlighter-rouge">bool</code>, <code class="highlighter-rouge">int</code> or <code class="highlighter-rouge">float</code>.</li>
+  <li>Then there’s an identifier. Mini-C uses the same rules as standard C for valid identifiers.</li>
+  <li>Finally, there’s a pair of square brackets: <code class="highlighter-rouge">[</code> followed by <code class="highlighter-rouge">]</code>.</li>
+</ul>
+
+<p>This level of precision in the grammar will be necessary when we come to write the parser. But before we can write the parser, we need to define the hierarchy of objects that the parser will store its results in. This is called the abstract syntax tree (AST).</p>
+
+<h3 id="the-abstract-syntax-tree-ast">The Abstract Syntax Tree (AST)</h3>
+
+<p>Now that we have a grammar for Mini-C, we need to turn it into code. The code won’t do anything yet - it’s just how we will represent source code after it has been parsed.</p>
+
+<p>Wikipedia defines an <a href="http://en.wikipedia.org/wiki/Abstract_syntax_tree">abstract syntax tree</a> (AST) as</p>
+
+<blockquote>
+  <p>… a tree representation of the abstract syntactic structure of source code written in a programming language.</p>
+</blockquote>
+
+<p>When you’re writing an F# program, as soon as you hear the word “tree”, you can smile. F# was built for such things. In C#, we’d probably use a hierarchy of classes, but F#’s <a href="http://msdn.microsoft.com/en-us/library/dd233226.aspx">discriminated unions</a> provide a more elegant solution. Hopefully you’ll see that F# lets us write code that looks surprisingly similar to the grammar. You’ll find this code in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Ast.fs">Ast.fs</a> in the <a href="https://github.com/tgjones/mini-c">Mini-C GitHub repository</a>.</p>
+
+<p>Let’s write some code. I’m not going to explain F#’s syntax, because there are plenty of other places that do a better job than I could. If you’re not familiar with F#, it might look a bit weird at first, but it grows on you.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="k">type</span> <span class="nc">Program</span> <span class="p">=</span> <span class="nc">Declaration</span> <span class="kt">list</span>
+</code></pre>
+</div>
+
+<p>This makes <code class="highlighter-rouge">Program</code> essentially an alias for a list of declarations. (In C#, we’d write <code class="highlighter-rouge">List&lt;Declaration&gt;</code>.)</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">Declaration</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">StaticVariableDeclaration</span> <span class="k">of</span> <span class="nc">VariableDeclaration</span>
+  <span class="p">|</span> <span class="nc">FunctionDeclaration</span> <span class="k">of</span> <span class="nc">FunctionDeclaration</span>
+</code></pre>
+</div>
+
+<p>A declaration is either a static variable declaration or a function declaration.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">TypeSpec</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">Void</span>
+  <span class="p">|</span> <span class="nc">Bool</span>
+  <span class="p">|</span> <span class="nc">Int</span>
+  <span class="p">|</span> <span class="nc">Float</span>
+</code></pre>
+</div>
+
+<p>The supported types in Mini-C are <code class="highlighter-rouge">void</code>, <code class="highlighter-rouge">bool</code>, <code class="highlighter-rouge">int</code> and <code class="highlighter-rouge">float</code>.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">VariableDeclaration</span> <span class="p">=</span> 
+    <span class="p">|</span> <span class="nc">ScalarVariableDeclaration</span> <span class="k">of</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Identifier</span>
+    <span class="p">|</span> <span class="nc">ArrayVariableDeclaration</span> <span class="k">of</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Identifier</span>
+</code></pre>
+</div>
+
+<p>A variable declaration can either be a scalar variable declaration or an array variable declaration. Both types of variable declaration consist of a type and an identifier. The <code class="highlighter-rouge">*</code> character is what F# uses to define tuples. In C#, we might write <code class="highlighter-rouge">Tuple&lt;TypeSpec, Identifier&gt;</code> (except we wouldn’t because nobody uses tuples in C#).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">FunctionDeclaration</span> <span class="p">=</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Identifier</span> <span class="p">*</span> <span class="nc">Parameters</span> <span class="p">*</span> <span class="nc">CompoundStatement</span>
+</code></pre>
+</div>
+
+<p>A function declaration consists of a type, an identifier, some function parameters, and a “compound statement”. We’ll see what compound statements are shortly.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">Identifier</span> <span class="p">=</span> <span class="kt">string</span>
+
+<span class="ow">and</span> <span class="nc">Parameters</span> <span class="p">=</span> <span class="nc">VariableDeclaration</span> <span class="kt">list</span>
+
+<span class="ow">and</span> <span class="nc">IdentifierRef</span> <span class="p">=</span> <span class="p">{</span> <span class="nc">Identifier</span> <span class="p">:</span> <span class="kt">string</span><span class="p">;</span> <span class="p">}</span>
+</code></pre>
+</div>
+
+<p>An identifier is simply a string. The <code class="highlighter-rouge">Parameters</code> type (as used in <code class="highlighter-rouge">FunctionDeclaration</code>) is an alias for a list of variable declarations. It’s worth noting that the <code class="highlighter-rouge">VariableDeclaration</code> type is used for both function parameters and global variable declarations. Although the grammar is a bit different in these two contexts, the actual data we need to store after parsing is the same.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">Statement</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">ExpressionStatement</span> <span class="k">of</span> <span class="nc">ExpressionStatement</span>
+  <span class="p">|</span> <span class="nc">CompoundStatement</span> <span class="k">of</span> <span class="nc">CompoundStatement</span>
+  <span class="p">|</span> <span class="nc">IfStatement</span> <span class="k">of</span> <span class="nc">IfStatement</span>
+  <span class="p">|</span> <span class="nc">WhileStatement</span> <span class="k">of</span> <span class="nc">WhileStatement</span>
+  <span class="p">|</span> <span class="nc">ReturnStatement</span> <span class="k">of</span> <span class="nc">Expression</span> <span class="n">option</span>
+  <span class="p">|</span> <span class="nc">BreakStatement</span>
+</code></pre>
+</div>
+
+<p>Here are examples of each type of Mini-C statement:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Statement Type</th>
+      <th>Mini-C Code</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Expression Statement</td>
+      <td><code class="highlighter-rouge">i = 2 + 3;</code></td>
+    </tr>
+    <tr>
+      <td>Compound Statement</td>
+      <td><code class="highlighter-rouge"><span class="p">{</span><span class="w"> </span><span class="err">int</span><span class="w"> </span><span class="err">j;</span><span class="w"> </span><span class="err">j</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">5;</span><span class="w"> </span><span class="err">j</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">j</span><span class="w"> </span><span class="err">+</span><span class="w"> </span><span class="err">1;</span><span class="w"> </span><span class="p">}</span></code></td>
+    </tr>
+    <tr>
+      <td>If Statement</td>
+      <td><code class="highlighter-rouge">if (i == 2) { return 3; }</code></td>
+    </tr>
+    <tr>
+      <td>While Statement</td>
+      <td><code class="highlighter-rouge">while (i &lt; 3) { i = i + 1; } </code></td>
+    </tr>
+    <tr>
+      <td>Return Statement</td>
+      <td><code class="highlighter-rouge">return true;</code></td>
+    </tr>
+    <tr>
+      <td>Break Statement</td>
+      <td><code class="highlighter-rouge">break;</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">ExpressionStatement</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">Expression</span> <span class="k">of</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">Nop</span>
+</code></pre>
+</div>
+
+<p>Many languages, including Mini-C, differentiate between <em>expressions</em> and <em>statements</em>. At a <em>very</em> high level:</p>
+
+<ul>
+  <li><strong>Expressions</strong> evaluate to a value.</li>
+  <li><strong>Statements</strong> do something.</li>
+</ul>
+
+<p><strong>Expression statements</strong> are where the two come together. An expression statement is simply a statement composed of an expression. We’ll soon see what expressions are.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">CompoundStatement</span> <span class="p">=</span> <span class="nc">LocalDeclarations</span> <span class="p">*</span> <span class="nc">Statement</span> <span class="kt">list</span>
+
+<span class="ow">and</span> <span class="nc">LocalDeclarations</span> <span class="p">=</span> <span class="nc">VariableDeclaration</span> <span class="kt">list</span>
+</code></pre>
+</div>
+
+<p>A compound statement is composed of a list of local variable declarations, and a list of statements. You might notice that there’s some recursion going on here: one of the <code class="highlighter-rouge">Statement</code> types is <code class="highlighter-rouge">CompoundStatement</code>, which itself is composed of a list of <code class="highlighter-rouge">Statement</code>s. That simplifies AST construction, and will also make working with the AST easier later on.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">IfStatement</span> <span class="p">=</span> <span class="nc">Expression</span> <span class="p">*</span> <span class="nc">Statement</span> <span class="p">*</span> <span class="nc">Statement</span> <span class="n">option</span>
+</code></pre>
+</div>
+
+<p>An <code class="highlighter-rouge">if</code> statement is composed of:</p>
+
+<ul>
+  <li>an expression - i.e. the condition to test</li>
+  <li>a statement to execute if the condition evaluates to true, which could be either a single statement or a compound statement</li>
+  <li>an optional statement to execute if the condition evaluates to false - this is what you’d write in the <code class="highlighter-rouge">else</code> part of the if statement</li>
+</ul>
+
+<p>Note that adding <code class="highlighter-rouge">option</code> after a type such as <code class="highlighter-rouge">Statement</code> is roughly analogous to writing <code class="highlighter-rouge">Statement?</code> or <code class="highlighter-rouge">Nullable&lt;Statement&gt;</code> in C#, except that F# is more awesome and allows the use of <code class="highlighter-rouge">option</code> for reference types too.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">WhileStatement</span> <span class="p">=</span> <span class="nc">Expression</span> <span class="p">*</span> <span class="nc">Statement</span>
+</code></pre>
+</div>
+
+<p>While statements, at least far as the AST goes, are similar to if statements. They are composed of an expression - which is the condition to test on each time through the loop, and a statement (which again, could be a compound statement).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">Expression</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">ScalarAssignmentExpression</span> <span class="k">of</span> <span class="nc">IdentifierRef</span> <span class="p">*</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">ArrayAssignmentExpression</span> <span class="k">of</span> <span class="nc">IdentifierRef</span> <span class="p">*</span> <span class="nc">Expression</span> <span class="p">*</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">BinaryExpression</span> <span class="k">of</span> <span class="nc">Expression</span> <span class="p">*</span> <span class="nc">BinaryOperator</span> <span class="p">*</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">UnaryExpression</span> <span class="k">of</span> <span class="nc">UnaryOperator</span> <span class="p">*</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">IdentifierExpression</span> <span class="k">of</span> <span class="nc">IdentifierRef</span>
+  <span class="p">|</span> <span class="nc">ArrayIdentifierExpression</span> <span class="k">of</span> <span class="nc">IdentifierRef</span> <span class="p">*</span> <span class="nc">Expression</span>
+  <span class="p">|</span> <span class="nc">FunctionCallExpression</span> <span class="k">of</span> <span class="nc">Identifier</span> <span class="p">*</span> <span class="nc">Arguments</span>
+  <span class="p">|</span> <span class="nc">ArraySizeExpression</span> <span class="k">of</span> <span class="nc">IdentifierRef</span>
+  <span class="p">|</span> <span class="nc">LiteralExpression</span> <span class="k">of</span> <span class="nc">Literal</span>
+  <span class="p">|</span> <span class="nc">ArrayAllocationExpression</span> <span class="k">of</span> <span class="nc">TypeSpec</span> <span class="p">*</span> <span class="nc">Expression</span>
+</code></pre>
+</div>
+
+<p>In partnership with statements, expressions make up the core of most languages. Mini-C has a simple grammar, and correspondingly few expression types. Here are examples of each type of Mini-C expression:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Expression Type</th>
+      <th>Mini-C Code</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Scalar assignment</td>
+      <td><code class="highlighter-rouge">i = 2 + 3</code></td>
+    </tr>
+    <tr>
+      <td>Array assignment</td>
+      <td><code class="highlighter-rouge">j[0] = 2 + 3;</code></td>
+    </tr>
+    <tr>
+      <td>Binary</td>
+      <td><code class="highlighter-rouge">i == 2</code></td>
+    </tr>
+    <tr>
+      <td>Unary</td>
+      <td><code class="highlighter-rouge">-i</code></td>
+    </tr>
+    <tr>
+      <td>Identifier</td>
+      <td><code class="highlighter-rouge">i</code></td>
+    </tr>
+    <tr>
+      <td>Array identifier</td>
+      <td><code class="highlighter-rouge">j[0]</code></td>
+    </tr>
+    <tr>
+      <td>Function call</td>
+      <td><code class="highlighter-rouge">myFunc(0, true)</code></td>
+    </tr>
+    <tr>
+      <td>Array size</td>
+      <td><code class="highlighter-rouge">j.size</code></td>
+    </tr>
+    <tr>
+      <td>Literal</td>
+      <td><code class="highlighter-rouge">true</code></td>
+    </tr>
+    <tr>
+      <td>Array allocation</td>
+      <td><code class="highlighter-rouge">new int[3]</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Note that many of these definitions are recursive. <code class="highlighter-rouge">ScalarAssignmentExpression</code>, for example, is composed of an <code class="highlighter-rouge">IdentifierRef</code> and an <code class="highlighter-rouge">Expression</code>. If you think about it, this makes sense - on the right hand side of an assignment, you want to be able to use any arbitrary expression, including other assignments (at least in C-like languages).</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">BinaryOperator</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">ConditionalOr</span>
+  <span class="p">|</span> <span class="nc">Equal</span>
+  <span class="p">|</span> <span class="nc">NotEqual</span>
+  <span class="p">|</span> <span class="nc">LessEqual</span>
+  <span class="p">|</span> <span class="nc">Less</span>
+  <span class="p">|</span> <span class="nc">GreaterEqual</span>
+  <span class="p">|</span> <span class="nc">Greater</span>
+  <span class="p">|</span> <span class="nc">ConditionalAnd</span>
+  <span class="p">|</span> <span class="nc">Add</span>
+  <span class="p">|</span> <span class="nc">Subtract</span>
+  <span class="p">|</span> <span class="nc">Multiply</span>
+  <span class="p">|</span> <span class="nc">Divide</span>
+  <span class="p">|</span> <span class="nc">Modulus</span>
+
+<span class="ow">and</span> <span class="nc">UnaryOperator</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">LogicalNegate</span>
+  <span class="p">|</span> <span class="nc">Negate</span>
+  <span class="p">|</span> <span class="nc">Identity</span>
+</code></pre>
+</div>
+
+<p>Binary and unary operators are hopefully self-explanatory, and comparable to the operators in most C-based languages.</p>
+
+<div class="language-ocaml highlighter-rouge"><pre class="highlight"><code><span class="ow">and</span> <span class="nc">Literal</span> <span class="p">=</span>
+  <span class="p">|</span> <span class="nc">BoolLiteral</span> <span class="k">of</span> <span class="kt">bool</span>
+  <span class="p">|</span> <span class="nc">IntLiteral</span> <span class="k">of</span> <span class="kt">int</span>
+  <span class="p">|</span> <span class="nc">FloatLiteral</span> <span class="k">of</span> <span class="kt">float</span>
+</code></pre>
+</div>
+
+<p>Mini-C supports these literals:</p>
+
+<ul>
+  <li><code class="highlighter-rouge">BoolLiteral</code> - <code class="highlighter-rouge">true</code> or <code class="highlighter-rouge">false</code></li>
+  <li><code class="highlighter-rouge">IntLiteral</code> - <code class="highlighter-rouge">1</code>, <code class="highlighter-rouge">-2</code>, etc.</li>
+  <li><code class="highlighter-rouge">FloatLiteral</code> - <code class="highlighter-rouge">1.23</code>, <code class="highlighter-rouge">-0.5</code>, etc.</li>
+</ul>
+
+<h3 id="until-next-time">Until next time…</h3>
+
+<p>And that’s it! You’ll find all that code in <a href="https://github.com/tgjones/mini-c/blob/master/src/MiniC.Compiler/Ast.fs">Ast.fs</a> in the GitHub repository. F#’s discriminated unions are perfectly suited for defining an abstract syntax tree.</p>
+
+<p><a href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">Next time</a>, we’ll build a parser capable of turning Mini-C source code into a tree of objects, using the AST we’ve defined here.</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2014/04/13/writing-a-minic-to-msil-compiler-in-fsharp-part-0-introduction">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2014/05/29/writing-a-minic-to-msil-compiler-in-fsharp-part-2-lexing-and-parsing">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>

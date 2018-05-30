@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <title>OpenSAGE Dev Diary #3 (2017-12-17) - timjones.io</title>
+
+    <meta name="description" content="Blog and open source projects by Tim Jones.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="alternate" href="http://timjones.io/feed.xml" type="application/atom+xml" title="timjones.io Feed">
+
+    <link href="https://fonts.googleapis.com/css?family=Noto+Sans|Noto+Serif|Source+Code+Pro" rel="stylesheet">
+    <link rel="stylesheet" href="/assets/css/site.css">
+
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+                inlineMath: [['$','$'], ['\\(','\\)']],
+                processEscapes: true
+            },
+            showProcessingMessages: false
+        });
+    </script>
+    <script type="text/javascript" async src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML.js"></script>
+</head>
+
+<body>
+    <header class="masthead">
+        <div class="container">
+            <nav>
+                <ul>
+                    <li>
+                        <h3><a href="/" class="site-title">Tim Jones</a></h3>
+                    </li>
+                    <li><a href="/projects/">Projects</a></li>
+                    <li><a href="/about/">About</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        <main>
+            <article>
+    <h1 class="post-title">OpenSAGE Dev Diary #3 (2017-12-17)</h1>
+
+    <div class="post-date">
+        <time datetime="2017-12-17T11:00:00+00:00">17 December 2017</time>
+    </div>
+
+    
+    <div class="post-tags">
+        <ul>
+            
+            <li><a href="/blog/tags/opensage">OpenSAGE</a></li>
+            
+        </ul>
+    </div>
+    
+
+    <p><em>OpenSAGE is an open-source re-implementation of the <a href="https://en.wikipedia.org/wiki/SAGE_(game_engine)">SAGE game engine</a>. SAGE was the game engine used in C&amp;C Generals, C&amp;C Generals Zero Hour, Battle for Middle-earth and its sequels, C&amp;C 3 and its sequel, and Red Alert 3 and its sequel. I’ve been working on OpenSAGE for 6 months, and made some good progress, so I’ve started this series of blog posts to talk about what is happening in the project each week. You can also star or watch the <a href="https://github.com/OpenSAGE/OpenSAGE">OpenSAGE GitHub repo</a> for a more real-time view of things.</em></p>
+
+<p>Following on from <a href="/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10">last week’s post</a>, here is what’s been happening this week in <a href="https://github.com/OpenSAGE/OpenSAGE">OpenSAGE</a>.</p>
+
+<h2 id="progress-this-week">Progress this week</h2>
+
+<p><img src="/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png" alt="GUI - Main Menu" srcset="/assets/resized/opensage-2017-12-17-gui-main-menu-400x237.png 400w,/assets/resized/opensage-2017-12-17-gui-main-menu-800x474.png 800w,/assets/resized/opensage-2017-12-17-gui-main-menu-1200x711.png 1200w,/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png 1600w" /></p>
+
+<p>This week in OpenSAGE:</p>
+
+<ul>
+  <li>
+    <p>I’ve finished porting the data viewer from WPF to <a href="https://github.com/picoe/Eto">Eto.Forms</a>. I haven’t really introduced what the data viewer is, so I’ll do that below. I want OpenSAGE to be a cross-platform project (it’s Windows-only right now), and I’d like the data viewer to at least be on whatever desktop platforms OpenSAGE supports, if not mobile. Xamarin Forms was an option, but on Windows it only supports UWP (a WPF port of Xamarin Forms is in the works, apparently, but not ready yet). UWP is no good for OpenSAGE because of the way it handles file system permissions. So for the data viewer, I wanted a cross-platform UI framework that runs on at least WPF, macOS, and Linux. Eto.Forms ticks those boxes. Having used it for a couple of weeks, I’m really impressed with how easy it is to get up and running. I want to thank <a href="https://twitter.com/cwensley">Curtis Wensley</a> for making and maintaining such an awesome framework. I built a <a href="https://github.com/OpenSAGE/OpenSAGE/blob/master/src/OpenSage.DataViewer.Windows/Controls/GameControlHandler.cs">custom control</a> to render 3D content, and it couldn’t have been easier to integrate with Eto.Forms.</p>
+  </li>
+  <li>
+    <p>I’ve made progress on rendering the various GUI screens from C&amp;C Generals. Thankfully the GUI screens (main menu, options screen, game loading screen, game setup screen, etc.) are defined in parse-able data files, not hardcoded in the game’s binary. This week I have implemented text rendering (using DirectWrite) - quite a critical feature for GUI screens… I’ll talk more about GUI rendering below.</p>
+  </li>
+  <li>
+    <p>I merged a <a href="https://github.com/OpenSAGE/OpenSAGE/pull/11">pull request</a> from <a href="https://github.com/feliwir">Stephan Vedder</a> that added support for <code class="highlighter-rouge">.const</code> files. <code class="highlighter-rouge">.const</code> files were used in Battle for Middle-earth (BFME) and later SAGE games, as part of the Flash-based UI system. This is a whole new area that I haven’t done any work on myself, so it’s exciting to see it starting to appear in OpenSAGE - thanks Stephan!</p>
+  </li>
+  <li>
+    <p>I have started to setup a <a href="https://en.wikipedia.org/wiki/Continuous_integration">CI</a> build. Normally I’d setup an AppVeyor build and be done with it, but my requirements for OpenSAGE are a bit different. Most of OpenSAGE’s <a href="https://github.com/OpenSAGE/OpenSAGE/tree/master/src/OpenSage.Game.Tests">tests</a> use the actual data files from SAGE game installations. For copyright reasons, I can’t upload those data files anywhere. So I’ve settled on <a href="https://www.visualstudio.com/vso/">Visual Studio Team Services</a>, which lets me use a private build agent to do the builds. I’ve got a computer running at home, with all the SAGE games installed, that will be a private build agent and run the OpenSAGE test suite whenever it’s instructed to by VSTS. I’m still setting this up, so for now the build badge in the GitHub readme shows a failing build.</p>
+  </li>
+</ul>
+
+<h2 id="data-viewer">Data viewer</h2>
+
+<p>When I started working on OpenSAGE, I realised it would be good to have a way to preview the results of the file format parsers that I was working on. At that time I was working on a <code class="highlighter-rouge">.map</code> parser. <code class="highlighter-rouge">.map</code> files in Generals can contain both multi-player maps and single-player missions; they contain the terrain data as well as scripts needed for multi-player or single-player games. Since I didn’t yet have an in-game UI, I built a simple WPF app with two panels: on the left, a list of files contained in the Generals folder, and on the right, a preview of the selected file. I built previewers for the main file formats as I figured out them out: <code class="highlighter-rouge">.w3d</code>, <code class="highlighter-rouge">.map</code>, <code class="highlighter-rouge">.ini</code>, etc.</p>
+
+<p>Once OpenSAGE is far enough along in development that it’s possible to start a game from the in-game UI, the data viewer will become less important, but still a helpful way to view individual files. For now, there is no “game” executable, so the data viewer is all there is.</p>
+
+<p>This week I finished porting the data viewer from WPF to Eto.Forms, so that it can work on macOS and Linux. I haven’t yet implemented rendering backends for either of those platforms, but at least I’ve removed one of the obstacles.</p>
+
+<p>Here are screenshots with representative examples of all the file types that the OpenSAGE Data Viewer knows how to handle:</p>
+
+<h3 id="w3d">.w3d</h3>
+
+<p><code class="highlighter-rouge">.w3d</code> files were used in C&amp;C Generals and subsequent SAGE games to store 3D models. C&amp;C 3 and later games used an evolution of this format, called <code class="highlighter-rouge">.w3x</code>, which is kind of the same thing but XML-based.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-w3d-1200x957.png" alt="W3D Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-w3d-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-w3d-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-w3d-1200x957.png 1200w" /></p>
+
+<h3 id="map">.map</h3>
+
+<p><code class="highlighter-rouge">.map</code> files store the single-player and multi-player missions, including terrain data and scripts. The <code class="highlighter-rouge">.map</code> viewer lets you change the time of day, which affects lighting.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-map-1600x967.png" alt="Map Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-map-400x242.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-map-800x483.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-map-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-data-viewer-map-1600x967.png 1600w" /></p>
+
+<h3 id="dds-and-tga">.dds and .tga</h3>
+
+<p><code class="highlighter-rouge">.dds</code> files were used to store 3D model textures, and <code class="highlighter-rouge">.tga</code> files were used for terrain and UI textures.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-dds-1200x957.png" alt="DDS Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-dds-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-dds-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-dds-1200x957.png 1200w" /></p>
+
+<h3 id="csf">.csf</h3>
+
+<p><code class="highlighter-rouge">.csf</code> - compiled string files - stored the translated strings.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-csf-1200x957.png" alt="CSF Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-csf-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-csf-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-csf-1200x957.png 1200w" /></p>
+
+<h3 id="const">.const</h3>
+
+<p><code class="highlighter-rouge">.const</code> files store constant value definitions for use in the <code class="highlighter-rouge">.apt</code> UI framework.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-const-1200x957.png" alt="Const Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-const-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-const-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-const-1200x957.png 1200w" /></p>
+
+<h3 id="ini">.ini</h3>
+
+<p><code class="highlighter-rouge">.ini</code> files were used in Generals and subsequent SAGE games to store almost everything about the game, except for what was stored in other file types. My <code class="highlighter-rouge">.ini</code> viewer currently only displays object definitions and particle systems.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-data-viewer-ini-1200x957.png" alt="Const Viewer" srcset="/assets/resized/opensage-2017-12-17-data-viewer-ini-400x319.png 400w,/assets/resized/opensage-2017-12-17-data-viewer-ini-800x638.png 800w,/assets/resized/opensage-2017-12-17-data-viewer-ini-1200x957.png 1200w" /></p>
+
+<h2 id="gui-rendering">GUI rendering</h2>
+
+<p>Last week I mentioned the <code class="highlighter-rouge">.wnd</code> format used for UI screens in C&amp;C Generals. This week I’ve been working on rendering more parts of it, including text. Here’s the current state of the main menu (defined in <code class="highlighter-rouge">MainMenu.wnd</code>):</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png" alt="GUI - Main Menu" srcset="/assets/resized/opensage-2017-12-17-gui-main-menu-400x237.png 400w,/assets/resized/opensage-2017-12-17-gui-main-menu-800x474.png 800w,/assets/resized/opensage-2017-12-17-gui-main-menu-1200x711.png 1200w,/assets/resized/opensage-2017-12-17-gui-main-menu-1600x948.png 1600w" /></p>
+
+<p>Some UI elements are visible that should be hidden - I still need to look at why that’s so. Buttons respond to mouse hover now, but they don’t yet do anything when clicked.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-gui-options-1600x967.png" alt="GUI - Options" srcset="/assets/resized/opensage-2017-12-17-gui-options-400x242.png 400w,/assets/resized/opensage-2017-12-17-gui-options-800x483.png 800w,/assets/resized/opensage-2017-12-17-gui-options-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-gui-options-1600x967.png 1600w" /></p>
+
+<p>This is the Options menu. There’s much more to do here. I need to implement textboxes, checkboxes, and comboboxes.</p>
+
+<p>And here’s one we all like to see - the victory screen. Yes, even that was defined in a <code class="highlighter-rouge">.wnd</code> file, not hardcoded.</p>
+
+<p><img src="/assets/resized/opensage-2017-12-17-gui-victorious-1600x967.png" alt="GUI - Victorious" srcset="/assets/resized/opensage-2017-12-17-gui-victorious-400x242.png 400w,/assets/resized/opensage-2017-12-17-gui-victorious-800x483.png 800w,/assets/resized/opensage-2017-12-17-gui-victorious-1200x725.png 1200w,/assets/resized/opensage-2017-12-17-gui-victorious-1600x967.png 1600w" /></p>
+
+<p>The <code class="highlighter-rouge">.wnd</code> viewer has the UI hierarchy in a tree view on the left - you can select a UI element and it will be highlighted on the right.</p>
+
+<p>That’s all for this week - see you next time!</p>
+
+</article>
+
+<nav class="pagination">
+  
+    <a class="pagination-item" href="/blog/archive/2017/12/10/opensage-dev-diary-2-2017-12-10">Previous</a>
+  
+  
+    <a class="pagination-item" href="/blog/archive/2017/12/24/opensage-dev-diary-4-2017-12-24">Next</a>
+  
+</nav>
+
+<div id="disqus_thread"></div>
+<script>
+    (function() { // DON'T EDIT BELOW THIS LINE
+    var d = document, s = d.createElement('script');
+    s.src = 'https://timjones.disqus.com/embed.js';
+    s.setAttribute('data-timestamp', +new Date());
+    (d.head || d.body).appendChild(s);
+    })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="https://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+        </main>
+    </div>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="social">
+    <ul>
+        <li>
+            <a href="https://twitter.com/_tim_jones_" rel="external">
+                <svg width="30" height="30" viewBox="0 0 30 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">Twitter icon</title>
+  <desc>A gray icon for following me on Twitter</desc>
+  <path d="M28.928 7.296q-1.184 1.728-2.88 2.976 0 0.256 0 0.736 0 2.336-0.672 4.64t-2.048 4.448-3.296 3.744-4.608 2.624-5.792 0.96q-4.832 0-8.832-2.592 0.608 0.064 1.376 0.064 4.032 0 7.168-2.464-1.888-0.032-3.36-1.152t-2.048-2.848q0.608 0.096 1.088 0.096 0.768 0 1.536-0.192-2.016-0.416-3.328-1.984t-1.312-3.68v-0.064q1.216 0.672 2.624 0.736-1.184-0.8-1.888-2.048t-0.704-2.752q0-1.568 0.8-2.912 2.176 2.656 5.248 4.256t6.656 1.76q-0.16-0.672-0.16-1.312 0-2.4 1.696-4.064t4.064-1.696q2.528 0 4.224 1.824 1.952-0.384 3.68-1.408-0.672 2.048-2.56 3.2 1.664-0.192 3.328-0.896z"></path>
+</svg>
+                <span>Follow me on Twitter</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://github.com/tgjones" rel="external">
+                <svg width="30" height="30" viewBox="0 0 27 32" xmlns="http://www.w3.org/2000/svg" aria-labelledby="title">
+  <title id="title">GitHub icon</title>
+  <desc>A gray icon for following me on GitHub</desc>
+  <path d="M13.728 2.272q3.712 0 6.88 1.856t4.992 4.992 1.824 6.88q0 4.48-2.624 8.064t-6.752 4.96q-0.48 0.096-0.704-0.128t-0.224-0.544q0-0.032 0-1.376t0-2.4q0-1.728-0.928-2.528 1.024-0.096 1.824-0.32t1.696-0.704 1.44-1.184 0.96-1.856 0.352-2.688q0-2.144-1.408-3.68 0.672-1.632-0.128-3.648-0.512-0.16-1.472 0.192t-1.632 0.8l-0.672 0.416q-1.664-0.48-3.424-0.48t-3.456 0.48q-0.256-0.192-0.736-0.48t-1.504-0.704-1.504-0.224q-0.8 2.016-0.16 3.648-1.408 1.536-1.408 3.68 0 1.504 0.384 2.656t0.928 1.888 1.44 1.184 1.664 0.704 1.824 0.32q-0.672 0.64-0.864 1.856-0.384 0.16-0.8 0.256t-1.024 0.096-1.152-0.384-0.992-1.12q-0.352-0.576-0.864-0.928t-0.896-0.448l-0.352-0.032q-0.384 0-0.512 0.064t-0.096 0.224 0.16 0.256 0.224 0.192l0.128 0.096q0.384 0.192 0.768 0.672t0.576 0.928l0.192 0.416q0.224 0.672 0.768 1.088t1.184 0.544 1.248 0.096 0.992-0.032l0.416-0.096q0 0.704 0 1.6t0.032 0.96q0 0.32-0.256 0.544t-0.704 0.128q-4.128-1.376-6.752-4.96t-2.624-8.064q0-3.744 1.856-6.88t4.96-4.992 6.912-1.856zM5.184 21.984q0.064-0.128-0.096-0.224-0.192-0.032-0.256 0.032-0.032 0.128 0.128 0.224t0.224-0.032zM5.76 22.592q0.128-0.096-0.032-0.288-0.192-0.16-0.288-0.064-0.128 0.096 0.032 0.288t0.288 0.064zM6.272 23.392q0.192-0.128 0-0.352-0.128-0.224-0.288-0.096-0.16 0.096 0 0.32t0.288 0.128zM7.040 24.128q0.128-0.128-0.064-0.32-0.224-0.224-0.352-0.064-0.16 0.16 0.064 0.352 0.192 0.192 0.352 0.032zM8.064 24.576q0.032-0.192-0.256-0.288-0.256-0.064-0.32 0.128t0.224 0.288q0.256 0.096 0.352-0.128zM9.184 24.672q0-0.224-0.32-0.192-0.288 0-0.288 0.192 0 0.224 0.32 0.192 0.288 0 0.288-0.192zM10.208 24.512q-0.032-0.224-0.32-0.16-0.288 0.032-0.256 0.256t0.32 0.128 0.256-0.224z"></path>
+</svg>        
+                <span>Follow me on GitHub</span>
+            </a>
+        </li>
+        <li>
+            <a href="https://www.strava.com/athletes/timjones" rel="external">
+                <?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="30px" height="30px" viewBox="0 0 244 244" enable-background="new 0 0 244 244" xml:space="preserve">
+<g>
+	<path fill="none" d="M122,242C55.8,242,2,188.2,2,122S55.8,2,122,2c66.2,0,120,53.8,120,120S188.2,242,122,242z M122,21.7
+		c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"/>
+	<path d="M122,21.7c-55.3,0-100.3,45-100.3,100.3s45,100.3,100.3,100.3s100.3-45,100.3-100.3S177.3,21.7,122,21.7z"
+		/>
+	<g>
+		<polyline fill="#fff" points="139.4,184.3 112.3,131.1 128.4,131.1 139.4,152.6 150.2,131.1 166.3,131.1 139.4,184.3 		"/>
+		<polygon fill="#fff" points="113.9,102.2 128.6,131.2 150.1,131.2 113.7,59.7 77.7,131.2 99.3,131.2 113.9,102.2 		"/>
+	</g>
+</g>
+</svg>
+
+                <span>Follow me on Strava</span>
+            </a>
+        </li>
+    </ul>
+</div>
+
+            <p>© 2017 Tim Jones. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-5166698-5', 'auto');
+  ga('send', 'pageview');
+</script>
+</body>
+
+</html>
