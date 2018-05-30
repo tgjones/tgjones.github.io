@@ -43,7 +43,7 @@ The old Try HLSL site only supported Microsoft's old and new HLSL compilers, so 
 
 ## Compiler chaining
 
-When a compiler outputs a language (or binary format) that can be fed into another compiler, you get an "Add Compiler" button. Click this, and you'll be able to chain together up to 5 compilers. Here's an example of compiling HLSL using DXC, outputting SPIR-V, piping that into SPIRV-Cross, and outputting GLSL:
+When a compiler outputs a language (or binary format) that can be fed into another compiler, you get an "Add Compiler" button. Click this, and you'll be able to chain together up to 5 compilers. Here's an example of compiling HLSL using DXC, outputting SPIR-V, piping that into SPIRV-Cross, and outputting Metal:
 
 {% responsive_image path: assets/posts/shader-playground-compiler-chaining.png alt: "Screenshot of compiler chaining" %}
 
